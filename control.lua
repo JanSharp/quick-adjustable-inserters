@@ -376,16 +376,6 @@ local function validate_target_inserter(player)
   return is_valid
 end
 
----@param player PlayerDataQAI
----@param new_inserter LuaEntity
-local function adjusted_an_inserter_while_already_targeting_one(player, new_inserter)
-  local prev_target_inserter = player.target_inserter
-  switch_to_idle(player)
-  if new_inserter ~= prev_target_inserter then
-    switch_to_selecting_pickup(player, new_inserter)
-  end
-end
-
 ---@type table<string, fun(player: PlayerDataQAI, selected: LuaEntity)>
 local on_adjust_handler_lut = {
   ["idle"] = function(player, selected)
@@ -396,7 +386,11 @@ local on_adjust_handler_lut = {
   ["selecting-pickup"] = function(player, selected)
     if not validate_target_inserter(player) then return end
     if selected.type == "inserter" then
-      adjusted_an_inserter_while_already_targeting_one(player, selected)
+      if selected == player.target_inserter then
+        switch_to_selecting_drop(player, selected)
+      else
+        switch_to_selecting_pickup(player, selected)
+      end
       return
     end
     if selected.name == square_entity_name then
@@ -414,7 +408,11 @@ local on_adjust_handler_lut = {
   ["selecting-drop"] = function(player, selected)
     if not validate_target_inserter(player) then return end
     if selected.type == "inserter" then
-      adjusted_an_inserter_while_already_targeting_one(player, selected)
+      if selected == player.target_inserter then
+        switch_to_idle(player)
+      else
+        switch_to_selecting_pickup(player, selected)
+      end
       return
     end
     if selected.name == ninth_entity_name then
