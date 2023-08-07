@@ -63,8 +63,7 @@ data:extend{
   make_selectable{
     name = "QAI-selectable-rect",
     selection_box = {{-1.5, -1}, {1.5, 1}},
-    tile_width = 3,
-    tile_height = 2,
+    extra_flags = function() return "placeable-off-grid" end,
   },
 }
 

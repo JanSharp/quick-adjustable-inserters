@@ -41,6 +41,21 @@ local entity_name_lut = {
   [rect_entity_name] = true,
 }
 
+local direction_lut = {
+  defines.direction.north,
+  defines.direction.east,
+  defines.direction.south,
+  defines.direction.west,
+}
+local inverse_direction_lut = {
+  [defines.direction.north] = defines.direction.south,
+  [defines.direction.east] = defines.direction.west,
+  [defines.direction.south] = defines.direction.north,
+  [defines.direction.west] = defines.direction.east,
+}
+local x_direction_multiplier_lut = {0, 1, 0, -1}
+local y_direction_multiplier_lut = {-1, 0, 1, 0}
+
 ---@return GlobalDataQAI
 local function get_global()
   return global
@@ -106,6 +121,7 @@ end)
 ---@param surface LuaSurface
 ---@param position MapPosition
 ---@return uint unit_number
+---@return LuaEntity
 local function place_pooled_entity(entity_pool, surface, position)
   if entity_pool.free_count ~= 0 then
     local unit_number, entity = next(entity_pool.free_entities)
@@ -114,7 +130,7 @@ local function place_pooled_entity(entity_pool, surface, position)
     entity_pool.free_entities[unit_number] = nil
     entity_pool.used_entities[unit_number] = entity
     entity.teleport(position)
-    return unit_number
+    return unit_number, entity
   end
 
   local entity = surface.create_entity{
@@ -127,7 +143,7 @@ local function place_pooled_entity(entity_pool, surface, position)
   local unit_number = entity.unit_number ---@cast unit_number -nil
   entity_pool.used_count = entity_pool.used_count + 1
   entity_pool.used_entities[unit_number] = entity
-  return unit_number
+  return unit_number, entity
 end
 
 ---@param entity_pool EntityPoolQAI
@@ -165,16 +181,10 @@ local function switch_to_idle(player)
 end
 
 ---@param player PlayerDataQAI
----@param target_inserter LuaEntity
-local function switch_to_selecting_pickup(player, target_inserter)
-  if player.state == "selecting-pickup" and player.target_inserter == target_inserter then return end
-  if player.state ~= "idle" then
-    switch_to_idle(player)
-  end
-  player.target_inserter = target_inserter
+local function place_squares(player)
   local global = get_global()
-  local surface = target_inserter.surface
-  local position = target_inserter.position
+  local surface = player.target_inserter.surface
+  local position = player.target_inserter.position
   local top_left_x = math.floor(position.x) - reach_range
   local top_left_y = math.floor(position.y) - reach_range
   local side_length = reach_range * 2 + 1
@@ -189,20 +199,13 @@ local function switch_to_selecting_pickup(player, target_inserter)
       ::continue::
     end
   end
-  player.state = "selecting-pickup"
 end
 
 ---@param player PlayerDataQAI
----@param target_inserter LuaEntity
-local function switch_to_selecting_drop(player, target_inserter)
-  if player.state == "selecting-drop" and player.target_inserter == target_inserter then return end
-  if player.state ~= "idle" then
-    switch_to_idle(player)
-  end
-  player.target_inserter = target_inserter
+local function place_ninths(player)
   local global = get_global()
-  local surface = target_inserter.surface
-  local position = target_inserter.position
+  local surface = player.target_inserter.surface
+  local position = player.target_inserter.position
   local top_left_x = math.floor(position.x) - reach_range
   local top_left_y = math.floor(position.y) - reach_range
   local side_length = reach_range * 2 + 1
@@ -221,6 +224,62 @@ local function switch_to_selecting_drop(player, target_inserter)
       ::continue::
     end
   end
+end
+
+---@param player PlayerDataQAI
+local function place_rects(player)
+  local global = get_global()
+  local surface = player.target_inserter.surface
+  local position = player.target_inserter.position
+  local root_x = position.x
+  local root_y = position.y
+  for i = 1, 4 do
+    position.x = root_x + x_direction_multiplier_lut[i] * (reach_range + 1.5)
+    position.y = root_y + y_direction_multiplier_lut[i] * (reach_range + 1.5)
+    local unit_number, entity = place_pooled_entity(global.rect_pool, surface, position)
+    entity.direction = direction_lut[i]
+    player.used_rects[#player.used_rects+1] = unit_number
+  end
+end
+
+---@param player PlayerDataQAI
+---@param new_direction defines.direction @
+---If you look at the feet of the inserter, the forwards pointing feet should be the direction this variable
+---is defining.
+local function set_direction(player, new_direction)
+  local inserter = player.target_inserter
+  local pickup_position = inserter.pickup_position
+  local drop_position = inserter.drop_position
+  -- However, the actual internal direction of inserters appears to be the direction they are picking up from.
+  -- This confuses me, so I'm pretending it's the other way around and only flipping it when writing/reading.
+  inserter.direction = inverse_direction_lut[new_direction]
+  inserter.pickup_position = pickup_position
+  inserter.drop_position = drop_position
+end
+
+---@param player PlayerDataQAI
+---@param target_inserter LuaEntity
+local function switch_to_selecting_pickup(player, target_inserter)
+  if player.state == "selecting-pickup" and player.target_inserter == target_inserter then return end
+  if player.state ~= "idle" then
+    switch_to_idle(player)
+  end
+  player.target_inserter = target_inserter
+  place_squares(player)
+  place_rects(player)
+  player.state = "selecting-pickup"
+end
+
+---@param player PlayerDataQAI
+---@param target_inserter LuaEntity
+local function switch_to_selecting_drop(player, target_inserter)
+  if player.state == "selecting-drop" and player.target_inserter == target_inserter then return end
+  if player.state ~= "idle" then
+    switch_to_idle(player)
+  end
+  player.target_inserter = target_inserter
+  place_ninths(player)
+  place_rects(player)
   player.state = "selecting-drop"
 end
 
@@ -263,7 +322,7 @@ local on_adjust_handler_lut = {
       return
     end
     if selected.name == rect_entity_name then
-      -- TODO: impl
+      set_direction(player, selected.direction)
       return
     end
     switch_to_idle(player)
@@ -281,7 +340,7 @@ local on_adjust_handler_lut = {
       return
     end
     if selected.name == rect_entity_name then
-      -- TODO: impl
+      set_direction(player, selected.direction)
       return
     end
     switch_to_idle(player)
