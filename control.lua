@@ -28,6 +28,7 @@
 ---@field used_squares uint[]
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
+---@field line_ids uint64[]
 
 local ev = defines.events
 local square_entity_name = "QAI-selectable-square"
@@ -90,6 +91,7 @@ local function init_player(player)
     used_squares = {},
     used_ninths = {},
     used_rects = {},
+    line_ids = {},
   }
   get_global().players[player.index] = player_data
   return player_data
@@ -166,13 +168,22 @@ local function remove_used_pooled_entities(entity_pool, used_unit_numbers)
   end
 end
 
+---@param ids uint64[]
+local function destroy_rendering_ids(ids)
+  for _, id in pairs(ids) do
+    rendering.destroy(id)
+  end
+end
+
 ---@param player PlayerDataQAI
 local function switch_to_idle(player)
   if player.state == "idle" then return end
   local global = get_global()
   remove_used_pooled_entities(global.square_pool, player.used_squares)
   remove_used_pooled_entities(global.ninth_pool, player.used_ninths)
+  -- TODO: keep rects and grid when switching between pickup/drop states
   remove_used_pooled_entities(global.rect_pool, player.used_rects)
+  destroy_rendering_ids(player.line_ids)
   player.target_inserter = nil
   player.state = "idle"
   if player.player.selected and entity_name_lut[player.player.selected.name] then
@@ -258,6 +269,41 @@ local function set_direction(player, new_direction)
 end
 
 ---@param player PlayerDataQAI
+local function draw_grid(player)
+  local surface = player.target_inserter.surface
+  local from = {}
+  local to = {}
+  ---@type LuaRendering.draw_line_param
+  local line_param = {
+    surface = surface,
+    color = {1, 1, 1},
+    width = 1,
+    from = from,
+    to = to,
+  }
+  local position = player.target_inserter.position
+  local top_left_x = math.floor(position.x) - reach_range
+  local top_left_y = math.floor(position.y) - reach_range
+  local side_length = reach_range * 2 + 1
+
+  from.y = top_left_y
+  to.y = top_left_y + side_length
+  for x = top_left_x, top_left_x + side_length do
+    from.x = x
+    to.x = x
+    player.line_ids[#player.line_ids+1] = rendering.draw_line(line_param)
+  end
+
+  from.x = top_left_x
+  to.x = top_left_x + side_length
+  for y = top_left_y, top_left_y + side_length do
+    from.y = y
+    to.y = y
+    player.line_ids[#player.line_ids+1] = rendering.draw_line(line_param)
+  end
+end
+
+---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
 local function switch_to_selecting_pickup(player, target_inserter)
   if player.state == "selecting-pickup" and player.target_inserter == target_inserter then return end
@@ -267,6 +313,7 @@ local function switch_to_selecting_pickup(player, target_inserter)
   player.target_inserter = target_inserter
   place_squares(player)
   place_rects(player)
+  draw_grid(player)
   player.state = "selecting-pickup"
 end
 
@@ -280,6 +327,7 @@ local function switch_to_selecting_drop(player, target_inserter)
   player.target_inserter = target_inserter
   place_ninths(player)
   place_rects(player)
+  draw_grid(player)
   player.state = "selecting-drop"
 end
 
