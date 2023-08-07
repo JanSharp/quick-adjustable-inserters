@@ -1,0 +1,9 @@
+{
+  "name": "quick_adjustable_inserters",
+  "version": "0.1.0",
+  "factorio_version": "1.1",
+  "title": "Quick Adjustable Inserters",
+  "author": "JanSharp",
+  "description": "Adjust inserters in world, without GUI.",
+  "dependencies": []
+}
