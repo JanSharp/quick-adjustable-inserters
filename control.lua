@@ -29,6 +29,7 @@
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
 ---@field line_ids uint64[]
+---@field direction_arrow_id uint64 @ `nil` when idle.
 
 local ev = defines.events
 local square_entity_name = "QAI-selectable-square"
@@ -127,6 +128,7 @@ end)
 local function place_pooled_entity(entity_pool, surface, position)
   if entity_pool.free_count ~= 0 then
     local unit_number, entity = next(entity_pool.free_entities)
+    -- TODO: check valid
     entity_pool.free_count = entity_pool.free_count - 1
     entity_pool.used_count = entity_pool.used_count + 1
     entity_pool.free_entities[unit_number] = nil
@@ -181,9 +183,10 @@ local function switch_to_idle(player)
   local global = get_global()
   remove_used_pooled_entities(global.square_pool, player.used_squares)
   remove_used_pooled_entities(global.ninth_pool, player.used_ninths)
-  -- TODO: keep rects and grid when switching between pickup/drop states
+  -- TODO: keep rects, arrow and grid when switching between pickup/drop states
   remove_used_pooled_entities(global.rect_pool, player.used_rects)
   destroy_rendering_ids(player.line_ids)
+  rendering.destroy(player.direction_arrow_id)
   player.target_inserter = nil
   player.state = "idle"
   if player.player.selected and entity_name_lut[player.player.selected.name] then
@@ -238,6 +241,27 @@ local function place_ninths(player)
 end
 
 ---@param player PlayerDataQAI
+local function draw_direction_arrow(player)
+  local inserter = player.target_inserter
+  player.direction_arrow_id = rendering.draw_polygon{
+    surface = inserter.surface,
+    color = {1, 1, 1},
+    vertices = {
+      {target = {x = -1.3, y = reach_range + 0.85}},
+      {target = {x = 0, y = reach_range + 0.85 + 1.3}},
+      {target = {x = 1.3, y = reach_range + 0.85}},
+    },
+    orientation = inserter.orientation,
+    target = inserter,
+  }
+end
+
+---@param player PlayerDataQAI
+local function update_direction_arrow(player)
+  rendering.set_orientation(player.direction_arrow_id, player.target_inserter.orientation)
+end
+
+---@param player PlayerDataQAI
 local function place_rects(player)
   local global = get_global()
   local surface = player.target_inserter.surface
@@ -266,6 +290,15 @@ local function set_direction(player, new_direction)
   inserter.direction = inverse_direction_lut[new_direction]
   inserter.pickup_position = pickup_position
   inserter.drop_position = drop_position
+end
+
+---@param player PlayerDataQAI
+---@param new_direction defines.direction @
+---If you look at the feet of the inserter, the forwards pointing feet should be the direction this variable
+---is defining.
+local function set_direction_and_update_arrow(player, new_direction)
+  set_direction(player, new_direction)
+  update_direction_arrow(player)
 end
 
 ---@param player PlayerDataQAI
@@ -313,6 +346,7 @@ local function switch_to_selecting_pickup(player, target_inserter)
   player.target_inserter = target_inserter
   place_squares(player)
   place_rects(player)
+  draw_direction_arrow(player)
   draw_grid(player)
   player.state = "selecting-pickup"
 end
@@ -327,6 +361,7 @@ local function switch_to_selecting_drop(player, target_inserter)
   player.target_inserter = target_inserter
   place_ninths(player)
   place_rects(player)
+  draw_direction_arrow(player)
   draw_grid(player)
   player.state = "selecting-drop"
 end
@@ -370,7 +405,7 @@ local on_adjust_handler_lut = {
       return
     end
     if selected.name == rect_entity_name then
-      set_direction(player, selected.direction)
+      set_direction_and_update_arrow(player, selected.direction)
       return
     end
     switch_to_idle(player)
@@ -388,7 +423,7 @@ local on_adjust_handler_lut = {
       return
     end
     if selected.name == rect_entity_name then
-      set_direction(player, selected.direction)
+      set_direction_and_update_arrow(player, selected.direction)
       return
     end
     switch_to_idle(player)
