@@ -145,6 +145,7 @@ local function place_pooled_entity(entity_pool, surface, position)
   if not entity then
     error("Creating an internal entity required by Quick Adjustable Inserters failed.")
   end
+  entity.destructible = false
   local unit_number = entity.unit_number ---@cast unit_number -nil
   entity_pool.used_count = entity_pool.used_count + 1
   entity_pool.used_entities[unit_number] = entity
