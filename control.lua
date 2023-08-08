@@ -67,6 +67,7 @@ local function get_global()
   return global
 end
 
+---@param event EventData|{player_index: uint}
 ---@return PlayerDataQAI?
 local function get_player(event)
   return get_global().players[event.player_index]
@@ -138,7 +139,7 @@ end)
 local switch_to_idle
 
 script.on_event(ev.on_player_removed, function(event)
-  local player = get_player()
+  local player = get_player(event)
   switch_to_idle(player)
   get_global().players[event.player_index] = nil
 end)
@@ -151,7 +152,7 @@ script.on_event(ev.on_surface_deleted, function(event)
 end)
 
 script.on_event(ev.on_player_changed_force, function(event)
-  local player = get_player()
+  local player = get_player(event)
   switch_to_idle(player)
 end)
 
@@ -305,6 +306,7 @@ local function draw_direction_arrow(player)
   local inserter = player.target_inserter
   player.direction_arrow_id = rendering.draw_polygon{
     surface = inserter.surface,
+    forces = {player.force_index},
     color = {1, 1, 1},
     vertices = {
       {target = {x = -1.3, y = reach_range + 0.85}},
@@ -369,6 +371,7 @@ local function draw_grid(player)
   ---@type LuaRendering.draw_line_param
   local line_param = {
     surface = surface,
+    forces = {player.force_index},
     color = {1, 1, 1},
     width = 1,
     from = from,
