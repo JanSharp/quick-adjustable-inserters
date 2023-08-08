@@ -30,6 +30,7 @@
 ---@field used_rects uint[]
 ---@field line_ids uint64[]
 ---@field direction_arrow_id uint64 @ `nil` when idle.
+---@field pickup_highlight LuaEntity? @ Can be `nil` even when not idle.
 
 local ev = defines.events
 local square_entity_name = "QAI-selectable-square"
@@ -178,6 +179,13 @@ local function destroy_rendering_ids(ids)
 end
 
 ---@param player PlayerDataQAI
+local function destroy_pickup_highlight(player)
+  if player.pickup_highlight then
+    player.pickup_highlight.destroy()
+  end
+end
+
+---@param player PlayerDataQAI
 local function switch_to_idle(player)
   if player.state == "idle" then return end
   local global = get_global()
@@ -187,6 +195,7 @@ local function switch_to_idle(player)
   remove_used_pooled_entities(global.rect_pool, player.used_rects)
   destroy_rendering_ids(player.line_ids)
   rendering.destroy(player.direction_arrow_id)
+  destroy_pickup_highlight(player)
   player.target_inserter = nil
   player.state = "idle"
   if player.player.selected and entity_name_lut[player.player.selected.name] then
@@ -337,6 +346,22 @@ local function draw_grid(player)
 end
 
 ---@param player PlayerDataQAI
+local function create_pickup_highlight(player)
+  local inserter = player.target_inserter
+  local pickup_pos = inserter.pickup_position
+  local surface = inserter.surface
+  player.pickup_highlight = surface.create_entity{
+    name = "highlight-box",
+    position = {x = 0, y = 0},
+    bounding_box = {
+      left_top = {x = pickup_pos.x - 0.5, y = pickup_pos.y - 0.5},
+      right_bottom = {x = pickup_pos.x + 0.5, y = pickup_pos.y + 0.5},
+    },
+    box_type = "copy",
+  }
+end
+
+---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
 local function switch_to_selecting_pickup(player, target_inserter)
   if player.state == "selecting-pickup" and player.target_inserter == target_inserter then return end
@@ -363,6 +388,7 @@ local function switch_to_selecting_drop(player, target_inserter)
   place_rects(player)
   draw_direction_arrow(player)
   draw_grid(player)
+  create_pickup_highlight(player)
   player.state = "selecting-drop"
 end
 
