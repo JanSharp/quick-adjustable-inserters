@@ -1,0 +1,12 @@
+
+- [ ] change force of selectable entities to match the player
+- [ ] change visibility of rendering objects to the same force as the player
+- [ ] handle player changing force while in non idle state
+- [ ] add player reach restriction
+- [ ] add player force restriction
+- [ ] impl disabled custom drop vectors
+- [ ] impl only cardinal
+- [ ] impl only cardinal and diagonal
+- [ ] support the technologies from bobinsters
+- [ ] don't do anything if the inserter doesn't support runtime changeable vectors
+- [ ] maybe add some animations
