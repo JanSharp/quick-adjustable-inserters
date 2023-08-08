@@ -443,6 +443,26 @@ local function validate_target_inserter(player)
   return is_valid
 end
 
+---@param player PlayerDataQAI
+---@param position MapPosition
+local function set_drop_position(player, position)
+  -- Modulo always returns a positive number.
+  local x_from_tile_center = (position.x % 1) - 0.5
+  local y_from_tile_center = (position.y % 1) - 0.5
+  -- 51 / 256 = 0.19921875. Vanilla inserter drop positions are offset by 0.2 away from the center, however
+  -- it ultimately gets rounded to 51 / 256, because of map positions. In other words, this matches vanilla.
+  local x_offset = x_from_tile_center == 0 and 0
+    or x_from_tile_center < 0 and -51/256
+    or 51/256
+  local y_offset = y_from_tile_center == 0 and 0
+    or y_from_tile_center < 0 and -51/256
+    or 51/256
+  player.target_inserter.drop_position = {
+    x = math.floor(position.x) + 0.5 + x_offset,
+    y = math.floor(position.y) + 0.5 + y_offset,
+  }
+end
+
 ---@type table<string, fun(player: PlayerDataQAI, selected: LuaEntity)>
 local on_adjust_handler_lut = {
   ["idle"] = function(player, selected)
@@ -483,7 +503,7 @@ local on_adjust_handler_lut = {
       return
     end
     if selected.name == ninth_entity_name then
-      player.target_inserter.drop_position = selected.position
+      set_drop_position(player, selected.position)
       switch_to_idle(player)
       return
     end
