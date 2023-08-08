@@ -1,11 +1,4 @@
 
-local function empty_picture()
-  return {
-    filename = "__core__/graphics/empty.png",
-    size = 1,
-  }
-end
-
 local function make_selectable(params)
   return {
     type = "simple-entity-with-owner",
@@ -14,10 +7,8 @@ local function make_selectable(params)
     icon_size = 1,
     force_visibility = "ally",
     picture = {
-      north = empty_picture(),
-      east = empty_picture(),
-      south = empty_picture(),
-      west = empty_picture(),
+      filename = "__core__/graphics/empty.png",
+      size = 1,
     },
     selection_box = params.selection_box,
     tile_width = params.tile_width,
