@@ -24,6 +24,7 @@
 
 ---@class PlayerDataQAI
 ---@field player LuaPlayer
+---@field player_index uint
 ---@field force_index uint8
 ---@field state PlayerStateQAI
 ---@field target_inserter LuaEntity @ `nil` when idle.
@@ -108,6 +109,7 @@ local function init_player(player)
   ---@type PlayerDataQAI
   local player_data = {
     player = player,
+    player_index = player.index,
     force_index = player.force_index--[[@as uint8]],
     state = "idle",
     used_squares = {},
@@ -414,6 +416,7 @@ local function create_pickup_highlight(player)
       right_bottom = {x = pickup_pos.x + 0.5, y = pickup_pos.y + 0.5},
     },
     box_type = "copy",
+    render_player_index = player.player_index,
   }
 end
 
