@@ -5,5 +5,7 @@
   "title": "Quick Adjustable Inserters",
   "author": "JanSharp",
   "description": "Adjust inserters in world, without GUI.",
-  "dependencies": []
+  "dependencies": [
+    "bobinserters >= 1.1.7"
+  ]
 }
