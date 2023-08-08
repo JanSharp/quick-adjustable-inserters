@@ -128,14 +128,17 @@ end)
 ---@return LuaEntity
 local function place_pooled_entity(entity_pool, surface, position)
   if entity_pool.free_count ~= 0 then
-    local unit_number, entity = next(entity_pool.free_entities)
-    -- TODO: check valid
     entity_pool.free_count = entity_pool.free_count - 1
-    entity_pool.used_count = entity_pool.used_count + 1
-    entity_pool.free_entities[unit_number] = nil
-    entity_pool.used_entities[unit_number] = entity
-    entity.teleport(position)
-    return unit_number, entity
+    local unit_number, entity = next(entity_pool.free_entities)
+    if not entity.valid then
+      entity_pool.free_entities[unit_number] = nil
+    else
+      entity_pool.used_count = entity_pool.used_count + 1
+      entity_pool.free_entities[unit_number] = nil
+      entity_pool.used_entities[unit_number] = entity
+      entity.teleport(position)
+      return unit_number, entity
+    end
   end
 
   local entity = surface.create_entity{
