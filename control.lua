@@ -7,10 +7,11 @@
 ---@field ninth_pool EntityPoolQAI
 ---@field rect_pool EntityPoolQAI
 
--- TODO: per surface pools
-
 ---@class EntityPoolQAI
 ---@field entity_name string
+---@field surface_pools table<uint, EntityPoolSurfaceQAI>
+
+---@class EntityPoolSurfaceQAI
 ---@field free_count int
 ---@field used_count int
 ---@field free_entities table<uint, LuaEntity>
@@ -25,6 +26,7 @@
 ---@field player LuaPlayer
 ---@field state PlayerStateQAI
 ---@field target_inserter LuaEntity @ `nil` when idle.
+---@field current_surface_index uint @  `nil` when idle.
 ---@field used_squares uint[]
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
@@ -75,12 +77,27 @@ local function new_entity_pool(entity_name)
   ---@type EntityPoolQAI
   local result = {
     entity_name = entity_name,
+    surface_pools = {},
+  }
+  return result
+end
+
+---@param entity_pool EntityPoolQAI
+---@param surface_index uint
+local function get_surface_pool(entity_pool, surface_index)
+  local surface_pool = entity_pool.surface_pools[surface_index]
+  if surface_pool then
+    return surface_pool
+  end
+  ---@type EntityPoolSurfaceQAI
+  surface_pool = {
     free_count = 0,
     used_count = 0,
     free_entities = {},
     used_entities = {},
   }
-  return result
+  entity_pool.surface_pools[surface_index] = surface_pool
+  return surface_pool
 end
 
 ---@param player LuaPlayer
@@ -124,21 +141,30 @@ script.on_event(ev.on_player_removed, function(event)
   get_global().players[event.player_index] = nil
 end)
 
+script.on_event(ev.on_surface_deleted, function(event)
+  local global = get_global()
+  global.square_pool.surface_pools[event.surface_index] = nil
+  global.ninth_pool.surface_pools[event.surface_index] = nil
+  global.rect_pool.surface_pools[event.surface_index] = nil
+end)
+
 ---@param entity_pool EntityPoolQAI
 ---@param surface LuaSurface
 ---@param position MapPosition
 ---@return uint unit_number
 ---@return LuaEntity
 local function place_pooled_entity(entity_pool, surface, position)
-  if entity_pool.free_count ~= 0 then
-    entity_pool.free_count = entity_pool.free_count - 1
-    local unit_number, entity = next(entity_pool.free_entities)
+  local surface_pool = get_surface_pool(entity_pool, surface.index)
+
+  if surface_pool.free_count ~= 0 then
+    surface_pool.free_count = surface_pool.free_count - 1
+    local unit_number, entity = next(surface_pool.free_entities)
     if not entity.valid then
-      entity_pool.free_entities[unit_number] = nil
+      surface_pool.free_entities[unit_number] = nil
     else
-      entity_pool.used_count = entity_pool.used_count + 1
-      entity_pool.free_entities[unit_number] = nil
-      entity_pool.used_entities[unit_number] = entity
+      surface_pool.used_count = surface_pool.used_count + 1
+      surface_pool.free_entities[unit_number] = nil
+      surface_pool.used_entities[unit_number] = entity
       entity.teleport(position)
       return unit_number, entity
     end
@@ -153,27 +179,31 @@ local function place_pooled_entity(entity_pool, surface, position)
   end
   entity.destructible = false
   local unit_number = entity.unit_number ---@cast unit_number -nil
-  entity_pool.used_count = entity_pool.used_count + 1
-  entity_pool.used_entities[unit_number] = entity
+  surface_pool.used_count = surface_pool.used_count + 1
+  surface_pool.used_entities[unit_number] = entity
   return unit_number, entity
 end
 
 ---@param entity_pool EntityPoolQAI
+---@param surface_index uint
 ---@param unit_number uint
-local function remove_pooled_entity(entity_pool, unit_number)
-  entity_pool.used_count = entity_pool.used_count - 1
-  entity_pool.free_count = entity_pool.free_count + 1
-  local entity = entity_pool.used_entities[unit_number]
-  entity_pool.used_entities[unit_number] = nil
-  entity_pool.free_entities[unit_number] = entity
+local function remove_pooled_entity(entity_pool, surface_index, unit_number)
+  local surface_pool = entity_pool.surface_pools[surface_index]
+  if not surface_pool then return end -- Surface has been deleted already, nothing to do.
+  surface_pool.used_count = surface_pool.used_count - 1
+  surface_pool.free_count = surface_pool.free_count + 1
+  local entity = surface_pool.used_entities[unit_number]
+  surface_pool.used_entities[unit_number] = nil
+  surface_pool.free_entities[unit_number] = entity
   entity.teleport{x = 0, y = 0}
 end
 
 ---@param entity_pool EntityPoolQAI
+---@param surface_index uint
 ---@param used_unit_numbers uint[]
-local function remove_used_pooled_entities(entity_pool, used_unit_numbers)
+local function remove_used_pooled_entities(entity_pool, surface_index, used_unit_numbers)
   for i = 1, #used_unit_numbers do
-    remove_pooled_entity(entity_pool, used_unit_numbers[i])
+    remove_pooled_entity(entity_pool, surface_index, used_unit_numbers[i])
     used_unit_numbers[i] = nil
   end
 end
@@ -196,10 +226,12 @@ end
 function switch_to_idle(player)
   if player.state == "idle" then return end
   local global = get_global()
-  remove_used_pooled_entities(global.square_pool, player.used_squares)
-  remove_used_pooled_entities(global.ninth_pool, player.used_ninths)
+  local surface_index = player.current_surface_index
+  player.current_surface_index = nil
+  remove_used_pooled_entities(global.square_pool, surface_index, player.used_squares)
+  remove_used_pooled_entities(global.ninth_pool, surface_index, player.used_ninths)
   -- TODO: keep rects, arrow and grid when switching between pickup/drop states
-  remove_used_pooled_entities(global.rect_pool, player.used_rects)
+  remove_used_pooled_entities(global.rect_pool, surface_index, player.used_rects)
   destroy_rendering_ids(player.line_ids)
   rendering.destroy(player.direction_arrow_id)
   destroy_pickup_highlight(player)
@@ -376,6 +408,7 @@ local function switch_to_selecting_pickup(player, target_inserter)
     switch_to_idle(player)
   end
   player.target_inserter = target_inserter
+  player.current_surface_index = target_inserter.surface_index
   place_squares(player)
   place_rects(player)
   draw_direction_arrow(player)
@@ -391,6 +424,7 @@ local function switch_to_selecting_drop(player, target_inserter)
     switch_to_idle(player)
   end
   player.target_inserter = target_inserter
+  player.current_surface_index = target_inserter.surface_index
   place_ninths(player)
   place_rects(player)
   draw_direction_arrow(player)
