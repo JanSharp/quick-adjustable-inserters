@@ -5,7 +5,7 @@ local function make_selectable(params)
     name = params.name,
     icon = "__core__/graphics/empty.png",
     icon_size = 1,
-    force_visibility = "ally",
+    force_visibility = "same",
     picture = {
       filename = "__core__/graphics/empty.png",
       size = 1,

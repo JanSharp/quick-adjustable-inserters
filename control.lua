@@ -24,6 +24,7 @@
 
 ---@class PlayerDataQAI
 ---@field player LuaPlayer
+---@field force_index uint8
 ---@field state PlayerStateQAI
 ---@field target_inserter LuaEntity @ `nil` when idle.
 ---@field current_surface_index uint @  `nil` when idle.
@@ -106,6 +107,7 @@ local function init_player(player)
   ---@type PlayerDataQAI
   local player_data = {
     player = player,
+    force_index = player.force_index--[[@as uint8]],
     state = "idle",
     used_squares = {},
     used_ninths = {},
@@ -148,12 +150,18 @@ script.on_event(ev.on_surface_deleted, function(event)
   global.rect_pool.surface_pools[event.surface_index] = nil
 end)
 
+script.on_event(ev.on_player_changed_force, function(event)
+  local player = get_player()
+  switch_to_idle(player)
+end)
+
 ---@param entity_pool EntityPoolQAI
 ---@param surface LuaSurface
+---@param force_index uint8
 ---@param position MapPosition
 ---@return uint unit_number
 ---@return LuaEntity
-local function place_pooled_entity(entity_pool, surface, position)
+local function place_pooled_entity(entity_pool, surface, force_index, position)
   local surface_pool = get_surface_pool(entity_pool, surface.index)
 
   if surface_pool.free_count ~= 0 then
@@ -166,6 +174,7 @@ local function place_pooled_entity(entity_pool, surface, position)
       surface_pool.free_entities[unit_number] = nil
       surface_pool.used_entities[unit_number] = entity
       entity.teleport(position)
+      entity.force = force_index
       return unit_number, entity
     end
   end
@@ -173,6 +182,7 @@ local function place_pooled_entity(entity_pool, surface, position)
   local entity = surface.create_entity{
     name = entity_pool.entity_name,
     position = position,
+    force = force_index,
   }
   if not entity then
     error("Creating an internal entity required by Quick Adjustable Inserters failed.")
@@ -191,11 +201,13 @@ local function remove_pooled_entity(entity_pool, surface_index, unit_number)
   local surface_pool = entity_pool.surface_pools[surface_index]
   if not surface_pool then return end -- Surface has been deleted already, nothing to do.
   surface_pool.used_count = surface_pool.used_count - 1
-  surface_pool.free_count = surface_pool.free_count + 1
   local entity = surface_pool.used_entities[unit_number]
   surface_pool.used_entities[unit_number] = nil
+  if not entity then return end
+  surface_pool.free_count = surface_pool.free_count + 1
   surface_pool.free_entities[unit_number] = entity
   entity.teleport{x = 0, y = 0}
+  entity.force = "neutral"
 end
 
 ---@param entity_pool EntityPoolQAI
@@ -256,7 +268,7 @@ local function place_squares(player)
       if x == reach_range and y == reach_range then goto continue end
       position.x = top_left_x + x + 0.5
       position.y = top_left_y + y + 0.5
-      local unit_number = place_pooled_entity(global.square_pool, surface, position)
+      local unit_number = place_pooled_entity(global.square_pool, surface, player.force_index, position)
       player.used_squares[#player.used_squares+1] = unit_number
       ::continue::
     end
@@ -279,7 +291,7 @@ local function place_ninths(player)
         for inner_y = 0, 2 do
           position.x = top_left_x + x + inner_x / 3 + 1 / 6
           position.y = top_left_y + y + inner_y / 3 + 1 / 6
-          local unit_number = place_pooled_entity(global.ninth_pool, surface, position)
+          local unit_number = place_pooled_entity(global.ninth_pool, surface, player.force_index, position)
           player.used_ninths[#player.used_ninths+1] = unit_number
         end
       end
@@ -319,7 +331,7 @@ local function place_rects(player)
   for i = 1, 4 do
     position.x = root_x + x_direction_multiplier_lut[i] * (reach_range + 1.5)
     position.y = root_y + y_direction_multiplier_lut[i] * (reach_range + 1.5)
-    local unit_number, entity = place_pooled_entity(global.rect_pool, surface, position)
+    local unit_number, entity = place_pooled_entity(global.rect_pool, surface, player.force_index, position)
     entity.direction = direction_lut[i]
     player.used_rects[#player.used_rects+1] = unit_number
   end
