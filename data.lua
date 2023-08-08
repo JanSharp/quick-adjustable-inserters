@@ -26,7 +26,7 @@ local function make_selectable(params)
     collision_mask = {},
     selection_priority = 201,
     flags = {
-      "placeable-neutral", -- They don't have a force though, right?
+      "placeable-neutral",
       "not-on-map",
       "not-blueprintable",
       "not-deconstructable",
