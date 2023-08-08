@@ -116,8 +116,11 @@ script.on_event(ev.on_player_created, function(event)
   init_player(game.get_player(event.player_index)--[[@as LuaPlayer]])
 end)
 
+local switch_to_idle
+
 script.on_event(ev.on_player_removed, function(event)
-  -- TODO: cleanup their entities if they were in that state
+  local player = get_player()
+  switch_to_idle(player)
   get_global().players[event.player_index] = nil
 end)
 
@@ -190,7 +193,7 @@ local function destroy_pickup_highlight(player)
 end
 
 ---@param player PlayerDataQAI
-local function switch_to_idle(player)
+function switch_to_idle(player)
   if player.state == "idle" then return end
   local global = get_global()
   remove_used_pooled_entities(global.square_pool, player.used_squares)
