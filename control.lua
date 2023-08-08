@@ -155,6 +155,7 @@ script.on_event(ev.on_player_changed_force, function(event)
   local player = get_player(event)
   if not player then return end
   switch_to_idle(player)
+  player.force_index = player.player.force_index--[[@as uint8]]
 end)
 
 ---@param entity_pool EntityPoolQAI
