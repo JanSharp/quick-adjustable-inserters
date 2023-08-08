@@ -1,7 +1,8 @@
 
-- [ ] change force of selectable entities to match the player
-- [ ] change visibility of rendering objects to the same force as the player
-- [ ] handle player changing force while in non idle state
+- [x] change force of selectable entities to match the player
+- [x] change visibility of rendering objects to the same force as the player
+- [x] change visibility of highlight entities to a single player
+- [x] handle player changing force while in non idle state
 - [ ] add player reach restriction
 - [ ] add player force restriction
 - [ ] impl disabled custom drop vectors
