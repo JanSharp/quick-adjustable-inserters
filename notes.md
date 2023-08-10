@@ -11,3 +11,4 @@
 - [ ] support the technologies from bobinsters
 - [ ] don't do anything if the inserter doesn't support runtime changeable vectors
 - [ ] maybe add some animations
+- [ ] estimate inserter speed
