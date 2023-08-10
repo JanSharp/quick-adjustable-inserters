@@ -141,7 +141,7 @@ end)
 local switch_to_idle
 
 script.on_event(ev.on_player_removed, function(event)
-  local player = get_player(event)
+  local player = get_player(event) ---@cast player -nil
   switch_to_idle(player)
   get_global().players[event.player_index] = nil
 end)
