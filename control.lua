@@ -6,6 +6,7 @@
 ---@field square_pool EntityPoolQAI
 ---@field ninth_pool EntityPoolQAI
 ---@field rect_pool EntityPoolQAI
+global = {}
 
 ---@class EntityPoolQAI
 ---@field entity_name string
@@ -90,15 +91,10 @@ local inverse_direction_lut = {
   [defines.direction.west] = defines.direction.east,
 }
 
----@return GlobalDataQAI
-local function get_global()
-  return global
-end
-
 ---@param event EventData|{player_index: uint}
 ---@return PlayerDataQAI?
 local function get_player(event)
-  return get_global().players[event.player_index]
+  return global.players[event.player_index]
 end
 
 ---@param entity_name string
@@ -397,7 +393,7 @@ local function init_player(player)
     used_rects = {},
     line_ids = {},
   }
-  get_global().players[player.index] = player_data
+  global.players[player.index] = player_data
   return player_data
 end
 
@@ -423,11 +419,10 @@ local switch_to_idle
 script.on_event(ev.on_player_removed, function(event)
   local player = get_player(event) ---@cast player -nil
   switch_to_idle(player)
-  get_global().players[event.player_index] = nil
+  global.players[event.player_index] = nil
 end)
 
 script.on_event(ev.on_surface_deleted, function(event)
-  local global = get_global()
   global.square_pool.surface_pools[event.surface_index] = nil
   global.ninth_pool.surface_pools[event.surface_index] = nil
   global.rect_pool.surface_pools[event.surface_index] = nil
@@ -522,7 +517,6 @@ end
 ---@param player PlayerDataQAI
 function switch_to_idle(player)
   if player.state == "idle" then return end
-  local global = get_global()
   local surface_index = player.current_surface_index
   player.current_surface_index = nil
   remove_used_pooled_entities(global.square_pool, surface_index, player.used_squares)
@@ -558,7 +552,6 @@ end
 
 ---@param player PlayerDataQAI
 local function place_squares(player)
-  local global = get_global()
   local surface = player.target_inserter.surface
   local inserter_position = player.target_inserter.position
   local offset_from_inserter = player.target_inserter_cache.offset_from_inserter
@@ -576,7 +569,6 @@ end
 
 ---@param player PlayerDataQAI
 local function place_ninths(player)
-  local global = get_global()
   local surface = player.target_inserter.surface
   local inserter_position = player.target_inserter.position
   local offset_from_inserter = player.target_inserter_cache.offset_from_inserter
@@ -627,7 +619,6 @@ local flip_direction_lut = {
 
 ---@param player PlayerDataQAI
 local function place_rects(player)
-  local global = get_global()
   local cache = player.target_inserter_cache
   local surface = player.target_inserter.surface
   local inserter_position = player.target_inserter.position
