@@ -24,6 +24,7 @@ local function make_selectable(params)
     selection_priority = 201,
     flags = {
       "placeable-neutral",
+      "placeable-off-grid",
       "not-on-map",
       "not-blueprintable",
       "not-deconstructable",
@@ -32,7 +33,7 @@ local function make_selectable(params)
       "no-copy-paste",
       "not-upgradable",
       "not-in-kill-statistics",
-      (params.extra_flags or function() end)(), -- var results, allows adding multiple extra flags.
+      "not-rotatable",
     },
   }
 end
@@ -49,17 +50,14 @@ data:extend{
     selection_box = {{-0.5, -0.5}, {0.5, 0.5}},
     tile_width = 1,
     tile_height = 1,
-    extra_flags = function() return "not-rotatable" end,
   },
   make_selectable{
     name = "QAI-selectable-ninth",
     -- 256 / 3 = 85.33333333333333, 86 to round up instead of down to ensure gaps are filled
     selection_box = {{-86 / 256 / 2, -86 / 256 / 2}, {86 / 256 / 2, 86 / 256 / 2}},
-    extra_flags = function() return "not-rotatable", "placeable-off-grid" end,
   },
   make_selectable{
     name = "QAI-selectable-rect",
     selection_box = {{-1.5, -1}, {1.5, 1}},
-    extra_flags = function() return "placeable-off-grid" end,
   },
 }

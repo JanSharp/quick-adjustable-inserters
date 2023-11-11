@@ -17,6 +17,37 @@
 ---@field free_entities table<uint, LuaEntity>
 ---@field used_entities table<uint, LuaEntity>
 
+---@class LineDefinitionQAI
+---@field from MapPosition
+---@field to MapPosition
+
+---@class DirectionArrowDefinitionQAI
+---@field position MapPosition
+---@field direction defines.direction
+
+---@class InserterCacheQAI
+---@field prototype LuaEntityPrototype
+---@field tech_level TechnologyLevelQAI
+---Defines how to calculate the left top position of the grid when given an inserter entity. By adding
+---this value to the inserter's position, the left top position - the grid origin - has been found. All
+---other positions in this definition are then relative to this calculated position.\
+---For inserters placable off grid, the tiles, lines and simply everything from this mod will also be off
+---grid.
+---@field is_square boolean @ When false, `vertical_offset_from_inserter ~= horizontal_offset_from_inserter`.
+---@field offset_from_inserter MapPosition @ For north and south. For east and west, flip x and y.
+---@field tiles MapPosition[]
+---@field lines LineDefinitionQAI[]
+---@field direction_arrows DirectionArrowDefinitionQAI[] @ Always 4.
+---@field direction_arrow_position MapPosition
+---@field direction_arrow_vertices ScriptRenderVertexTarget[]
+
+---@class TechnologyLevelQAI
+---@field range integer
+---@field drop_offset boolean
+---@field perpendicular boolean @ Meaning horizontal and vertical. Couldn't find a better term.
+---@field diagonal boolean
+---@field all_tiles boolean @ When true, `perpendicular` and `diagonal` are implied to also be true.
+
 ---@alias PlayerStateQAI
 ---| "idle"
 ---| "selecting-pickup"
@@ -28,6 +59,11 @@
 ---@field force_index uint8
 ---@field state PlayerStateQAI
 ---@field target_inserter LuaEntity @ `nil` when idle.
+---@field target_inserter_cache InserterCacheQAI @ `nil` when idle.
+---`nil` when idle.\
+---`true` for non square inserters facing west or east.
+---Those end up pretending to be north and south, but flipped diagonally.
+---@field should_flip boolean
 ---@field current_surface_index uint @  `nil` when idle.
 ---@field used_squares uint[]
 ---@field used_ninths uint[]
@@ -40,7 +76,6 @@ local ev = defines.events
 local square_entity_name = "QAI-selectable-square"
 local ninth_entity_name = "QAI-selectable-ninth"
 local rect_entity_name = "QAI-selectable-rect"
-local reach_range = 2
 
 local entity_name_lut = {
   [square_entity_name] = true,
@@ -48,20 +83,12 @@ local entity_name_lut = {
   [rect_entity_name] = true,
 }
 
-local direction_lut = {
-  defines.direction.north,
-  defines.direction.east,
-  defines.direction.south,
-  defines.direction.west,
-}
 local inverse_direction_lut = {
   [defines.direction.north] = defines.direction.south,
   [defines.direction.east] = defines.direction.west,
   [defines.direction.south] = defines.direction.north,
   [defines.direction.west] = defines.direction.east,
 }
-local x_direction_multiplier_lut = {0, 1, 0, -1}
-local y_direction_multiplier_lut = {-1, 0, 1, 0}
 
 ---@return GlobalDataQAI
 local function get_global()
@@ -101,6 +128,259 @@ local function get_surface_pool(entity_pool, surface_index)
   }
   entity_pool.surface_pools[surface_index] = surface_pool
   return surface_pool
+end
+
+---@param cache InserterCacheQAI
+---@param tile_width integer @ The size of the inserter itself.
+---@param tile_height integer @ The size of the inserter itself.
+local function generate_tiles_cache(cache, tile_width, tile_height)
+  -- Positions are integers, top left is 1, 1.
+  local tech_level = cache.tech_level
+  local grid_width = tile_width + tech_level.range * 2
+  local grid_height = tile_height + tech_level.range * 2
+  local tiles = cache.tiles
+
+  if tech_level.all_tiles then
+    for y = 1, grid_height do
+      for x = 1, grid_width do
+        if not (tech_level.range < x and x <= tech_level.range + tile_width
+          and tech_level.range < y and y <= tech_level.range + tile_height)
+        then
+          tiles[#tiles+1] = {x = x - 1, y = y - 1}
+        end
+      end
+    end
+    return
+  end
+
+  assert(tech_level.perpendicular or tech_level.diagonal, "Having both perpendicular and diagonal be \z
+    disabled means there nowhere for an inserter to pickup from or drop to, which makes no sense."
+  )
+
+  if tech_level.perpendicular then
+    for y = tech_level.range + 1, tech_level.range + tile_height do
+      for x = 1, tech_level.range * 2 do
+        if x > tech_level.range then
+          x = x + tile_width
+        end
+        tiles[#tiles+1] = {x = x - 1, y = y - 1}
+      end
+    end
+    for x = tech_level.range + 1, tech_level.range + tile_width do
+      for y = 1, tech_level.range * 2 do
+        if y > tech_level.range then
+          y = y + tile_height
+        end
+        tiles[#tiles+1] = {x = x - 1, y = y - 1}
+      end
+    end
+  end
+
+  if tech_level.diagonal then
+    for i = 1, tech_level.range * 2 do
+      tiles[#tiles+1] = {
+        x = (i > tech_level.range and (i + tile_width) or i) - 1,
+        y = (i > tech_level.range and (i + tile_height) or i) - 1,
+      }
+      local x = tech_level.range * 2 - i + 1
+      tiles[#tiles+1] = {
+        x = (x > tech_level.range and (x + tile_width) or x) - 1,
+        y = (i > tech_level.range and (i + tile_height) or i) - 1,
+      }
+    end
+  end
+end
+
+---@param cache InserterCacheQAI
+local function generate_lines_cache(cache)
+  local lines = cache.lines
+
+  local horizontal_grid = {}
+  local vertical_grid = {}
+  local function get_point(x, y)
+    return x * 2^16 + y
+  end
+  local function get_xy(point)
+    -- Not using bit32 because math is faster than those function calls.
+    local y = point % 2^16 -- Basically bitwise AND on lower 16 bits.
+    return (point - y) / 2^16, y -- Basically right shift by 16 for x.
+  end
+  for _, tile in pairs(cache.tiles) do
+    horizontal_grid[get_point(tile.x, tile.y)] = true
+    horizontal_grid[get_point(tile.x, tile.y + 1)] = true
+    vertical_grid[get_point(tile.x, tile.y)] = true
+    vertical_grid[get_point(tile.x + 1, tile.y)] = true
+  end
+
+  ---@return boolean @ Returns true if the point existed.
+  local function check_and_remove_point(grid, point)
+    local exists = grid[point]
+    grid[point] = nil
+    return exists
+  end
+
+  while true do
+    local point = next(horizontal_grid)
+    if not point then break end
+    horizontal_grid[point] = nil
+    local x, y = get_xy(point)
+    local from_x = x
+    local to_x = x
+    while check_and_remove_point(horizontal_grid, get_point(from_x - 1, y)) do
+      from_x = from_x - 1
+    end
+    while check_and_remove_point(horizontal_grid, get_point(to_x + 1, y)) do
+      to_x = to_x + 1
+    end
+    lines[#lines+1] = {
+      from = {x = from_x, y = y},
+      to = {x = to_x + 1, y = y},
+    }
+  end
+
+  while true do
+    local point = next(vertical_grid)
+    if not point then break end
+    vertical_grid[point] = nil
+    local x, y = get_xy(point)
+    local from_y = y
+    local to_y = y
+    while check_and_remove_point(vertical_grid, get_point(x, from_y - 1)) do
+      from_y = from_y - 1
+    end
+    while check_and_remove_point(vertical_grid, get_point(x, to_y + 1)) do
+      to_y = to_y + 1
+    end
+    lines[#lines+1] = {
+      from = {x = x, y = from_y},
+      to = {x = x, y = to_y + 1},
+    }
+  end
+end
+
+---@param cache InserterCacheQAI
+---@param tile_width integer
+---@param tile_height integer
+local function generate_direction_arrow_cache(cache, tile_width, tile_height)
+  local range = cache.tech_level.range
+  cache.direction_arrows = {
+    {
+      direction = defines.direction.north,
+      position = {
+        x = range + tile_width / 2,
+        y = -1,
+      },
+    },
+    {
+      direction = defines.direction.south,
+      position = {
+        x = range + tile_width / 2,
+        y = range * 2 + tile_height + 1,
+      },
+    },
+    {
+      direction = defines.direction.west,
+      position = {
+        x = -1,
+        y = range + tile_height / 2,
+      },
+    },
+    {
+      direction = defines.direction.east,
+      position = {
+        x = range * 2 + tile_width + 1,
+        y = range + tile_height / 2,
+      },
+    },
+  }
+  cache.direction_arrow_position = {
+    x = range + tile_width / 2,
+    y = range + tile_height / 2,
+  }
+  -- The y values are positive, so pointing south, because an inserter with direction north moves items south.
+  -- This is a consistent convention in base and mods.
+  cache.direction_arrow_vertices = {
+    {target = {x = -1.3, y = range + tile_height / 2 + 0.35}},
+    {target = {x = 0, y = range + tile_height / 2 + 0.35 + 1.3}},
+    {target = {x = 1.3, y = range + tile_height / 2 + 0.35}},
+  }
+end
+
+---Centers the collision box both horizontally and vertically, by taking the distance from the center and
+---making both left and right have the same - higher - distance. Same goes for top and bottom.
+---@param col_box BoundingBox
+local function normalize_collision_box(col_box)
+  local x_distance = math.max(-col_box.left_top.x, col_box.right_bottom.x)
+  local y_distance = math.max(-col_box.left_top.y, col_box.right_bottom.y)
+  col_box.left_top.x = -x_distance
+  col_box.left_top.y = -y_distance
+  col_box.right_bottom.x = x_distance
+  col_box.right_bottom.y = y_distance
+end
+
+---@param inserter LuaEntityPrototype
+---@param tech_level TechnologyLevelQAI
+---@return InserterCacheQAI
+local function generate_cache_for_inserter(inserter, tech_level)
+  local range = tech_level.range
+  local col_box = inserter.collision_box
+  normalize_collision_box(col_box)
+
+  -- These do not match the values from the prototype, because it seems that changing the pickup and drop
+  -- positions does not care about being inside of the tile width/height of the inserter itself. It even
+  -- allows them being inside of the collision box of the inserter itself.
+  -- However, I do not wish to put the pickup or drop position inside of the collision box and the tiles said
+  -- box is touching, therefore the width and height is evaluated manually, with snapping in mind.
+  local tile_width
+  local tile_height
+  local offset_from_inserter
+  if inserter.flags["placeable-off-grid"] then
+    local col_width = col_box.right_bottom.x - col_box.left_top.x
+    local col_height = col_box.right_bottom.y - col_box.left_top.y
+    tile_width = math.ceil(col_width)
+    tile_height = math.ceil(col_height)
+    offset_from_inserter = {
+      x = col_box.left_top.x - ((tile_width - col_width) / 2) - range,
+      y = col_box.left_top.y - ((tile_height - col_height) / 2) - range,
+    }
+  else
+    local odd_width = (inserter.tile_width % 2) == 1
+    local odd_height = (inserter.tile_height % 2) == 1
+    local shifted_left_top = {
+      x = col_box.left_top.x + (odd_width and 0.5 or 0),
+      y = col_box.left_top.y + (odd_height and 0.5 or 0),
+    }
+    local snapped_left_top = {
+      x = math.floor(shifted_left_top.x),
+      y = math.floor(shifted_left_top.y),
+    }
+    local snapped_right_bottom = {
+      x = math.ceil(col_box.right_bottom.x + (odd_width and 0.5 or 0)),
+      y = math.ceil(col_box.right_bottom.y + (odd_height and 0.5 or 0)),
+    }
+    tile_width = snapped_right_bottom.x - snapped_left_top.x
+    tile_height = snapped_right_bottom.y - snapped_left_top.y
+    offset_from_inserter = {
+      x = col_box.left_top.x - (shifted_left_top.x - snapped_left_top.x) - range,
+      y = col_box.left_top.y - (shifted_left_top.y - snapped_left_top.y) - range,
+    }
+  end
+
+  ---@type InserterCacheQAI
+  local cache = {
+    prototype = inserter,
+    tech_level = tech_level,
+    is_square = tile_width == tile_height,
+    offset_from_inserter = offset_from_inserter,
+    tiles = {},
+    lines = {},
+    direction_arrows = {},
+    direction_arrow_vertices = {},
+  }
+  generate_tiles_cache(cache, tile_width, tile_height)
+  generate_lines_cache(cache)
+  generate_direction_arrow_cache(cache, tile_width, tile_height)
+  return cache
 end
 
 ---@param player LuaPlayer
@@ -253,6 +533,8 @@ function switch_to_idle(player)
   rendering.destroy(player.direction_arrow_id)
   destroy_pickup_highlight(player)
   player.target_inserter = nil
+  player.target_inserter_cache = nil
+  player.should_flip = nil
   player.state = "idle"
   if player.player.selected and entity_name_lut[player.player.selected.name] then
     player.player.selected = nil
@@ -260,23 +542,35 @@ function switch_to_idle(player)
 end
 
 ---@param player PlayerDataQAI
+---@param pos MapPosition
+---@param do_copy boolean?
+---@return MapPosition
+local function flip(player, pos, do_copy)
+  if player.should_flip then
+    if do_copy then
+      pos = {x = pos.y, y = pos.x}
+    else
+      pos.x, pos.y = pos.y, pos.x
+    end
+  end
+  return pos
+end
+
+---@param player PlayerDataQAI
 local function place_squares(player)
   local global = get_global()
   local surface = player.target_inserter.surface
-  local position = player.target_inserter.position
-  local top_left_x = math.floor(position.x) - reach_range
-  local top_left_y = math.floor(position.y) - reach_range
-  local side_length = reach_range * 2 + 1
-  -- Zero based loops.
-  for x = 0, side_length - 1 do
-    for y = 0, side_length - 1 do
-      if x == reach_range and y == reach_range then goto continue end
-      position.x = top_left_x + x + 0.5
-      position.y = top_left_y + y + 0.5
-      local unit_number = place_pooled_entity(global.square_pool, surface, player.force_index, position)
-      player.used_squares[#player.used_squares+1] = unit_number
-      ::continue::
-    end
+  local inserter_position = player.target_inserter.position
+  local offset_from_inserter = player.target_inserter_cache.offset_from_inserter
+  local position = {}
+  for _, tile in pairs(player.target_inserter_cache.tiles) do
+    position.x = offset_from_inserter.x + tile.x + 0.5
+    position.y = offset_from_inserter.y + tile.y + 0.5
+    flip(player, position)
+    position.x = position.x + inserter_position.x
+    position.y = position.y + inserter_position.y
+    local unit_number = place_pooled_entity(global.square_pool, surface, player.force_index, position)
+    player.used_squares[#player.used_squares+1] = unit_number
   end
 end
 
@@ -284,23 +578,20 @@ end
 local function place_ninths(player)
   local global = get_global()
   local surface = player.target_inserter.surface
-  local position = player.target_inserter.position
-  local top_left_x = math.floor(position.x) - reach_range
-  local top_left_y = math.floor(position.y) - reach_range
-  local side_length = reach_range * 2 + 1
-  -- Zero based loops.
-  for x = 0, side_length - 1 do
-    for y = 0, side_length - 1 do
-      if x == reach_range and y == reach_range then goto continue end
-      for inner_x = 0, 2 do
-        for inner_y = 0, 2 do
-          position.x = top_left_x + x + inner_x / 3 + 1 / 6
-          position.y = top_left_y + y + inner_y / 3 + 1 / 6
-          local unit_number = place_pooled_entity(global.ninth_pool, surface, player.force_index, position)
-          player.used_ninths[#player.used_ninths+1] = unit_number
-        end
+  local inserter_position = player.target_inserter.position
+  local offset_from_inserter = player.target_inserter_cache.offset_from_inserter
+  local position = {}
+  for _, tile in pairs(player.target_inserter_cache.tiles) do
+    for inner_x = 0, 2 do
+      for inner_y = 0, 2 do
+        position.x = offset_from_inserter.x + tile.x + inner_x / 3 + 1 / 6
+        position.y = offset_from_inserter.y + tile.y + inner_y / 3 + 1 / 6
+        flip(player, position)
+        position.x = position.x + inserter_position.x
+        position.y = position.y + inserter_position.y
+        local unit_number = place_pooled_entity(global.ninth_pool, surface, player.force_index, position)
+        player.used_ninths[#player.used_ninths+1] = unit_number
       end
-      ::continue::
     end
   end
 end
@@ -308,17 +599,17 @@ end
 ---@param player PlayerDataQAI
 local function draw_direction_arrow(player)
   local inserter = player.target_inserter
+  local inserter_position = inserter.position
+  local cache = player.target_inserter_cache
+  inserter_position.x = inserter_position.x + cache.offset_from_inserter.x + cache.direction_arrow_position.x
+  inserter_position.y = inserter_position.y + cache.offset_from_inserter.y + cache.direction_arrow_position.y
   player.direction_arrow_id = rendering.draw_polygon{
     surface = inserter.surface,
     forces = {player.force_index},
     color = {1, 1, 1},
-    vertices = {
-      {target = {x = -1.3, y = reach_range + 0.85}},
-      {target = {x = 0, y = reach_range + 0.85 + 1.3}},
-      {target = {x = 1.3, y = reach_range + 0.85}},
-    },
+    vertices = player.target_inserter_cache.direction_arrow_vertices,
     orientation = inserter.orientation,
-    target = inserter,
+    target = inserter_position,
   }
 end
 
@@ -327,19 +618,32 @@ local function update_direction_arrow(player)
   rendering.set_orientation(player.direction_arrow_id, player.target_inserter.orientation)
 end
 
+-- Flipped along a diagonal going from left top to right bottom.
+local is_east_or_west_lut = {[defines.direction.east] = true, [defines.direction.west] = true}
+local flip_direction_lut = {
+  [defines.direction.north] = defines.direction.west,
+  [defines.direction.south] = defines.direction.east,
+}
+
 ---@param player PlayerDataQAI
 local function place_rects(player)
   local global = get_global()
+  local cache = player.target_inserter_cache
   local surface = player.target_inserter.surface
-  local position = player.target_inserter.position
-  local root_x = position.x
-  local root_y = position.y
-  for i = 1, 4 do
-    position.x = root_x + x_direction_multiplier_lut[i] * (reach_range + 1.5)
-    position.y = root_y + y_direction_multiplier_lut[i] * (reach_range + 1.5)
+  local inserter_position = player.target_inserter.position
+  local offset_from_inserter = cache.offset_from_inserter
+  local position = {}
+  for _, dir_arrow in pairs(cache.direction_arrows) do
+    if not cache.is_square and is_east_or_west_lut[dir_arrow.direction] then goto continue end
+    position.x = offset_from_inserter.x + dir_arrow.position.x
+    position.y = offset_from_inserter.y + dir_arrow.position.y
+    flip(player, position)
+    position.x = position.x + inserter_position.x
+    position.y = position.y + inserter_position.y
     local unit_number, entity = place_pooled_entity(global.rect_pool, surface, player.force_index, position)
-    entity.direction = direction_lut[i]
+    entity.direction = player.should_flip and flip_direction_lut[dir_arrow.direction] or dir_arrow.direction
     player.used_rects[#player.used_rects+1] = unit_number
+    ::continue::
   end
 end
 
@@ -369,7 +673,11 @@ end
 
 ---@param player PlayerDataQAI
 local function draw_grid(player)
+  local cache = player.target_inserter_cache
+  local offset_from_inserter = cache.offset_from_inserter
   local surface = player.target_inserter.surface
+
+  -- line drawing
   local from = {}
   local to = {}
   ---@type LuaRendering.draw_line_param
@@ -378,27 +686,19 @@ local function draw_grid(player)
     forces = {player.force_index},
     color = {1, 1, 1},
     width = 1,
-    from = from,
-    to = to,
+    from = player.target_inserter,
+    from_offset = from,
+    to = player.target_inserter,
+    to_offset = to,
   }
-  local position = player.target_inserter.position
-  local top_left_x = math.floor(position.x) - reach_range
-  local top_left_y = math.floor(position.y) - reach_range
-  local side_length = reach_range * 2 + 1
 
-  from.y = top_left_y
-  to.y = top_left_y + side_length
-  for x = top_left_x, top_left_x + side_length do
-    from.x = x
-    to.x = x
-    player.line_ids[#player.line_ids+1] = rendering.draw_line(line_param)
-  end
-
-  from.x = top_left_x
-  to.x = top_left_x + side_length
-  for y = top_left_y, top_left_y + side_length do
-    from.y = y
-    to.y = y
+  for _, line in pairs(cache.lines) do
+    from.x = offset_from_inserter.x + line.from.x
+    from.y = offset_from_inserter.y + line.from.y
+    to.x = offset_from_inserter.x + line.to.x
+    to.y = offset_from_inserter.y + line.to.y
+    flip(player, from)
+    flip(player, to)
     player.line_ids[#player.line_ids+1] = rendering.draw_line(line_param)
   end
 end
@@ -428,6 +728,15 @@ local function switch_to_selecting_pickup(player, target_inserter)
     switch_to_idle(player)
   end
   player.target_inserter = target_inserter
+  player.target_inserter_cache = generate_cache_for_inserter(target_inserter.prototype, {
+    all_tiles = false,
+    diagonal = true,
+    perpendicular = true,
+    drop_offset = true,
+    range = 3,
+  })
+  player.should_flip = not player.target_inserter_cache.is_square
+    and is_east_or_west_lut[target_inserter.direction]
   player.current_surface_index = target_inserter.surface_index
   place_squares(player)
   place_rects(player)
@@ -444,6 +753,15 @@ local function switch_to_selecting_drop(player, target_inserter)
     switch_to_idle(player)
   end
   player.target_inserter = target_inserter
+  player.target_inserter_cache = generate_cache_for_inserter(target_inserter.prototype, {
+    all_tiles = false,
+    diagonal = true,
+    perpendicular = true,
+    drop_offset = true,
+    range = 3,
+  })
+  player.should_flip = not player.target_inserter_cache.is_square
+    and is_east_or_west_lut[target_inserter.direction]
   player.current_surface_index = target_inserter.surface_index
   place_ninths(player)
   place_rects(player)
@@ -466,9 +784,15 @@ end
 ---@param player PlayerDataQAI
 ---@param position MapPosition
 local function set_drop_position(player, position)
+  local inserter_position = player.target_inserter.position
+  local offset_from_inserter = player.target_inserter_cache.offset_from_inserter
+  local left_top_x = inserter_position.x + offset_from_inserter.x
+  local left_top_y = inserter_position.y + offset_from_inserter.y
+  local relative_x = position.x - left_top_x
+  local relative_y = position.y - left_top_y
   -- Modulo always returns a positive number.
-  local x_from_tile_center = (position.x % 1) - 0.5
-  local y_from_tile_center = (position.y % 1) - 0.5
+  local x_from_tile_center = (relative_x % 1) - 0.5
+  local y_from_tile_center = (relative_y % 1) - 0.5
   -- 51 / 256 = 0.19921875. Vanilla inserter drop positions are offset by 0.2 away from the center, however
   -- it ultimately gets rounded to 51 / 256, because of map positions. In other words, this matches vanilla.
   local x_offset = x_from_tile_center == 0 and 0
@@ -478,8 +802,8 @@ local function set_drop_position(player, position)
     or y_from_tile_center < 0 and -51/256
     or 51/256
   player.target_inserter.drop_position = {
-    x = math.floor(position.x) + 0.5 + x_offset,
-    y = math.floor(position.y) + 0.5 + y_offset,
+    x = left_top_x + math.floor(relative_x) + 0.5 + x_offset,
+    y = left_top_y + math.floor(relative_y) + 0.5 + y_offset,
   }
 end
 

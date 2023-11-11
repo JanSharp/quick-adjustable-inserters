@@ -4,11 +4,23 @@
 - [x] change visibility of highlight entities to a single player
 - [x] handle player changing force while in non idle state
 - [ ] add player reach restriction
-- [ ] add player force restriction
 - [ ] impl disabled custom drop vectors
-- [ ] impl only cardinal
-- [ ] impl only cardinal and diagonal
+- [x] impl only perpendicular
+- [x] impl only perpendicular and diagonal
 - [ ] support the technologies from bobinsters
 - [ ] don't do anything if the inserter doesn't support runtime changeable vectors
 - [ ] maybe add some animations
 - [ ] estimate inserter speed
+- [ ] add feature where you can place the inserter using this mods key bind and it will automatically uses the same pickup and drop vectors as the last modified inserter, if they have the same dimensions.
+- [ ] maybe add another key bind to place an inserter and instantly enter the configuration mode
+  - [ ] upon entering, clear the cursor
+  - [ ] upon leaving, restore the cursor, if possible and if it didn't change through other means in the mean time
+- [ ] support ghosts, if possible (I think it is)
+- [x] support inserters of any size, and off grid
+- [ ] handle multiplayer
+  - [ ] switch to idle when leaving
+  - [ ] ignore interactions with entities that are placed for a different player
+  - [ ] prevent 2 players from interacting with the same inserter at the same time
+  - [ ] add force restriction
+- [ ] what should happen if the inserter gets rotated while the grid/overlay is active?
+- [ ] update existing grids/arrows/invisible entities whenever tech level or inserter prototype changes
