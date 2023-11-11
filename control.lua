@@ -3,6 +3,7 @@
 
 ---@class GlobalDataQAI
 ---@field players table<int, PlayerDataQAI>
+---@field inserter_cache_lut table<string, InserterCacheQAI>
 ---@field square_pool EntityPoolQAI
 ---@field ninth_pool EntityPoolQAI
 ---@field rect_pool EntityPoolQAI
@@ -397,24 +398,55 @@ local function init_player(player)
   return player_data
 end
 
+local switch_to_idle
+
+local function update_inserter_cache()
+  global.inserter_cache_lut = {}
+  for _, inserter in pairs(game.get_filtered_entity_prototypes{{filter = "type", type = "inserter"}}) do
+    if inserter.allow_custom_vectors then
+      -- TODO: Make tech level not hardcoded.
+      global.inserter_cache_lut[inserter.name] = generate_cache_for_inserter(inserter, {
+        all_tiles = false,
+        diagonal = true,
+        perpendicular = true,
+        drop_offset = true,
+        range = 3,
+      })
+    end
+  end
+  for _, player in pairs(global.players) do
+    if player.state ~= "idle" then
+      switch_to_idle(player)
+    end
+  end
+end
+
 script.on_init(function()
   ---@type GlobalDataQAI
   global = {
     players = {},
+    inserter_cache_lut = (nil)--[[@as any]], -- Set in `update_inserter_cache`.
     square_pool = new_entity_pool(square_entity_name),
     ninth_pool = new_entity_pool(ninth_entity_name),
     rect_pool = new_entity_pool(rect_entity_name),
   }
+  update_inserter_cache()
   for _, player in pairs(game.players) do
     init_player(player)
+  end
+end)
+
+script.on_configuration_changed(function(event)
+  if not event.mod_changes["quick_adjustable_inserters"]
+    or event.mod_changes["quick_adjustable_inserters"].old_version
+  then
+    update_inserter_cache()
   end
 end)
 
 script.on_event(ev.on_player_created, function(event)
   init_player(game.get_player(event.player_index)--[[@as LuaPlayer]])
 end)
-
-local switch_to_idle
 
 script.on_event(ev.on_player_removed, function(event)
   local player = get_player(event) ---@cast player -nil
@@ -713,22 +745,26 @@ end
 
 ---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
+---@return boolean
+local function try_set_target_inserter(player, target_inserter)
+  local cache = global.inserter_cache_lut[target_inserter.name]
+  if not cache then return false end -- Not an inserter that can be adjusted.
+  player.target_inserter = target_inserter
+  player.target_inserter_cache = cache
+  player.should_flip = not player.target_inserter_cache.is_square
+    and is_east_or_west_lut[target_inserter.direction]
+  player.current_surface_index = target_inserter.surface_index
+  return true
+end
+
+---@param player PlayerDataQAI
+---@param target_inserter LuaEntity
 local function switch_to_selecting_pickup(player, target_inserter)
   if player.state == "selecting-pickup" and player.target_inserter == target_inserter then return end
   if player.state ~= "idle" then
     switch_to_idle(player)
   end
-  player.target_inserter = target_inserter
-  player.target_inserter_cache = generate_cache_for_inserter(target_inserter.prototype, {
-    all_tiles = false,
-    diagonal = true,
-    perpendicular = true,
-    drop_offset = true,
-    range = 3,
-  })
-  player.should_flip = not player.target_inserter_cache.is_square
-    and is_east_or_west_lut[target_inserter.direction]
-  player.current_surface_index = target_inserter.surface_index
+  if not try_set_target_inserter(player, target_inserter) then return end
   place_squares(player)
   place_rects(player)
   draw_direction_arrow(player)
@@ -743,17 +779,7 @@ local function switch_to_selecting_drop(player, target_inserter)
   if player.state ~= "idle" then
     switch_to_idle(player)
   end
-  player.target_inserter = target_inserter
-  player.target_inserter_cache = generate_cache_for_inserter(target_inserter.prototype, {
-    all_tiles = false,
-    diagonal = true,
-    perpendicular = true,
-    drop_offset = true,
-    range = 3,
-  })
-  player.should_flip = not player.target_inserter_cache.is_square
-    and is_east_or_west_lut[target_inserter.direction]
-  player.current_surface_index = target_inserter.surface_index
+  if not try_set_target_inserter(player, target_inserter) then return end
   place_ninths(player)
   place_rects(player)
   draw_direction_arrow(player)
