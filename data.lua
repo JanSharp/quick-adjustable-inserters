@@ -10,6 +10,12 @@ local function make_selectable(params)
       filename = "__core__/graphics/empty.png",
       size = 1,
     },
+    minable = {
+      -- It may unintended, but mining time being infinite results in 0 mining percentage
+      -- and doesn't show the progress bar.
+      mining_time = 1/0,
+      results = {},
+    },
     selection_box = params.selection_box,
     tile_width = params.tile_width,
     tile_height = params.tile_height,
