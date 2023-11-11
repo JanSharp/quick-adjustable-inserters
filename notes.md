@@ -7,6 +7,7 @@
 - [x] impl disabled custom drop vectors
 - [x] impl only perpendicular
 - [x] impl only perpendicular and diagonal
+- [x] detect and support inserters with already longer base range than 1
 - [ ] support the technologies from bobinsters
   - [ ] make inserter caches per force
 - [x] don't do anything if the inserter doesn't support runtime changeable vectors
@@ -14,6 +15,7 @@
   - [ ] happy little popup at both the pickup and drop positions (squares getting bigger and transparent)
   - [ ] with it lines connecting the 2, and a circle on the inserter base itself
   - [ ] do it in a way where there isn't any overlapping lines, so transparency doesn't screw us
+- [ ] maybe add very transparent white rendering in each tile that you can actually interact with
 - [ ] estimate inserter speed
 - [ ] add feature where you can place the inserter using this mods key bind and it will automatically uses the same pickup and drop vectors as the last modified inserter, if they have the same dimensions.
 - [ ] maybe add another key bind to place an inserter and instantly enter the configuration mode
@@ -30,3 +32,4 @@
 - [ ] update existing grids/arrows/invisible entities whenever tech level or inserter prototype changes
 - [ ] listen to destroy events to switch to idle as soon as possible
 - [x] maybe add a rendering circle on the inserter itself
+- [ ] maybe detect inserters that are by default diagonal and allow them to be diagonal first, then perpendicular after research

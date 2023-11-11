@@ -36,6 +36,8 @@ global = {}
 ---For inserters placable off grid, the tiles, lines and simply everything from this mod will also be off
 ---grid.
 ---@field is_square boolean @ When false, `vertical_offset_from_inserter ~= horizontal_offset_from_inserter`.
+---@field base_range integer
+---@field range_gap_from_center integer
 ---@field offset_from_inserter MapPosition @ For north and south. For east and west, flip x and y.
 ---@field tile_width integer
 ---@field tile_height integer
@@ -131,20 +133,37 @@ local function get_surface_pool(entity_pool, surface_index)
 end
 
 ---@param cache InserterCacheQAI
-local function generate_tiles_cache(cache)
+local function calculate_cached_base_reach(cache)
   local tile_width = cache.tile_width
   local tile_height = cache.tile_height
-  -- Positions are integers, top left is 1, 1.
+  local pickup_position = cache.prototype.inserter_pickup_position ---@cast pickup_position -nil
+  local drop_position = cache.prototype.inserter_drop_position ---@cast drop_position -nil
+  cache.base_range = math.ceil(math.max(
+    math.abs(pickup_position[1]) - (tile_width / 2),
+    math.abs(pickup_position[2]) - (tile_height / 2),
+    math.abs(drop_position[1]) - (tile_width / 2),
+    math.abs(drop_position[2]) - (tile_height / 2)
+  ))
+  cache.range_gap_from_center = math.max(0, cache.base_range - cache.tech_level.range)
+end
+
+---@param cache InserterCacheQAI
+local function generate_tiles_cache(cache)
+  -- Positions are integers, top left is 0, 0.
+  local tile_width = cache.tile_width
+  local tile_height = cache.tile_height
+  local gap = cache.range_gap_from_center
   local tech_level = cache.tech_level
-  local grid_width = tile_width + tech_level.range * 2
-  local grid_height = tile_height + tech_level.range * 2
+  local max_range = tech_level.range + gap
+  local grid_width = tile_width + max_range * 2
+  local grid_height = tile_height + max_range * 2
   local tiles = cache.tiles
 
   if tech_level.all_tiles then
     for y = 1, grid_height do
       for x = 1, grid_width do
-        if not (tech_level.range < x and x <= tech_level.range + tile_width
-          and tech_level.range < y and y <= tech_level.range + tile_height)
+        if not (tech_level.range < x and x <= tech_level.range + tile_width + gap * 2
+          and tech_level.range < y and y <= tech_level.range + tile_height + gap * 2)
         then
           tiles[#tiles+1] = {x = x - 1, y = y - 1}
         end
@@ -158,18 +177,18 @@ local function generate_tiles_cache(cache)
   )
 
   if tech_level.perpendicular then
-    for y = tech_level.range + 1, tech_level.range + tile_height do
+    for y = max_range + 1, max_range + tile_height do
       for x = 1, tech_level.range * 2 do
         if x > tech_level.range then
-          x = x + tile_width
+          x = x + tile_width + gap * 2
         end
         tiles[#tiles+1] = {x = x - 1, y = y - 1}
       end
     end
-    for x = tech_level.range + 1, tech_level.range + tile_width do
+    for x = max_range + 1, max_range + tile_width do
       for y = 1, tech_level.range * 2 do
         if y > tech_level.range then
-          y = y + tile_height
+          y = y + tile_height + gap * 2
         end
         tiles[#tiles+1] = {x = x - 1, y = y - 1}
       end
@@ -179,13 +198,13 @@ local function generate_tiles_cache(cache)
   if tech_level.diagonal then
     for i = 1, tech_level.range * 2 do
       tiles[#tiles+1] = {
-        x = (i > tech_level.range and (i + tile_width) or i) - 1,
-        y = (i > tech_level.range and (i + tile_height) or i) - 1,
+        x = (i > tech_level.range and (i + tile_width + gap * 2) or i) - 1,
+        y = (i > tech_level.range and (i + tile_height + gap * 2) or i) - 1,
       }
       local x = tech_level.range * 2 - i + 1
       tiles[#tiles+1] = {
-        x = (x > tech_level.range and (x + tile_width) or x) - 1,
-        y = (i > tech_level.range and (i + tile_height) or i) - 1,
+        x = (x > tech_level.range and (x + tile_width + gap * 2) or x) - 1,
+        y = (i > tech_level.range and (i + tile_height + gap * 2) or i) - 1,
       }
     end
   end
@@ -262,47 +281,47 @@ end
 local function generate_direction_arrow_cache(cache)
   local tile_width = cache.tile_width
   local tile_height = cache.tile_height
-  local range = cache.tech_level.range
+  local max_range = cache.tech_level.range + cache.range_gap_from_center
   cache.direction_arrows = {
     {
       direction = defines.direction.north,
       position = {
-        x = range + tile_width / 2,
+        x = max_range + tile_width / 2,
         y = -1,
       },
     },
     {
       direction = defines.direction.south,
       position = {
-        x = range + tile_width / 2,
-        y = range * 2 + tile_height + 1,
+        x = max_range + tile_width / 2,
+        y = max_range * 2 + tile_height + 1,
       },
     },
     {
       direction = defines.direction.west,
       position = {
         x = -1,
-        y = range + tile_height / 2,
+        y = max_range + tile_height / 2,
       },
     },
     {
       direction = defines.direction.east,
       position = {
-        x = range * 2 + tile_width + 1,
-        y = range + tile_height / 2,
+        x = max_range * 2 + tile_width + 1,
+        y = max_range + tile_height / 2,
       },
     },
   }
   cache.direction_arrow_position = {
-    x = range + tile_width / 2,
-    y = range + tile_height / 2,
+    x = max_range + tile_width / 2,
+    y = max_range + tile_height / 2,
   }
   -- The y values are positive, so pointing south, because an inserter with direction north moves items south.
   -- This is a consistent convention in base and mods.
   cache.direction_arrow_vertices = {
-    {target = {x = -1.3, y = range + tile_height / 2 + 0.35}},
-    {target = {x = 0, y = range + tile_height / 2 + 0.35 + 1.3}},
-    {target = {x = 1.3, y = range + tile_height / 2 + 0.35}},
+    {target = {x = -1.3, y = max_range + tile_height / 2 + 0.35}},
+    {target = {x = 0, y = max_range + tile_height / 2 + 0.35 + 1.3}},
+    {target = {x = 1.3, y = max_range + tile_height / 2 + 0.35}},
   }
 end
 
@@ -379,6 +398,9 @@ local function generate_cache_for_inserter(inserter, tech_level)
     direction_arrows = {},
     direction_arrow_vertices = {},
   }
+  calculate_cached_base_reach(cache)
+  offset_from_inserter.x = offset_from_inserter.x - cache.range_gap_from_center
+  offset_from_inserter.y = offset_from_inserter.y - cache.range_gap_from_center
   generate_tiles_cache(cache)
   generate_lines_cache(cache)
   generate_direction_arrow_cache(cache)
@@ -415,7 +437,7 @@ local function update_inserter_cache()
         diagonal = true,
         perpendicular = true,
         drop_offset = false,
-        range = 3,
+        range = 1,
       })
     end
   end
@@ -708,6 +730,7 @@ local function draw_grid(player)
   local offset_from_inserter = cache.offset_from_inserter
   local surface = player.target_inserter.surface
 
+  local max_range = cache.tech_level.range + cache.range_gap_from_center
   player.inserter_circle_id = rendering.draw_circle{
     surface = surface,
     forces = {player.force_index},
@@ -716,8 +739,8 @@ local function draw_grid(player)
     width = 2,
     target = player.target_inserter,
     target_offset = {
-      x = offset_from_inserter.x + cache.tech_level.range + cache.tile_width / 2,
-      y = offset_from_inserter.y + cache.tech_level.range + cache.tile_height / 2,
+      x = offset_from_inserter.x + max_range + cache.tile_width / 2,
+      y = offset_from_inserter.y + max_range + cache.tile_height / 2,
     },
   }
 
@@ -838,11 +861,12 @@ local function set_drop_position(player, position)
   local x_offset
   local y_offset
   if auto_determine_drop_offset then
-    x_offset = relative_x < tech_level.range and -51/256
-      or (tech_level.range + cache.tile_width) < relative_x and 51/256
+    local max_range = tech_level.range + cache.range_gap_from_center
+    x_offset = relative_x < max_range and -51/256
+      or (max_range + cache.tile_width) < relative_x and 51/256
       or 0
-    y_offset = relative_y < tech_level.range and -51/256
-      or (tech_level.range + cache.tile_height) < relative_y and 51/256
+    y_offset = relative_y < max_range and -51/256
+      or (max_range + cache.tile_height) < relative_y and 51/256
       or 0
   else
     -- Modulo always returns a positive number.
