@@ -37,6 +37,8 @@ global = {}
 ---grid.
 ---@field is_square boolean @ When false, `vertical_offset_from_inserter ~= horizontal_offset_from_inserter`.
 ---@field offset_from_inserter MapPosition @ For north and south. For east and west, flip x and y.
+---@field tile_width integer
+---@field tile_height integer
 ---@field tiles MapPosition[]
 ---@field lines LineDefinitionQAI[]
 ---@field direction_arrows DirectionArrowDefinitionQAI[] @ Always 4.
@@ -128,9 +130,9 @@ local function get_surface_pool(entity_pool, surface_index)
 end
 
 ---@param cache InserterCacheQAI
----@param tile_width integer @ The size of the inserter itself.
----@param tile_height integer @ The size of the inserter itself.
-local function generate_tiles_cache(cache, tile_width, tile_height)
+local function generate_tiles_cache(cache)
+  local tile_width = cache.tile_width
+  local tile_height = cache.tile_height
   -- Positions are integers, top left is 1, 1.
   local tech_level = cache.tech_level
   local grid_width = tile_width + tech_level.range * 2
@@ -256,9 +258,9 @@ local function generate_lines_cache(cache)
 end
 
 ---@param cache InserterCacheQAI
----@param tile_width integer
----@param tile_height integer
-local function generate_direction_arrow_cache(cache, tile_width, tile_height)
+local function generate_direction_arrow_cache(cache)
+  local tile_width = cache.tile_width
+  local tile_height = cache.tile_height
   local range = cache.tech_level.range
   cache.direction_arrows = {
     {
@@ -369,14 +371,16 @@ local function generate_cache_for_inserter(inserter, tech_level)
     tech_level = tech_level,
     is_square = tile_width == tile_height,
     offset_from_inserter = offset_from_inserter,
+    tile_width = tile_width,
+    tile_height = tile_height,
     tiles = {},
     lines = {},
     direction_arrows = {},
     direction_arrow_vertices = {},
   }
-  generate_tiles_cache(cache, tile_width, tile_height)
+  generate_tiles_cache(cache)
   generate_lines_cache(cache)
-  generate_direction_arrow_cache(cache, tile_width, tile_height)
+  generate_direction_arrow_cache(cache)
   return cache
 end
 
@@ -409,7 +413,7 @@ local function update_inserter_cache()
         all_tiles = false,
         diagonal = true,
         perpendicular = true,
-        drop_offset = true,
+        drop_offset = false,
         range = 3,
       })
     end
@@ -780,7 +784,11 @@ local function switch_to_selecting_drop(player, target_inserter)
     switch_to_idle(player)
   end
   if not try_set_target_inserter(player, target_inserter) then return end
-  place_ninths(player)
+  if player.target_inserter_cache.tech_level.drop_offset then
+    place_ninths(player)
+  else
+    place_squares(player)
+  end
   place_rects(player)
   draw_direction_arrow(player)
   draw_grid(player)
@@ -801,23 +809,37 @@ end
 ---@param player PlayerDataQAI
 ---@param position MapPosition
 local function set_drop_position(player, position)
+  local cache = player.target_inserter_cache
+  local tech_level = cache.tech_level
+  local auto_determine_drop_offset = not tech_level.drop_offset
   local inserter_position = player.target_inserter.position
-  local offset_from_inserter = player.target_inserter_cache.offset_from_inserter
+  local offset_from_inserter = cache.offset_from_inserter
   local left_top_x = inserter_position.x + offset_from_inserter.x
   local left_top_y = inserter_position.y + offset_from_inserter.y
   local relative_x = position.x - left_top_x
   local relative_y = position.y - left_top_y
-  -- Modulo always returns a positive number.
-  local x_from_tile_center = (relative_x % 1) - 0.5
-  local y_from_tile_center = (relative_y % 1) - 0.5
-  -- 51 / 256 = 0.19921875. Vanilla inserter drop positions are offset by 0.2 away from the center, however
-  -- it ultimately gets rounded to 51 / 256, because of map positions. In other words, this matches vanilla.
-  local x_offset = x_from_tile_center == 0 and 0
-    or x_from_tile_center < 0 and -51/256
-    or 51/256
-  local y_offset = y_from_tile_center == 0 and 0
-    or y_from_tile_center < 0 and -51/256
-    or 51/256
+  local x_offset
+  local y_offset
+  if auto_determine_drop_offset then
+    x_offset = relative_x < tech_level.range and -51/256
+      or (tech_level.range + cache.tile_width) < relative_x and 51/256
+      or 0
+    y_offset = relative_y < tech_level.range and -51/256
+      or (tech_level.range + cache.tile_height) < relative_y and 51/256
+      or 0
+  else
+    -- Modulo always returns a positive number.
+    local x_from_tile_center = (relative_x % 1) - 0.5
+    local y_from_tile_center = (relative_y % 1) - 0.5
+    -- 51 / 256 = 0.19921875. Vanilla inserter drop positions are offset by 0.2 away from the center, however
+    -- it ultimately gets rounded to 51 / 256, because of map positions. In other words, this matches vanilla.
+    x_offset = x_from_tile_center == 0 and 0
+      or x_from_tile_center < 0 and -51/256
+      or 51/256
+    y_offset = y_from_tile_center == 0 and 0
+      or y_from_tile_center < 0 and -51/256
+      or 51/256
+  end
   player.target_inserter.drop_position = {
     x = left_top_x + math.floor(relative_x) + 0.5 + x_offset,
     y = left_top_y + math.floor(relative_y) + 0.5 + y_offset,
@@ -863,7 +885,7 @@ local on_adjust_handler_lut = {
       end
       return
     end
-    if selected.name == ninth_entity_name then
+    if selected.name == square_entity_name or selected.name == ninth_entity_name then
       set_drop_position(player, selected.position)
       switch_to_idle(player)
       return
