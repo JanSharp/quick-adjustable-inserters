@@ -73,6 +73,7 @@ global = {}
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
 ---@field line_ids uint64[]
+---@field inserter_circle_id uint64 @ `nil` when idle.
 ---@field direction_arrow_id uint64 @ `nil` when idle.
 ---@field pickup_highlight LuaEntity? @ Can be `nil` even when not idle.
 
@@ -560,7 +561,10 @@ function switch_to_idle(player)
   -- TODO: keep rects, arrow and grid when switching between pickup/drop states
   remove_used_pooled_entities(global.rect_pool, surface_index, player.used_rects)
   destroy_rendering_ids(player.line_ids)
+  rendering.destroy(player.inserter_circle_id)
   rendering.destroy(player.direction_arrow_id)
+  player.inserter_circle_id = nil
+  player.direction_arrow_id = nil
   destroy_pickup_highlight(player)
   player.target_inserter = nil
   player.target_inserter_cache = nil
@@ -703,6 +707,19 @@ local function draw_grid(player)
   local cache = player.target_inserter_cache
   local offset_from_inserter = cache.offset_from_inserter
   local surface = player.target_inserter.surface
+
+  player.inserter_circle_id = rendering.draw_circle{
+    surface = surface,
+    forces = {player.force_index},
+    color = {1, 1, 1},
+    radius = math.min(cache.tile_width, cache.tile_height) / 2 - 0.25,
+    width = 2,
+    target = player.target_inserter,
+    target_offset = {
+      x = offset_from_inserter.x + cache.tech_level.range + cache.tile_width / 2,
+      y = offset_from_inserter.y + cache.tech_level.range + cache.tile_height / 2,
+    },
+  }
 
   -- line drawing
   local from = {}

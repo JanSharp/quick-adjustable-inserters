@@ -29,3 +29,4 @@
 - [ ] what should happen if the inserter gets rotated while the grid/overlay is active?
 - [ ] update existing grids/arrows/invisible entities whenever tech level or inserter prototype changes
 - [ ] listen to destroy events to switch to idle as soon as possible
+- [x] maybe add a rendering circle on the inserter itself
