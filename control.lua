@@ -214,6 +214,9 @@ end
 local function generate_lines_cache(cache)
   local lines = cache.lines
 
+  -- The final lines are represented as points in these grids.
+  -- 0, 0 in horizontal_grid is the line going from the top left corner 1 tile to the right.
+  -- 0, 0 in vertical_grid is the line going from the top left corner 1 tile downwards.
   local horizontal_grid = {}
   local vertical_grid = {}
   local function get_point(x, y)
