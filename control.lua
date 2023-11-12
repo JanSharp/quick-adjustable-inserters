@@ -5,6 +5,7 @@
 ---@field players table<int, PlayerDataQAI>
 ---@field forces table<uint8, ForceDataQAI>
 ---@field inserters_in_use table<uint32, PlayerDataQAI> @ Indexed by inserter unit_number.
+---@field active_players PlayerDataQAI[]|{count: integer, next_index: integer}
 ---@field square_pool EntityPoolQAI
 ---@field ninth_pool EntityPoolQAI
 ---@field rect_pool EntityPoolQAI
@@ -71,10 +72,13 @@ global = {}
 ---@field player_index uint
 ---@field force_index uint8
 ---@field state PlayerStateQAI
+---@field index_in_active_players integer @ `nil` when idle.
 ---`nil` when idle. Must be stored, because we can switch to idle _after_ an entity has been invalidated.
 ---@field target_inserter_unit_number uint32
 ---@field target_inserter LuaEntity @ `nil` when idle.
 ---@field target_inserter_cache InserterCacheQAI @ `nil` when idle.
+---@field target_inserter_position MapPosition @ `nil` when idle.
+---@field target_inserter_direction defines.direction @ `nil` when idle.
 ---`nil` when idle.\
 ---`true` for non square inserters facing west or east.
 ---Those end up pretending to be north and south, but flipped diagonally.
@@ -508,6 +512,26 @@ local function destroy_pickup_highlight(player)
 end
 
 ---@param player PlayerDataQAI
+local function add_active_player(player)
+  local active_players = global.active_players
+  active_players.count = active_players.count + 1
+  active_players[active_players.count] = player
+  player.index_in_active_players = active_players.count
+end
+
+---@param player PlayerDataQAI
+local function remove_active_player(player)
+  local active_players = global.active_players
+  local count = active_players.count
+  local index = player.index_in_active_players
+  active_players[index] = active_players[count]
+  active_players[index].index_in_active_players = index
+  active_players[count] = nil
+  active_players.count = count - 1
+  player.index_in_active_players = nil
+end
+
+---@param player PlayerDataQAI
 local function switch_to_idle(player)
   if player.state == "idle" then return end
   local surface_index = player.current_surface_index
@@ -524,9 +548,12 @@ local function switch_to_idle(player)
   player.direction_arrow_id = nil
   destroy_pickup_highlight(player)
   global.inserters_in_use[player.target_inserter_unit_number] = nil
+  remove_active_player(player)
   player.target_inserter_unit_number = nil
   player.target_inserter = nil
   player.target_inserter_cache = nil
+  player.target_inserter_position = nil
+  player.target_inserter_direction = nil
   player.should_flip = nil
   player.state = "idle"
   if player.player.selected and entity_name_lut[player.player.selected.name] then
@@ -791,9 +818,12 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
     return false
   end
   global.inserters_in_use[unit_number] = player
+  add_active_player(player)
   player.target_inserter_unit_number = unit_number
   player.target_inserter = target_inserter
   player.target_inserter_cache = cache
+  player.target_inserter_position = target_inserter.position
+  player.target_inserter_direction = target_inserter.direction
   player.should_flip = not player.target_inserter_cache.is_square
     and is_east_or_west_lut[target_inserter.direction]
   player.current_surface_index = target_inserter.surface_index
@@ -838,15 +868,16 @@ local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
 end
 
 ---@param player PlayerDataQAI
-local function switch_to_idle_and_back(player)
+---@param do_check_reach boolean?
+local function switch_to_idle_and_back(player, do_check_reach)
   if player.state == "idle" then return end
   local target_inserter = player.target_inserter
   local selecting_pickup = player.state == "selecting-pickup"
   switch_to_idle(player)
   if selecting_pickup then
-    switch_to_selecting_pickup(player, target_inserter)
+    switch_to_selecting_pickup(player, target_inserter, do_check_reach)
   else
-    switch_to_selecting_drop(player, target_inserter)
+    switch_to_selecting_drop(player, target_inserter, do_check_reach)
   end
 end
 
@@ -1023,6 +1054,34 @@ local function init_player(player)
   return player_data
 end
 
+---@param player PlayerDataQAI
+local function update_active_player(player)
+  local inserter = player.target_inserter
+  if not inserter.valid then
+    switch_to_idle(player)
+    return
+  end
+  local position = inserter.position
+  local prev_position = player.target_inserter_position
+  if inserter.direction ~= player.target_inserter_direction
+    or position.x ~= prev_position.x
+    or position.y ~= prev_position.y
+  then
+    switch_to_idle_and_back(player, true)
+  end
+end
+
+script.on_event(ev.on_tick, function(event)
+  local active_players = global.active_players
+  local next_index = active_players.next_index
+  local player = active_players[next_index]
+  if player then
+    update_active_player(player)
+  else
+    active_players.next_index = 1
+  end
+end)
+
 script.on_event("QAI-adjust", function(event)
   local player = get_player(event)
   if not player then return end
@@ -1043,6 +1102,18 @@ script.on_event(ev.on_player_changed_position, function(event)
       switch_to_idle(player)
     end
   end
+end)
+
+script.on_event(ev.on_player_rotated_entity, function(event)
+  local player = global.inserters_in_use[event.entity.unit_number] ---@cast player PlayerDataQAI
+  if not player then return end
+  switch_to_idle_and_back(player)
+end)
+
+script.on_event(ev.script_raised_teleported, function(event)
+  local player = global.inserters_in_use[event.entity.unit_number] ---@cast player PlayerDataQAI
+  if not player then return end
+  switch_to_idle_and_back(player, true)
 end)
 
 for _, destroy_event in pairs{
@@ -1131,6 +1202,7 @@ script.on_init(function()
     players = {},
     forces = {},
     inserters_in_use = {},
+    active_players = {count = 0, next_index = 1},
     square_pool = new_entity_pool(square_entity_name),
     ninth_pool = new_entity_pool(ninth_entity_name),
     rect_pool = new_entity_pool(rect_entity_name),
