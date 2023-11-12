@@ -4,6 +4,7 @@
 ---@class GlobalDataQAI
 ---@field players table<int, PlayerDataQAI>
 ---@field forces table<uint8, ForceDataQAI>
+---@field inserters_in_use table<uint32, PlayerDataQAI> @ Indexed by inserter unit_number.
 ---@field square_pool EntityPoolQAI
 ---@field ninth_pool EntityPoolQAI
 ---@field rect_pool EntityPoolQAI
@@ -70,6 +71,8 @@ global = {}
 ---@field player_index uint
 ---@field force_index uint8
 ---@field state PlayerStateQAI
+---`nil` when idle. Must be stored, because we can switch to idle _after_ an entity has been invalidated.
+---@field target_inserter_unit_number uint32
 ---@field target_inserter LuaEntity @ `nil` when idle.
 ---@field target_inserter_cache InserterCacheQAI @ `nil` when idle.
 ---`nil` when idle.\
@@ -518,6 +521,8 @@ local function switch_to_idle(player)
   player.inserter_circle_id = nil
   player.direction_arrow_id = nil
   destroy_pickup_highlight(player)
+  global.inserters_in_use[player.target_inserter_unit_number] = nil
+  player.target_inserter_unit_number = nil
   player.target_inserter = nil
   player.target_inserter_cache = nil
   player.should_flip = nil
@@ -725,6 +730,10 @@ local function try_set_target_inserter(player, target_inserter)
   if not force then return false end
   local cache = force.inserter_cache_lut[target_inserter.name]
   if not cache then return false end -- Not an inserter that can be adjusted.
+  local unit_number = target_inserter.unit_number ---@cast unit_number -nil
+  if global.inserters_in_use[unit_number] then return false end -- Only 1 player can use an inserter at a time.
+  global.inserters_in_use[unit_number] = player
+  player.target_inserter_unit_number = unit_number
   player.target_inserter = target_inserter
   player.target_inserter_cache = cache
   player.should_flip = not player.target_inserter_cache.is_square
@@ -964,6 +973,23 @@ script.on_event("QAI-adjust", function(event)
   on_adjust_handler_lut[player.state](player, selected)
 end)
 
+for _, destroy_event in pairs{
+  ev.on_entity_died,
+  ev.on_robot_mined_entity,
+  ev.on_player_mined_entity,
+  ev.script_raised_destroy,
+}
+do
+  ---@param event EventData.on_entity_died|EventData.on_robot_mined_entity|EventData.on_player_mined_entity|EventData.script_raised_destroy
+  script.on_event(destroy_event, function(event)
+    local player = global.inserters_in_use[event.entity.unit_number]
+    if not player then return end
+    switch_to_idle(player)
+  end, {
+    {filter = "type", type = "inserter"},
+  })
+end
+
 script.on_event({ev.on_research_finished, ev.on_research_reversed}, function(event)
   local research = event.research
   if not techs_we_care_about[research.name] then return end
@@ -1026,6 +1052,7 @@ script.on_init(function()
   global = {
     players = {},
     forces = {},
+    inserters_in_use = {},
     square_pool = new_entity_pool(square_entity_name),
     ninth_pool = new_entity_pool(ninth_entity_name),
     rect_pool = new_entity_pool(rect_entity_name),
