@@ -72,6 +72,7 @@ global = {}
 ---@field player LuaPlayer
 ---@field player_index uint
 ---@field force_index uint8
+---@field force LuaForce
 ---@field state PlayerStateQAI
 ---@field index_in_active_players integer @ `nil` when idle.
 ---`nil` when idle. Must be stored, because we can switch to idle _after_ an entity has been invalidated.
@@ -80,6 +81,7 @@ global = {}
 ---@field target_inserter_cache InserterCacheQAI @ `nil` when idle.
 ---@field target_inserter_position MapPosition @ `nil` when idle.
 ---@field target_inserter_direction defines.direction @ `nil` when idle.
+---@field target_inserter_force_index uint32 @ `nil` when idle.
 ---`nil` when idle.\
 ---`true` for non square inserters facing west or east.
 ---Those end up pretending to be north and south, but flipped diagonally.
@@ -570,6 +572,7 @@ local function switch_to_idle(player)
   player.target_inserter_cache = nil
   player.target_inserter_position = nil
   player.target_inserter_direction = nil
+  player.target_inserter_force_index = nil
   player.should_flip = nil
   player.state = "idle"
   if player.player.selected and entity_name_lut[player.player.selected.name] then
@@ -821,6 +824,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
   if not force then return false end
   local cache = force.inserter_cache_lut[target_inserter.name]
   if not cache then return false end -- Not an inserter that can be adjusted.
+  if not player.force.valid or not target_inserter.force.is_friend(player.force_index) then return false end
   local unit_number = target_inserter.unit_number ---@cast unit_number -nil
   if global.inserters_in_use[unit_number] then return false end -- Only 1 player can use an inserter at a time.
   if do_check_reach and not player.player.can_reach_entity(target_inserter) then
@@ -840,6 +844,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
   player.target_inserter_cache = cache
   player.target_inserter_position = target_inserter.position
   player.target_inserter_direction = target_inserter.direction
+  player.target_inserter_force_index = target_inserter.force_index
   player.should_flip = not player.target_inserter_cache.is_square
     and is_east_or_west_lut[target_inserter.direction]
   player.current_surface_index = target_inserter.surface_index
@@ -1070,6 +1075,7 @@ local function init_player(player)
     player = player,
     player_index = player.index,
     force_index = player.force_index--[[@as uint8]],
+    force = player.force--[[@as LuaForce]],
     state = "idle",
     used_squares = {},
     used_ninths = {},
@@ -1091,6 +1097,7 @@ local function update_active_player(player)
   local position = inserter.position
   local prev_position = player.target_inserter_position
   if inserter.direction ~= player.target_inserter_direction
+    or inserter.force_index ~= player.target_inserter_force_index
     or position.x ~= prev_position.x
     or position.y ~= prev_position.y
   then
@@ -1174,6 +1181,21 @@ script.on_event(ev.on_force_reset, function(event)
   update_tech_level_for_force(force)
 end)
 
+---@param force LuaForce
+local function recheck_players_in_force(force)
+  for _, player in pairs(force.players) do
+    local player_data = global.players[player.index]
+    if player_data then
+      switch_to_idle_and_back(player_data)
+    end
+  end
+end
+
+script.on_event(ev.on_force_friends_changed, function(event)
+  recheck_players_in_force(event.force)
+  recheck_players_in_force(event.other_force)
+end)
+
 script.on_event(ev.on_surface_deleted, function(event)
   cleanup_deleted_surface_pool(global.square_pool, event.surface_index)
   cleanup_deleted_surface_pool(global.ninth_pool, event.surface_index)
@@ -1184,6 +1206,7 @@ script.on_event(ev.on_player_changed_force, function(event)
   local player = get_player(event)
   if not player then return end
   player.force_index = player.player.force_index--[[@as uint8]]
+  player.force = player.player.force--[[@as LuaForce]]
   switch_to_idle_and_back(player)
 end)
 

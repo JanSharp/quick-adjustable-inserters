@@ -29,8 +29,8 @@
   - [x] switch to idle when leaving
   - [x] ignore interactions with entities that are placed for a different player
   - [x] prevent 2 players from interacting with the same inserter at the same time
-  - [ ] add force restriction
-    - [ ] update player state if an inserter changes force while being adjusted
+  - [x] add force restriction
+    - [x] update player state if an inserter changes force while being adjusted
   - [ ] maybe add flying text when trying to adjust an inserter someone else is adjusting
 - [x] update player state when the inserter gets rotated or teleported while being adjusted
 - [x] update existing grids/arrows/invisible entities whenever tech level or inserter prototype changes
@@ -42,3 +42,4 @@
 - [ ] change all rendering to target a position, not the entity. That way being tick paused in the editor and having mods do weird stuff without raising an event doesn't make this mod look weird
 - [x] add locale for the key bind/control
 - [ ] change default key sequence because it conflicts with bobinserters
+- [ ] maybe make direction arrow a little transparent
