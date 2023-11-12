@@ -1037,6 +1037,12 @@ script.on_event(ev.on_forces_merged, function(event)
   global.forces[event.source_index] = nil
 end)
 
+script.on_event(ev.on_player_left_game, function(event)
+  local player = get_player(event)
+  if not player then return end
+  switch_to_idle(player)
+end)
+
 script.on_event(ev.on_player_created, function(event)
   init_player(game.get_player(event.player_index)--[[@as LuaPlayer]])
 end)

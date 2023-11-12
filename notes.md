@@ -24,7 +24,7 @@
 - [ ] support ghosts, if possible (I think it is)
 - [x] support inserters of any size, and off grid
 - [ ] handle multiplayer
-  - [ ] switch to idle when leaving
+  - [x] switch to idle when leaving
   - [ ] ignore interactions with entities that are placed for a different player
   - [x] prevent 2 players from interacting with the same inserter at the same time
   - [ ] add force restriction
