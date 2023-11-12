@@ -36,3 +36,4 @@
 - [ ] maybe continuously check if the target inserter is still valid, so if the entity disappears without an event, we still clean up reasonably soon.
 - [x] maybe add a rendering circle on the inserter itself
 - [ ] maybe detect inserters that are by default diagonal and allow them to be diagonal first, then perpendicular after research
+- [x] add locale for invisible entities
