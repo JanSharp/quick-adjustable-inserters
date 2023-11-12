@@ -28,8 +28,10 @@
   - [ ] ignore interactions with entities that are placed for a different player
   - [ ] prevent 2 players from interacting with the same inserter at the same time
   - [ ] add force restriction
-- [ ] what should happen if the inserter gets rotated while the grid/overlay is active?
-- [ ] update existing grids/arrows/invisible entities whenever tech level or inserter prototype changes
+- [ ] enter idle state when the inserter gets rotated, teleported or changes force while the grid/overlay is active
+- [x] ~~update existing grids/arrows/invisible entities whenever tech level or inserter prototype changes~~
+  - [x] enter idle state when prototypes change
+  - [ ] update existing grids/arrows/invisible entities whenever tech level changes
 - [ ] listen to destroy events to switch to idle as soon as possible
 - [x] maybe add a rendering circle on the inserter itself
 - [ ] maybe detect inserters that are by default diagonal and allow them to be diagonal first, then perpendicular after research

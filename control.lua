@@ -410,93 +410,6 @@ local function generate_cache_for_inserter(inserter, tech_level)
   return cache
 end
 
----@param player LuaPlayer
----@return PlayerDataQAI
-local function init_player(player)
-  ---@type PlayerDataQAI
-  local player_data = {
-    player = player,
-    player_index = player.index,
-    force_index = player.force_index--[[@as uint8]],
-    state = "idle",
-    used_squares = {},
-    used_ninths = {},
-    used_rects = {},
-    line_ids = {},
-  }
-  global.players[player.index] = player_data
-  return player_data
-end
-
-local switch_to_idle
-
-local function update_inserter_cache()
-  global.inserter_cache_lut = {}
-  for _, inserter in pairs(game.get_filtered_entity_prototypes{{filter = "type", type = "inserter"}}) do
-    if inserter.allow_custom_vectors then
-      -- TODO: Make tech level not hardcoded.
-      global.inserter_cache_lut[inserter.name] = generate_cache_for_inserter(inserter, {
-        all_tiles = false,
-        diagonal = true,
-        perpendicular = true,
-        drop_offset = false,
-        range = 1,
-      })
-    end
-  end
-  for _, player in pairs(global.players) do
-    if player.state ~= "idle" then
-      switch_to_idle(player)
-    end
-  end
-end
-
-script.on_init(function()
-  ---@type GlobalDataQAI
-  global = {
-    players = {},
-    inserter_cache_lut = (nil)--[[@as any]], -- Set in `update_inserter_cache`.
-    square_pool = new_entity_pool(square_entity_name),
-    ninth_pool = new_entity_pool(ninth_entity_name),
-    rect_pool = new_entity_pool(rect_entity_name),
-  }
-  update_inserter_cache()
-  for _, player in pairs(game.players) do
-    init_player(player)
-  end
-end)
-
-script.on_configuration_changed(function(event)
-  if not event.mod_changes["quick_adjustable_inserters"]
-    or event.mod_changes["quick_adjustable_inserters"].old_version
-  then
-    update_inserter_cache()
-  end
-end)
-
-script.on_event(ev.on_player_created, function(event)
-  init_player(game.get_player(event.player_index)--[[@as LuaPlayer]])
-end)
-
-script.on_event(ev.on_player_removed, function(event)
-  local player = get_player(event) ---@cast player -nil
-  switch_to_idle(player)
-  global.players[event.player_index] = nil
-end)
-
-script.on_event(ev.on_surface_deleted, function(event)
-  global.square_pool.surface_pools[event.surface_index] = nil
-  global.ninth_pool.surface_pools[event.surface_index] = nil
-  global.rect_pool.surface_pools[event.surface_index] = nil
-end)
-
-script.on_event(ev.on_player_changed_force, function(event)
-  local player = get_player(event)
-  if not player then return end
-  switch_to_idle(player)
-  player.force_index = player.player.force_index--[[@as uint8]]
-end)
-
 ---@param entity_pool EntityPoolQAI
 ---@param surface LuaSurface
 ---@param force_index uint8
@@ -577,7 +490,7 @@ local function destroy_pickup_highlight(player)
 end
 
 ---@param player PlayerDataQAI
-function switch_to_idle(player)
+local function switch_to_idle(player)
   if player.state == "idle" then return end
   local surface_index = player.current_surface_index
   player.current_surface_index = nil
@@ -951,4 +864,89 @@ script.on_event("QAI-adjust", function(event)
     return
   end
   on_adjust_handler_lut[player.state](player, selected)
+end)
+
+script.on_event(ev.on_surface_deleted, function(event)
+  global.square_pool.surface_pools[event.surface_index] = nil
+  global.ninth_pool.surface_pools[event.surface_index] = nil
+  global.rect_pool.surface_pools[event.surface_index] = nil
+end)
+
+script.on_event(ev.on_player_changed_force, function(event)
+  local player = get_player(event)
+  if not player then return end
+  switch_to_idle(player)
+  player.force_index = player.player.force_index--[[@as uint8]]
+end)
+
+local function update_inserter_cache()
+  global.inserter_cache_lut = {}
+  for _, inserter in pairs(game.get_filtered_entity_prototypes{{filter = "type", type = "inserter"}}) do
+    if inserter.allow_custom_vectors then
+      -- TODO: Make tech level not hardcoded.
+      global.inserter_cache_lut[inserter.name] = generate_cache_for_inserter(inserter, {
+        all_tiles = false,
+        diagonal = true,
+        perpendicular = true,
+        drop_offset = false,
+        range = 1,
+      })
+    end
+  end
+  for _, player in pairs(global.players) do
+    if player.state ~= "idle" then
+      switch_to_idle(player)
+    end
+  end
+end
+
+script.on_configuration_changed(function(event)
+  if not event.mod_changes["quick_adjustable_inserters"]
+    or event.mod_changes["quick_adjustable_inserters"].old_version
+  then
+    update_inserter_cache()
+  end
+end)
+
+---@param player LuaPlayer
+---@return PlayerDataQAI
+local function init_player(player)
+  ---@type PlayerDataQAI
+  local player_data = {
+    player = player,
+    player_index = player.index,
+    force_index = player.force_index--[[@as uint8]],
+    state = "idle",
+    used_squares = {},
+    used_ninths = {},
+    used_rects = {},
+    line_ids = {},
+  }
+  global.players[player.index] = player_data
+  return player_data
+end
+
+script.on_event(ev.on_player_created, function(event)
+  init_player(game.get_player(event.player_index)--[[@as LuaPlayer]])
+end)
+
+script.on_event(ev.on_player_removed, function(event)
+  local player = get_player(event) ---@cast player -nil
+  switch_to_idle(player)
+  global.players[event.player_index] = nil
+end)
+
+script.on_init(function()
+  ---@type GlobalDataQAI
+  global = {
+    players = {},
+    inserter_cache_lut = (nil)--[[@as any]], -- Set in `update_inserter_cache`.
+    square_pool = new_entity_pool(square_entity_name),
+    ninth_pool = new_entity_pool(ninth_entity_name),
+    rect_pool = new_entity_pool(rect_entity_name),
+  }
+  update_inserter_cache()
+  for _, player in pairs(game.players) do
+    init_player(player)
+  end
 end)
