@@ -640,10 +640,11 @@ local function draw_direction_arrow(player)
   local cache = player.target_inserter_cache
   inserter_position.x = inserter_position.x + cache.offset_from_inserter.x + cache.direction_arrow_position.x
   inserter_position.y = inserter_position.y + cache.offset_from_inserter.y + cache.direction_arrow_position.y
+  local opacity = 0.6
   player.direction_arrow_id = rendering.draw_polygon{
     surface = inserter.surface,
     forces = {player.force_index},
-    color = {1, 1, 1},
+    color = {opacity, opacity, opacity, opacity},
     vertices = player.target_inserter_cache.direction_arrow_vertices,
     orientation = inserter.orientation,
     target = inserter_position,

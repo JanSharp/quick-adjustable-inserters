@@ -42,4 +42,4 @@
 - [ ] change all rendering to target a position, not the entity. That way being tick paused in the editor and having mods do weird stuff without raising an event doesn't make this mod look weird
 - [x] add locale for the key bind/control
 - [ ] change default key sequence because it conflicts with bobinserters
-- [ ] maybe make direction arrow a little transparent
+- [x] maybe make direction arrow a little transparent
