@@ -6,6 +6,7 @@
 ---@field forces table<uint8, ForceDataQAI>
 ---@field inserters_in_use table<uint32, PlayerDataQAI> @ Indexed by inserter unit_number.
 ---@field active_players PlayerDataQAI[]|{count: integer, next_index: integer}
+---@field pooled_entities_to_player_lut table<uint32, PlayerDataQAI> @ pooled entity unit number => player index.
 ---@field square_pool EntityPoolQAI
 ---@field ninth_pool EntityPoolQAI
 ---@field rect_pool EntityPoolQAI
@@ -19,13 +20,13 @@ global = {}
 
 ---@class EntityPoolQAI
 ---@field entity_name string
----@field surface_pools table<uint, EntityPoolSurfaceQAI>
+---@field surface_pools table<uint, EntityPoolSurfaceQAI> @ surface_index => surface pool.
 
 ---@class EntityPoolSurfaceQAI
 ---@field free_count int
 ---@field used_count int
----@field free_entities table<uint, LuaEntity>
----@field used_entities table<uint, LuaEntity>
+---@field free_entities table<uint, LuaEntity> @ unit_number => entity.
+---@field used_entities table<uint, LuaEntity> @ unit_number => entity.
 
 ---@class LineDefinitionQAI
 ---@field from MapPosition
@@ -434,11 +435,11 @@ end
 
 ---@param entity_pool EntityPoolQAI
 ---@param surface LuaSurface
----@param force_index uint8
 ---@param position MapPosition
+---@param player PlayerDataQAI @ Only this player should be able to interact with this pooled entity.
 ---@return uint unit_number
 ---@return LuaEntity
-local function place_pooled_entity(entity_pool, surface, force_index, position)
+local function place_pooled_entity(entity_pool, surface, position, player)
   local surface_pool = get_surface_pool(entity_pool, surface.index)
 
   if surface_pool.free_count ~= 0 then
@@ -451,7 +452,8 @@ local function place_pooled_entity(entity_pool, surface, force_index, position)
       surface_pool.free_entities[unit_number] = nil
       surface_pool.used_entities[unit_number] = entity
       entity.teleport(position)
-      entity.force = force_index
+      entity.force = player.force_index
+      global.pooled_entities_to_player_lut[unit_number] = player
       return unit_number, entity
     end
   end
@@ -459,7 +461,7 @@ local function place_pooled_entity(entity_pool, surface, force_index, position)
   local entity = surface.create_entity{
     name = entity_pool.entity_name,
     position = position,
-    force = force_index,
+    force = player.force_index,
   }
   if not entity then
     error("Creating an internal entity required by Quick Adjustable Inserters failed.")
@@ -468,6 +470,7 @@ local function place_pooled_entity(entity_pool, surface, force_index, position)
   local unit_number = entity.unit_number ---@cast unit_number -nil
   surface_pool.used_count = surface_pool.used_count + 1
   surface_pool.used_entities[unit_number] = entity
+  global.pooled_entities_to_player_lut[unit_number] = player
   return unit_number, entity
 end
 
@@ -476,6 +479,7 @@ end
 ---@param unit_number uint
 local function remove_pooled_entity(entity_pool, surface_index, unit_number)
   local surface_pool = entity_pool.surface_pools[surface_index]
+  global.pooled_entities_to_player_lut[unit_number] = nil
   if not surface_pool then return end -- Surface has been deleted already, nothing to do.
   surface_pool.used_count = surface_pool.used_count - 1
   local entity = surface_pool.used_entities[unit_number]
@@ -485,6 +489,18 @@ local function remove_pooled_entity(entity_pool, surface_index, unit_number)
   surface_pool.free_entities[unit_number] = entity
   entity.teleport{x = 0, y = 0}
   entity.force = "neutral"
+end
+
+---Call this after a surface has been deleted.
+---@param entity_pool EntityPoolQAI
+---@param surface_index uint
+local function cleanup_deleted_surface_pool(entity_pool, surface_index)
+  local surface_pool = entity_pool.surface_pools[surface_index]
+  if not surface_pool then return end
+  for unit_number in pairs(surface_pool.used_entities) do
+    global.pooled_entities_to_player_lut[unit_number] = nil
+  end
+  entity_pool.surface_pools[surface_index] = nil
 end
 
 ---@param entity_pool EntityPoolQAI
@@ -588,7 +604,7 @@ local function place_squares(player)
     flip(player, position)
     position.x = position.x + inserter_position.x
     position.y = position.y + inserter_position.y
-    local unit_number = place_pooled_entity(global.square_pool, surface, player.force_index, position)
+    local unit_number = place_pooled_entity(global.square_pool, surface, position, player)
     player.used_squares[#player.used_squares+1] = unit_number
   end
 end
@@ -607,7 +623,7 @@ local function place_ninths(player)
         flip(player, position)
         position.x = position.x + inserter_position.x
         position.y = position.y + inserter_position.y
-        local unit_number = place_pooled_entity(global.ninth_pool, surface, player.force_index, position)
+        local unit_number = place_pooled_entity(global.ninth_pool, surface, position, player)
         player.used_ninths[#player.used_ninths+1] = unit_number
       end
     end
@@ -657,7 +673,7 @@ local function place_rects(player)
     flip(player, position)
     position.x = position.x + inserter_position.x
     position.y = position.y + inserter_position.y
-    local unit_number, entity = place_pooled_entity(global.rect_pool, surface, player.force_index, position)
+    local unit_number, entity = place_pooled_entity(global.rect_pool, surface, position, player)
     entity.direction = player.should_flip and flip_direction_lut[dir_arrow.direction] or dir_arrow.direction
     player.used_rects[#player.used_rects+1] = unit_number
     ::continue::
@@ -932,6 +948,15 @@ local function set_drop_position(player, position)
   }
 end
 
+---@param entity LuaEntity
+---@param selectable_name string
+---@param player PlayerDataQAI
+---@return boolean
+local function is_selectable_for_player(entity, selectable_name, player)
+  return entity.name == selectable_name
+    and global.pooled_entities_to_player_lut[entity.unit_number] == player
+end
+
 ---@type table<string, fun(player: PlayerDataQAI, selected: LuaEntity)>
 local on_adjust_handler_lut = {
   ["idle"] = function(player, selected)
@@ -949,12 +974,12 @@ local on_adjust_handler_lut = {
       end
       return
     end
-    if selected.name == square_entity_name then
+    if is_selectable_for_player(selected, square_entity_name, player) then
       player.target_inserter.pickup_position = selected.position
       switch_to_selecting_drop(player, player.target_inserter)
       return
     end
-    if selected.name == rect_entity_name then
+    if is_selectable_for_player(selected, rect_entity_name, player) then
       set_direction_and_update_arrow(player, selected.direction)
       return
     end
@@ -971,12 +996,14 @@ local on_adjust_handler_lut = {
       end
       return
     end
-    if selected.name == square_entity_name or selected.name == ninth_entity_name then
+    if is_selectable_for_player(selected, square_entity_name, player)
+      or is_selectable_for_player(selected, ninth_entity_name, player)
+    then
       set_drop_position(player, selected.position)
       switch_to_idle(player)
       return
     end
-    if selected.name == rect_entity_name then
+    if is_selectable_for_player(selected, rect_entity_name, player) then
       set_direction_and_update_arrow(player, selected.direction)
       return
     end
@@ -1148,9 +1175,9 @@ script.on_event(ev.on_force_reset, function(event)
 end)
 
 script.on_event(ev.on_surface_deleted, function(event)
-  global.square_pool.surface_pools[event.surface_index] = nil
-  global.ninth_pool.surface_pools[event.surface_index] = nil
-  global.rect_pool.surface_pools[event.surface_index] = nil
+  cleanup_deleted_surface_pool(global.square_pool, event.surface_index)
+  cleanup_deleted_surface_pool(global.ninth_pool, event.surface_index)
+  cleanup_deleted_surface_pool(global.rect_pool, event.surface_index)
 end)
 
 script.on_event(ev.on_player_changed_force, function(event)
@@ -1203,6 +1230,7 @@ script.on_init(function()
     forces = {},
     inserters_in_use = {},
     active_players = {count = 0, next_index = 1},
+    pooled_entities_to_player_lut = {},
     square_pool = new_entity_pool(square_entity_name),
     ninth_pool = new_entity_pool(ninth_entity_name),
     rect_pool = new_entity_pool(rect_entity_name),

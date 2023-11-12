@@ -27,10 +27,11 @@
 - [x] support inserters of any size, and off grid
 - [ ] handle multiplayer
   - [x] switch to idle when leaving
-  - [ ] ignore interactions with entities that are placed for a different player
+  - [x] ignore interactions with entities that are placed for a different player
   - [x] prevent 2 players from interacting with the same inserter at the same time
   - [ ] add force restriction
     - [ ] update player state if an inserter changes force while being adjusted
+  - [ ] maybe add flying text when trying to adjust an inserter someone else is adjusting
 - [x] update player state when the inserter gets rotated or teleported while being adjusted
 - [x] update existing grids/arrows/invisible entities whenever tech level or inserter prototype changes
 - [x] listen to destroy events to switch to idle as soon as possible
@@ -39,3 +40,4 @@
 - [ ] maybe detect inserters that are by default diagonal and allow them to be diagonal first, then perpendicular after research
 - [x] add locale for invisible entities
 - [ ] change all rendering to target a position, not the entity. That way being tick paused in the editor and having mods do weird stuff without raising an event doesn't make this mod look weird
+- [ ] add locale for the shortcut
