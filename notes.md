@@ -3,7 +3,7 @@
 - [x] change visibility of rendering objects to the same force as the player
 - [x] change visibility of highlight entities to a single player
 - [x] switch to idle and back when player changes force
-- [ ] add player reach restriction
+- [x] add player reach restriction
 - [x] impl disabled custom drop vectors
 - [x] impl only perpendicular
 - [x] impl only perpendicular and diagonal

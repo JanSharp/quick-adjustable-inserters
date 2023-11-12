@@ -768,14 +768,28 @@ end
 
 ---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
+---It should only perform reach checks when the player is selecting a new inserter. Any other state switching
+---should not care about being out of reach. Going out of reach while adjusting an inserter is handled in the
+---player position changed event, which is raised for each tile the player moves.
+---@param do_check_reach boolean?
 ---@return boolean
-local function try_set_target_inserter(player, target_inserter)
+local function try_set_target_inserter(player, target_inserter, do_check_reach)
   local force = global.forces[player.force_index]
   if not force then return false end
   local cache = force.inserter_cache_lut[target_inserter.name]
   if not cache then return false end -- Not an inserter that can be adjusted.
   local unit_number = target_inserter.unit_number ---@cast unit_number -nil
   if global.inserters_in_use[unit_number] then return false end -- Only 1 player can use an inserter at a time.
+  if do_check_reach and not player.player.can_reach_entity(target_inserter) then
+    target_inserter.surface.create_entity{
+      name = "flying-text",
+      text = {"cant-reach"},
+      position = target_inserter.position,
+      render_player_index = player.player_index,
+    }
+    player.player.play_sound{path = "utility/cannot_build"}
+    return false
+  end
   global.inserters_in_use[unit_number] = player
   player.target_inserter_unit_number = unit_number
   player.target_inserter = target_inserter
@@ -788,12 +802,13 @@ end
 
 ---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
-local function switch_to_selecting_pickup(player, target_inserter)
+---@param do_check_reach boolean?
+local function switch_to_selecting_pickup(player, target_inserter, do_check_reach)
   if player.state == "selecting-pickup" and player.target_inserter == target_inserter then return end
   if player.state ~= "idle" then
     switch_to_idle(player)
   end
-  if not try_set_target_inserter(player, target_inserter) then return end
+  if not try_set_target_inserter(player, target_inserter, do_check_reach) then return end
   place_squares(player)
   place_rects(player)
   draw_direction_arrow(player)
@@ -803,12 +818,13 @@ end
 
 ---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
-local function switch_to_selecting_drop(player, target_inserter)
+---@param do_check_reach boolean?
+local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
   if player.state == "selecting-drop" and player.target_inserter == target_inserter then return end
   if player.state ~= "idle" then
     switch_to_idle(player)
   end
-  if not try_set_target_inserter(player, target_inserter) then return end
+  if not try_set_target_inserter(player, target_inserter, do_check_reach) then return end
   if player.target_inserter_cache.tech_level.drop_offset then
     place_ninths(player)
   else
@@ -889,7 +905,7 @@ end
 local on_adjust_handler_lut = {
   ["idle"] = function(player, selected)
     if selected.type ~= "inserter" then return end
-    switch_to_selecting_pickup(player, selected)
+    switch_to_selecting_pickup(player, selected, true)
   end,
 
   ["selecting-pickup"] = function(player, selected)
@@ -898,7 +914,7 @@ local on_adjust_handler_lut = {
       if selected == player.target_inserter then
         switch_to_selecting_drop(player, selected)
       else
-        switch_to_selecting_pickup(player, selected)
+        switch_to_selecting_pickup(player, selected, true)
       end
       return
     end
@@ -920,7 +936,7 @@ local on_adjust_handler_lut = {
       if selected == player.target_inserter then
         switch_to_idle(player)
       else
-        switch_to_selecting_pickup(player, selected)
+        switch_to_selecting_pickup(player, selected, true)
       end
       return
     end
@@ -1016,6 +1032,17 @@ script.on_event("QAI-adjust", function(event)
     return
   end
   on_adjust_handler_lut[player.state](player, selected)
+end)
+
+script.on_event(ev.on_player_changed_position, function(event)
+  local player = get_player(event)
+  if not player then return end
+  if player.state ~= "idle" then
+    local inserter = player.target_inserter
+    if not inserter.valid or not player.player.can_reach_entity(inserter) then
+      switch_to_idle(player)
+    end
+  end
 end)
 
 for _, destroy_event in pairs{
