@@ -40,4 +40,5 @@
 - [ ] maybe detect inserters that are by default diagonal and allow them to be diagonal first, then perpendicular after research
 - [x] add locale for invisible entities
 - [ ] change all rendering to target a position, not the entity. That way being tick paused in the editor and having mods do weird stuff without raising an event doesn't make this mod look weird
-- [ ] add locale for the shortcut
+- [x] add locale for the key bind/control
+- [ ] change default key sequence because it conflicts with bobinserters
