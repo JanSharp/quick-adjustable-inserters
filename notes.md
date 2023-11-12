@@ -2,14 +2,14 @@
 - [x] change force of selectable entities to match the player
 - [x] change visibility of rendering objects to the same force as the player
 - [x] change visibility of highlight entities to a single player
-- [x] handle player changing force while in non idle state
+- [x] switch to idle and back when player changes force
 - [ ] add player reach restriction
 - [x] impl disabled custom drop vectors
 - [x] impl only perpendicular
 - [x] impl only perpendicular and diagonal
 - [x] detect and support inserters with already longer base range than 1
-- [ ] support the technologies from bobinsters
-  - [ ] make inserter caches per force
+- [x] support the technologies from bobinsters
+  - [x] make inserter caches per force
 - [x] don't do anything if the inserter doesn't support runtime changeable vectors
 - [ ] maybe add some animations
   - [ ] happy little popup at both the pickup and drop positions (squares getting bigger and transparent)
@@ -29,9 +29,7 @@
   - [ ] prevent 2 players from interacting with the same inserter at the same time
   - [ ] add force restriction
 - [ ] enter idle state when the inserter gets rotated, teleported or changes force while the grid/overlay is active
-- [x] ~~update existing grids/arrows/invisible entities whenever tech level or inserter prototype changes~~
-  - [x] enter idle state when prototypes change
-  - [ ] update existing grids/arrows/invisible entities whenever tech level changes
+- [x] update existing grids/arrows/invisible entities whenever tech level or inserter prototype changes
 - [ ] listen to destroy events to switch to idle as soon as possible
 - [x] maybe add a rendering circle on the inserter itself
 - [ ] maybe detect inserters that are by default diagonal and allow them to be diagonal first, then perpendicular after research

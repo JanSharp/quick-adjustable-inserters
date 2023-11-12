@@ -3,11 +3,17 @@
 
 ---@class GlobalDataQAI
 ---@field players table<int, PlayerDataQAI>
----@field inserter_cache_lut table<string, InserterCacheQAI>
+---@field forces table<uint8, ForceDataQAI>
 ---@field square_pool EntityPoolQAI
 ---@field ninth_pool EntityPoolQAI
 ---@field rect_pool EntityPoolQAI
 global = {}
+
+---@class ForceDataQAI
+---@field force_index uint32
+---@field force LuaForce
+---@field inserter_cache_lut table<string, InserterCacheQAI>
+---@field tech_level TechnologyLevelQAI
 
 ---@class EntityPoolQAI
 ---@field entity_name string
@@ -88,6 +94,14 @@ local entity_name_lut = {
   [square_entity_name] = true,
   [ninth_entity_name] = true,
   [rect_entity_name] = true,
+}
+
+local techs_we_care_about = {
+  ["long-inserters-1"] = true,
+  ["long-inserters-2"] = true,
+  ["near-inserters"] = true,
+  ["more-inserters-1"] = true,
+  ["more-inserters-2"] = true,
 }
 
 local inverse_direction_lut = {
@@ -707,7 +721,9 @@ end
 ---@param target_inserter LuaEntity
 ---@return boolean
 local function try_set_target_inserter(player, target_inserter)
-  local cache = global.inserter_cache_lut[target_inserter.name]
+  local force = global.forces[player.force_index]
+  if not force then return false end
+  local cache = force.inserter_cache_lut[target_inserter.name]
   if not cache then return false end -- Not an inserter that can be adjusted.
   player.target_inserter = target_inserter
   player.target_inserter_cache = cache
@@ -750,6 +766,19 @@ local function switch_to_selecting_drop(player, target_inserter)
   draw_grid(player)
   create_pickup_highlight(player)
   player.state = "selecting-drop"
+end
+
+---@param player PlayerDataQAI
+local function switch_to_idle_and_back(player)
+  if player.state == "idle" then return end
+  local target_inserter = player.target_inserter
+  local selecting_pickup = player.state == "selecting-pickup"
+  switch_to_idle(player)
+  if selecting_pickup then
+    switch_to_selecting_pickup(player, target_inserter)
+  else
+    switch_to_selecting_drop(player, target_inserter)
+  end
 end
 
 ---@param player PlayerDataQAI
@@ -855,58 +884,56 @@ local on_adjust_handler_lut = {
   end,
 }
 
-script.on_event("QAI-adjust", function(event)
-  local player = get_player(event)
-  if not player then return end
-  local selected = player.player.selected
-  if not selected then
-    switch_to_idle(player)
-    return
-  end
-  on_adjust_handler_lut[player.state](player, selected)
-end)
-
-script.on_event(ev.on_surface_deleted, function(event)
-  global.square_pool.surface_pools[event.surface_index] = nil
-  global.ninth_pool.surface_pools[event.surface_index] = nil
-  global.rect_pool.surface_pools[event.surface_index] = nil
-end)
-
-script.on_event(ev.on_player_changed_force, function(event)
-  local player = get_player(event)
-  if not player then return end
-  switch_to_idle(player)
-  player.force_index = player.player.force_index--[[@as uint8]]
-end)
-
-local function update_inserter_cache()
-  global.inserter_cache_lut = {}
+---@param force ForceDataQAI
+local function update_inserter_cache(force)
+  force.inserter_cache_lut = {}
   for _, inserter in pairs(game.get_filtered_entity_prototypes{{filter = "type", type = "inserter"}}) do
     if inserter.allow_custom_vectors then
-      -- TODO: Make tech level not hardcoded.
-      global.inserter_cache_lut[inserter.name] = generate_cache_for_inserter(inserter, {
-        all_tiles = false,
-        diagonal = true,
-        perpendicular = true,
-        drop_offset = false,
-        range = 1,
-      })
+      force.inserter_cache_lut[inserter.name] = generate_cache_for_inserter(inserter, force.tech_level)
     end
   end
-  for _, player in pairs(global.players) do
-    if player.state ~= "idle" then
-      switch_to_idle(player)
+  for _, player in pairs(force.force.players) do
+    local player_data = global.players[player.index]
+    if player_data then
+      switch_to_idle_and_back(player_data)
     end
   end
 end
 
-script.on_configuration_changed(function(event)
-  if not event.mod_changes["quick_adjustable_inserters"]
-    or event.mod_changes["quick_adjustable_inserters"].old_version
-  then
-    update_inserter_cache()
-  end
-end)
+---@param force ForceDataQAI
+local function update_tech_level_for_force(force)
+  local tech_level = force.tech_level
+  local techs = force.force.technologies
+  local long_inserters_1 = techs["long-inserters-1"]
+  local long_inserters_2 = techs["long-inserters-2"]
+  local near_inserters = techs["near-inserters"]
+  local more_inserters_1 = techs["more-inserters-1"]
+  local more_inserters_2 = techs["more-inserters-2"]
+  tech_level.range = long_inserters_2 and long_inserters_2.researched and 3
+    or long_inserters_1 and long_inserters_1.researched and 2
+    or 1
+  tech_level.drop_offset = near_inserters and near_inserters.researched or false
+  tech_level.perpendicular = true
+  tech_level.all_tiles = more_inserters_2 and more_inserters_2.researched or false
+  tech_level.diagonal = tech_level.all_tiles or more_inserters_1 and more_inserters_1.researched or false
+  update_inserter_cache(force)
+end
+
+---@param force LuaForce
+---@return ForceDataQAI
+local function init_force(force)
+  local force_index = force.index
+  ---@type ForceDataQAI
+  local force_data = {
+    force = force,
+    force_index = force_index,
+    tech_level = {},
+    inserter_cache_lut = (nil)--[[@as any]], -- Set in `update_inserter_cache`.
+  }
+  global.forces[force_index] = force_data
+  update_tech_level_for_force(force_data)
+  return force_data
+end
 
 ---@param player LuaPlayer
 ---@return PlayerDataQAI
@@ -926,6 +953,64 @@ local function init_player(player)
   return player_data
 end
 
+script.on_event("QAI-adjust", function(event)
+  local player = get_player(event)
+  if not player then return end
+  local selected = player.player.selected
+  if not selected then
+    switch_to_idle(player)
+    return
+  end
+  on_adjust_handler_lut[player.state](player, selected)
+end)
+
+script.on_event({ev.on_research_finished, ev.on_research_reversed}, function(event)
+  local research = event.research
+  if not techs_we_care_about[research.name] then return end
+  local force = global.forces[research.force.index]
+  if not force then return end
+  update_tech_level_for_force(force)
+end)
+
+script.on_event(ev.on_force_reset, function(event)
+  local force = global.forces[event.force.index]
+  if not force then return end
+  update_tech_level_for_force(force)
+end)
+
+script.on_event(ev.on_surface_deleted, function(event)
+  global.square_pool.surface_pools[event.surface_index] = nil
+  global.ninth_pool.surface_pools[event.surface_index] = nil
+  global.rect_pool.surface_pools[event.surface_index] = nil
+end)
+
+script.on_event(ev.on_player_changed_force, function(event)
+  local player = get_player(event)
+  if not player then return end
+  player.force_index = player.player.force_index--[[@as uint8]]
+  switch_to_idle_and_back(player)
+end)
+
+script.on_configuration_changed(function(event)
+  -- Ignore the event if this mod has just been added, since on_init ran already anyway.
+  if not event.mod_changes["quick_adjustable_inserters"]
+    or event.mod_changes["quick_adjustable_inserters"].old_version
+  then
+    for _, force in pairs(global.forces) do
+      update_tech_level_for_force(force)
+    end
+  end
+end)
+
+script.on_event(ev.on_force_created, function(event)
+  init_force(event.force)
+end)
+
+script.on_event(ev.on_forces_merged, function(event)
+  -- Merging forces raises the player changed force event, so nothing else to do here.
+  global.forces[event.source_index] = nil
+end)
+
 script.on_event(ev.on_player_created, function(event)
   init_player(game.get_player(event.player_index)--[[@as LuaPlayer]])
 end)
@@ -940,12 +1025,14 @@ script.on_init(function()
   ---@type GlobalDataQAI
   global = {
     players = {},
-    inserter_cache_lut = (nil)--[[@as any]], -- Set in `update_inserter_cache`.
+    forces = {},
     square_pool = new_entity_pool(square_entity_name),
     ninth_pool = new_entity_pool(ninth_entity_name),
     rect_pool = new_entity_pool(rect_entity_name),
   }
-  update_inserter_cache()
+  for _, force in pairs(game.forces) do
+    init_force(force)
+  end
   for _, player in pairs(game.players) do
     init_player(player)
   end
