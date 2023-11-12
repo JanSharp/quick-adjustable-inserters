@@ -815,6 +815,21 @@ end
 
 ---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
+---@param message LocalisedString
+---@return false
+local function show_error(player, target_inserter, message)
+  target_inserter.surface.create_entity{
+    name = "flying-text",
+    text = message,
+    position = target_inserter.position,
+    render_player_index = player.player_index,
+  }
+  player.player.play_sound{path = "utility/cannot_build"}
+  return false
+end
+
+---@param player PlayerDataQAI
+---@param target_inserter LuaEntity
 ---It should only perform reach checks when the player is selecting a new inserter. Any other state switching
 ---should not care about being out of reach. Going out of reach while adjusting an inserter is handled in the
 ---player position changed event, which is raised for each tile the player moves.
@@ -822,22 +837,27 @@ end
 ---@return boolean
 local function try_set_target_inserter(player, target_inserter, do_check_reach)
   local force = global.forces[player.force_index]
-  if not force then return false end
+  if not force or not player.force.valid then return false end
+
   local cache = force.inserter_cache_lut[target_inserter.name]
-  if not cache then return false end -- Not an inserter that can be adjusted.
-  if not player.force.valid or not target_inserter.force.is_friend(player.force_index) then return false end
-  local unit_number = target_inserter.unit_number ---@cast unit_number -nil
-  if global.inserters_in_use[unit_number] then return false end -- Only 1 player can use an inserter at a time.
-  if do_check_reach and not player.player.can_reach_entity(target_inserter) then
-    target_inserter.surface.create_entity{
-      name = "flying-text",
-      text = {"cant-reach"},
-      position = target_inserter.position,
-      render_player_index = player.player_index,
-    }
-    player.player.play_sound{path = "utility/cannot_build"}
-    return false
+  if not cache then
+    return show_error(player, target_inserter, {"qai.cant-change-inserter-at-runtime"})
   end
+
+  -- Specifically check if the force of the inserter is friends with the player. Friendship is one directional.
+  if not target_inserter.force.is_friend(player.force_index) then
+    return show_error(player, target_inserter, {"cant-rotate-enemy-structures"})
+  end
+
+  if do_check_reach and not player.player.can_reach_entity(target_inserter) then
+    return show_error(player, target_inserter, {"cant-reach"})
+  end
+
+  local unit_number = target_inserter.unit_number ---@cast unit_number -nil
+  if global.inserters_in_use[unit_number] then
+    return show_error(player, target_inserter, {"qai.only-one-player-can-adjust"})
+  end
+
   global.inserters_in_use[unit_number] = player
   add_active_player(player)
   player.target_inserter_unit_number = unit_number

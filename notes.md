@@ -25,13 +25,13 @@
   - [ ] upon leaving, restore the cursor, if possible and if it didn't change through other means in the mean time
 - [ ] support ghosts, if possible (I think it is)
 - [x] support inserters of any size, and off grid
-- [ ] handle multiplayer
+- [x] handle multiplayer
   - [x] switch to idle when leaving
   - [x] ignore interactions with entities that are placed for a different player
   - [x] prevent 2 players from interacting with the same inserter at the same time
   - [x] add force restriction
     - [x] update player state if an inserter changes force while being adjusted
-  - [ ] maybe add flying text when trying to adjust an inserter someone else is adjusting
+  - [x] maybe add flying text when trying to adjust an inserter someone else is adjusting
 - [x] update player state when the inserter gets rotated or teleported while being adjusted
 - [x] update existing grids/arrows/invisible entities whenever tech level or inserter prototype changes
 - [x] listen to destroy events to switch to idle as soon as possible
