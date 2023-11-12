@@ -84,6 +84,7 @@ global = {}
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
 ---@field line_ids uint64[]
+---@field background_ids uint64[]
 ---@field inserter_circle_id uint64 @ `nil` when idle.
 ---@field direction_arrow_id uint64 @ `nil` when idle.
 ---@field pickup_highlight LuaEntity? @ Can be `nil` even when not idle.
@@ -516,6 +517,7 @@ local function switch_to_idle(player)
   -- TODO: keep rects, arrow and grid when switching between pickup/drop states
   remove_used_pooled_entities(global.rect_pool, surface_index, player.used_rects)
   destroy_rendering_ids(player.line_ids)
+  destroy_rendering_ids(player.background_ids)
   rendering.destroy(player.inserter_circle_id)
   rendering.destroy(player.direction_arrow_id)
   player.inserter_circle_id = nil
@@ -660,14 +662,13 @@ local function set_direction_and_update_arrow(player, new_direction)
 end
 
 ---@param player PlayerDataQAI
-local function draw_grid(player)
+local function draw_circle_on_inserter(player)
   local cache = player.target_inserter_cache
   local offset_from_inserter = cache.offset_from_inserter
-  local surface = player.target_inserter.surface
 
   local max_range = cache.tech_level.range + cache.range_gap_from_center
   player.inserter_circle_id = rendering.draw_circle{
-    surface = surface,
+    surface = player.target_inserter.surface,
     forces = {player.force_index},
     color = {1, 1, 1},
     radius = math.min(cache.tile_width, cache.tile_height) / 2 - 0.25,
@@ -678,13 +679,18 @@ local function draw_grid(player)
       y = offset_from_inserter.y + max_range + cache.tile_height / 2,
     },
   }
+end
 
-  -- line drawing
+---@param player PlayerDataQAI
+local function draw_grid_lines(player)
+  local cache = player.target_inserter_cache
+  local offset_from_inserter = cache.offset_from_inserter
+
   local from = {}
   local to = {}
   ---@type LuaRendering.draw_line_param
   local line_param = {
-    surface = surface,
+    surface = player.target_inserter.surface,
     forces = {player.force_index},
     color = {1, 1, 1},
     width = 1,
@@ -703,6 +709,44 @@ local function draw_grid(player)
     flip(player, to)
     player.line_ids[#player.line_ids+1] = rendering.draw_line(line_param)
   end
+end
+
+---@param player PlayerDataQAI
+local function draw_grid_background(player)
+  local cache = player.target_inserter_cache
+  local offset_from_inserter = cache.offset_from_inserter
+
+  local left_top = {}
+  local right_bottom = {}
+  local opacity = 0.2
+  ---@type LuaRendering.draw_rectangle_param
+  local rectangle_param = {
+    surface = player.target_inserter.surface,
+    forces = {player.force_index},
+    color = {opacity, opacity, opacity, opacity},
+    filled = true,
+    left_top = player.target_inserter,
+    left_top_offset = left_top,
+    right_bottom = player.target_inserter,
+    right_bottom_offset = right_bottom,
+  }
+
+  for _, tile in pairs(cache.tiles) do
+    left_top.x = offset_from_inserter.x + tile.x
+    left_top.y = offset_from_inserter.y + tile.y
+    right_bottom.x = offset_from_inserter.x + tile.x + 1
+    right_bottom.y = offset_from_inserter.y + tile.y + 1
+    flip(player, left_top)
+    flip(player, right_bottom)
+    player.background_ids[#player.background_ids+1] = rendering.draw_rectangle(rectangle_param)
+  end
+end
+
+---@param player PlayerDataQAI
+local function draw_grid(player)
+  draw_circle_on_inserter(player)
+  draw_grid_lines(player)
+  draw_grid_background(player)
 end
 
 ---@param player PlayerDataQAI
@@ -957,6 +1001,7 @@ local function init_player(player)
     used_ninths = {},
     used_rects = {},
     line_ids = {},
+    background_ids = {},
   }
   global.players[player.index] = player_data
   return player_data
