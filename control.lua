@@ -275,6 +275,17 @@ local function check_and_remove_point(grid, point)
   return exists
 end
 
+---@return boolean @ Returns true if all the points in the row existed.
+local function check_and_remove_point_row(grid, left, right, y)
+  for x = left, right do
+    if not grid[get_point(x, y)] then return false end
+  end
+  for x = left, right do
+    grid[get_point(x, y)] = nil
+  end
+  return true
+end
+
 ---@param cache InserterCacheQAI
 local function generate_tiles_background_cache(cache)
   local count = 0
@@ -286,15 +297,44 @@ local function generate_tiles_background_cache(cache)
     vertices_flipped[count] = {target = {x = y, y = x}}
   end
 
+  ---@type table<uint32, true>
+  local grid = {}
+
   for _, tile in pairs(cache.tiles) do
-    -- The stupid way of doing it.
-    -- TODO: reuse vertices, combine adjacent tiles.
-    add(tile.x, tile.y)
-    add(tile.x, tile.y)
-    add(tile.x + 1, tile.y)
-    add(tile.x, tile.y + 1)
-    add(tile.x + 1, tile.y + 1)
-    add(tile.x + 1, tile.y + 1)
+    grid[get_point(tile.x, tile.y)] = true
+  end
+
+  while true do
+    local base_point = next(grid)
+    if not base_point then break end
+    grid[base_point] = nil
+
+    local left, top = get_xy(base_point)
+    local right, bottom = left, top
+    while check_and_remove_point(grid, get_point(left - 1, top)) do
+      left = left - 1
+    end
+    while check_and_remove_point(grid, get_point(right + 1, top)) do
+      right = right + 1
+    end
+    while check_and_remove_point_row(grid, left, right, top - 1) do
+      top = top - 1
+    end
+    while check_and_remove_point_row(grid, left, right, bottom + 1) do
+      bottom = bottom + 1
+    end
+
+    -- For example, with left, right, top and bottom all being 0 it's actually a 1 by 1 area.
+    right = right + 1
+    bottom = bottom + 1
+    -- Drawing each rectangle disconnected from each other even when some of their vertices are touching is
+    -- slightly less efficient, but overall doesn't actually add that many vertices.
+    add(left, top)
+    add(left, top)
+    add(left, bottom)
+    add(right, top)
+    add(right, bottom)
+    add(right, bottom)
   end
 end
 
