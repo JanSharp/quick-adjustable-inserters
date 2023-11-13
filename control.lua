@@ -73,8 +73,11 @@ global = {}
 ---@class PlayerDataQAI
 ---@field player LuaPlayer
 ---@field player_index uint
+---If at any point a mod changes a player's force and some mod causes this mod here to use this force_index
+---inside of their on_player_changed_force, before this mod here gets the event, then there will be errors
+---I'm guessing. But that's worth the performance improvement of having this cached for all the performance
+---critical code paths using it. (Same applies to force merging, probably.)
 ---@field force_index uint8
----@field force LuaForce
 ---@field state PlayerStateQAI
 ---@field index_in_active_players integer @ `nil` when idle.
 ---`nil` when idle. Must be stored, because we can switch to idle _after_ an entity has been invalidated.
@@ -905,7 +908,7 @@ end
 ---@return boolean
 local function try_set_target_inserter(player, target_inserter, do_check_reach)
   local force = global.forces[player.force_index]
-  if not force or not player.force.valid then return false end
+  if not force then return false end
 
   local cache = force.inserter_cache_lut[target_inserter.name]
   if not cache then
@@ -1162,7 +1165,6 @@ local function init_player(player)
     player = player,
     player_index = player.index,
     force_index = player.force_index--[[@as uint8]],
-    force = player.force--[[@as LuaForce]],
     state = "idle",
     used_squares = {},
     used_ninths = {},
@@ -1292,7 +1294,6 @@ script.on_event(ev.on_player_changed_force, function(event)
   local player = get_player(event)
   if not player then return end
   player.force_index = player.player.force_index--[[@as uint8]]
-  player.force = player.player.force--[[@as LuaForce]]
   switch_to_idle_and_back(player)
 end)
 

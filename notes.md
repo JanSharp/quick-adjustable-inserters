@@ -44,4 +44,3 @@
 - [x] add locale for the key bind/control
 - [ ] change default key sequence because it conflicts with bobinserters
 - [x] maybe make direction arrow a little transparent
-- [ ] just use player.player.force_index instead of all the caching crap
