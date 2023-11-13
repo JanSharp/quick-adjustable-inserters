@@ -40,7 +40,7 @@
 - [x] maybe add a rendering circle on the inserter itself
 - [ ] maybe detect inserters that are by default diagonal and allow them to be diagonal first, then perpendicular after research
 - [x] add locale for invisible entities
-- [ ] change all rendering to target a position, not the entity. That way being tick paused in the editor and having mods do weird stuff without raising an event doesn't make this mod look weird
+- [x] change all rendering to target a position, not the entity. That way being tick paused in the editor and having mods do weird stuff without raising an event doesn't make this mod look weird
 - [x] add locale for the key bind/control
 - [ ] change default key sequence because it conflicts with bobinserters
 - [x] maybe make direction arrow a little transparent

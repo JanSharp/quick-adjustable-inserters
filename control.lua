@@ -796,8 +796,8 @@ end
 ---@param player PlayerDataQAI
 local function draw_circle_on_inserter(player)
   local cache = player.target_inserter_cache
+  local inserter_position = player.target_inserter_position
   local offset_from_inserter = cache.offset_from_inserter
-
   local max_range = cache.tech_level.range + cache.range_gap_from_center
   player.inserter_circle_id = rendering.draw_circle{
     surface = player.target_inserter.surface,
@@ -805,10 +805,9 @@ local function draw_circle_on_inserter(player)
     color = {1, 1, 1},
     radius = math.min(cache.tile_width, cache.tile_height) / 2 - 0.25,
     width = 2,
-    target = player.target_inserter,
-    target_offset = {
-      x = offset_from_inserter.x + max_range + cache.tile_width / 2,
-      y = offset_from_inserter.y + max_range + cache.tile_height / 2,
+    target = {
+      x = inserter_position.x + offset_from_inserter.x + max_range + cache.tile_width / 2,
+      y = inserter_position.y + offset_from_inserter.y + max_range + cache.tile_height / 2,
     },
   }
 end
@@ -816,8 +815,8 @@ end
 ---@param player PlayerDataQAI
 local function draw_grid_lines(player)
   local cache = player.target_inserter_cache
+  local inserter_position = player.target_inserter_position
   local offset_from_inserter = cache.offset_from_inserter
-
   local from = {}
   local to = {}
   ---@type LuaRendering.draw_line_param
@@ -826,10 +825,8 @@ local function draw_grid_lines(player)
     forces = {player.force_index},
     color = {1, 1, 1},
     width = 1,
-    from = player.target_inserter,
-    from_offset = from,
-    to = player.target_inserter,
-    to_offset = to,
+    from = from,
+    to = to,
   }
 
   for _, line in pairs(cache.lines) do
@@ -839,6 +836,10 @@ local function draw_grid_lines(player)
     to.y = offset_from_inserter.y + line.to.y
     flip(player, from)
     flip(player, to)
+    from.x = from.x + inserter_position.x
+    from.y = from.y + inserter_position.y
+    to.x = to.x + inserter_position.x
+    to.y = to.y + inserter_position.y
     player.line_ids[#player.line_ids+1] = rendering.draw_line(line_param)
   end
 end
@@ -846,6 +847,14 @@ end
 ---@param player PlayerDataQAI
 local function draw_grid_background(player)
   local cache = player.target_inserter_cache
+  local inserter_position = player.target_inserter_position
+  local target = {
+    x = cache.offset_from_inserter.x,
+    y = cache.offset_from_inserter.y,
+  }
+  flip(player, target)
+  target.x = target.x + inserter_position.x
+  target.y = target.y + inserter_position.y
   local opacity = 0.2
   player.background_polygon_id = rendering.draw_polygon{
     surface = player.target_inserter.surface,
@@ -854,8 +863,7 @@ local function draw_grid_background(player)
     vertices = player.should_flip
       and cache.tiles_background_vertices_flipped
       or cache.tiles_background_vertices,
-    target = player.target_inserter,
-    target_offset = flip(player, cache.offset_from_inserter, true)--[[@as Vector]],
+    target = target,
   }
 end
 
