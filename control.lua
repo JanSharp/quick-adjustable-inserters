@@ -559,9 +559,11 @@ local function remove_used_pooled_entities(entity_pool, surface_index, used_unit
 end
 
 ---@param ids uint64[]
-local function destroy_rendering_ids(ids)
-  for _, id in pairs(ids) do
-    rendering.destroy(id)
+local function destroy_and_clear_rendering_ids(ids)
+  local destroy = rendering.destroy
+  for i = #ids, 1, -1 do
+    destroy(ids[i])
+    ids[i] = nil
   end
 end
 
@@ -601,7 +603,7 @@ local function switch_to_idle(player)
   remove_used_pooled_entities(global.ninth_pool, surface_index, player.used_ninths)
   -- TODO: keep rects, arrow and grid when switching between pickup/drop states
   remove_used_pooled_entities(global.rect_pool, surface_index, player.used_rects)
-  destroy_rendering_ids(player.line_ids)
+  destroy_and_clear_rendering_ids(player.line_ids)
   rendering.destroy(player.background_polygon_id)
   rendering.destroy(player.inserter_circle_id)
   rendering.destroy(player.direction_arrow_id)
