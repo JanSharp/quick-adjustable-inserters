@@ -485,7 +485,7 @@ end
 ---@return uint unit_number
 ---@return LuaEntity
 local function place_pooled_entity(entity_pool, surface, position, player)
-  local surface_pool = get_surface_pool(entity_pool, surface.index)
+  local surface_pool = get_surface_pool(entity_pool, player.current_surface_index)
 
   if surface_pool.free_count ~= 0 then
     surface_pool.free_count = surface_pool.free_count - 1
