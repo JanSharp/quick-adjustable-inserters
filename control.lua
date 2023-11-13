@@ -51,6 +51,8 @@ global = {}
 ---@field tile_width integer
 ---@field tile_height integer
 ---@field tiles MapPosition[]
+---@field tiles_background_vertices ScriptRenderVertexTarget[]
+---@field tiles_background_vertices_flipped ScriptRenderVertexTarget[]
 ---@field lines LineDefinitionQAI[]
 ---@field direction_arrows DirectionArrowDefinitionQAI[] @ Always 4.
 ---@field direction_arrow_position MapPosition
@@ -91,7 +93,7 @@ global = {}
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
 ---@field line_ids uint64[]
----@field background_ids uint64[]
+---@field background_polygon_id uint64 @ `nil` when idle.
 ---@field inserter_circle_id uint64 @ `nil` when idle.
 ---@field direction_arrow_id uint64 @ `nil` when idle.
 ---@field pickup_highlight LuaEntity? @ Can be `nil` even when not idle.
@@ -247,6 +249,29 @@ local function generate_tiles_cache(cache)
         y = (i > tech_level.range and (i + tile_height + gap * 2) or i) - 1,
       }
     end
+  end
+end
+
+---@param cache InserterCacheQAI
+local function generate_tiles_background_cache(cache)
+  local count = 0
+  local vertices = cache.tiles_background_vertices
+  local vertices_flipped = cache.tiles_background_vertices_flipped
+  local function add(x, y)
+    count = count + 1
+    vertices[count] = {target = {x = x, y = y}}
+    vertices_flipped[count] = {target = {x = y, y = x}}
+  end
+
+  for _, tile in pairs(cache.tiles) do
+    -- The stupid way of doing it.
+    -- TODO: reuse vertices, combine adjacent tiles.
+    add(tile.x, tile.y)
+    add(tile.x, tile.y)
+    add(tile.x + 1, tile.y)
+    add(tile.x, tile.y + 1)
+    add(tile.x + 1, tile.y + 1)
+    add(tile.x + 1, tile.y + 1)
   end
 end
 
@@ -437,6 +462,8 @@ local function generate_cache_for_inserter(inserter, tech_level)
     tile_width = tile_width,
     tile_height = tile_height,
     tiles = {},
+    tiles_background_vertices = {},
+    tiles_background_vertices_flipped = {},
     lines = {},
     direction_arrows = {},
     direction_arrow_vertices = {},
@@ -445,6 +472,7 @@ local function generate_cache_for_inserter(inserter, tech_level)
   offset_from_inserter.x = offset_from_inserter.x - cache.range_gap_from_center
   offset_from_inserter.y = offset_from_inserter.y - cache.range_gap_from_center
   generate_tiles_cache(cache)
+  generate_tiles_background_cache(cache)
   generate_lines_cache(cache)
   generate_direction_arrow_cache(cache)
   return cache
@@ -574,9 +602,10 @@ local function switch_to_idle(player)
   -- TODO: keep rects, arrow and grid when switching between pickup/drop states
   remove_used_pooled_entities(global.rect_pool, surface_index, player.used_rects)
   destroy_rendering_ids(player.line_ids)
-  destroy_rendering_ids(player.background_ids)
+  rendering.destroy(player.background_polygon_id)
   rendering.destroy(player.inserter_circle_id)
   rendering.destroy(player.direction_arrow_id)
+  player.background_polygon_id = nil
   player.inserter_circle_id = nil
   player.direction_arrow_id = nil
   destroy_pickup_highlight(player)
@@ -761,32 +790,17 @@ end
 ---@param player PlayerDataQAI
 local function draw_grid_background(player)
   local cache = player.target_inserter_cache
-  local offset_from_inserter = cache.offset_from_inserter
-
-  local left_top = {}
-  local right_bottom = {}
   local opacity = 0.2
-  ---@type LuaRendering.draw_rectangle_param
-  local rectangle_param = {
+  player.background_polygon_id = rendering.draw_polygon{
     surface = player.target_inserter.surface,
     forces = {player.force_index},
     color = {opacity, opacity, opacity, opacity},
-    filled = true,
-    left_top = player.target_inserter,
-    left_top_offset = left_top,
-    right_bottom = player.target_inserter,
-    right_bottom_offset = right_bottom,
+    vertices = player.should_flip
+      and cache.tiles_background_vertices_flipped
+      or cache.tiles_background_vertices,
+    target = player.target_inserter,
+    target_offset = flip(player, cache.offset_from_inserter, true)--[[@as Vector]],
   }
-
-  for _, tile in pairs(cache.tiles) do
-    left_top.x = offset_from_inserter.x + tile.x
-    left_top.y = offset_from_inserter.y + tile.y
-    right_bottom.x = offset_from_inserter.x + tile.x + 1
-    right_bottom.y = offset_from_inserter.y + tile.y + 1
-    flip(player, left_top)
-    flip(player, right_bottom)
-    player.background_ids[#player.background_ids+1] = rendering.draw_rectangle(rectangle_param)
-  end
 end
 
 ---@param player PlayerDataQAI
@@ -1101,7 +1115,6 @@ local function init_player(player)
     used_ninths = {},
     used_rects = {},
     line_ids = {},
-    background_ids = {},
   }
   global.players[player.index] = player_data
   return player_data

@@ -16,7 +16,7 @@
   - [ ] with it lines connecting the 2, and a circle on the inserter base itself
   - [ ] do it in a way where there isn't any overlapping lines, so transparency doesn't screw us
 - [x] maybe add very transparent white rendering in each tile that you can actually interact with
-  - [ ] generate vertices for a polygon and save it in cache, so the entire background is just 1 polygon
+  - [x] generate vertices for a polygon and save it in cache, so the entire background is just 1 polygon
 - [ ] speaking of, what if the entire grid was just a polygon that's cached
 - [ ] estimate inserter speed
 - [ ] add feature where you can place the inserter using this mods key bind and it will automatically uses the same pickup and drop vectors as the last modified inserter, if they have the same dimensions.
@@ -43,3 +43,4 @@
 - [x] add locale for the key bind/control
 - [ ] change default key sequence because it conflicts with bobinserters
 - [x] maybe make direction arrow a little transparent
+- [ ] just use player.player.force_index instead of all the caching crap
