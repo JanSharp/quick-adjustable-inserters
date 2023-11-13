@@ -47,13 +47,16 @@ global = {}
 ---@field is_square boolean @ When false, `vertical_offset_from_inserter ~= horizontal_offset_from_inserter`.
 ---@field base_range integer
 ---@field range_gap_from_center integer
----@field offset_from_inserter MapPosition @ For north and south. For east and west, flip x and y.
+---@field offset_from_inserter MapPosition
+---@field offset_from_inserter_flipped MapPosition @ Use when `player.should_flip` is true.
 ---@field tile_width integer
 ---@field tile_height integer
 ---@field tiles MapPosition[]
+---@field tiles_flipped MapPosition[]
 ---@field tiles_background_vertices ScriptRenderVertexTarget[]
 ---@field tiles_background_vertices_flipped ScriptRenderVertexTarget[]
 ---@field lines LineDefinitionQAI[]
+---@field lines_flipped LineDefinitionQAI[]
 ---@field direction_arrows DirectionArrowDefinitionQAI[] @ Always 4.
 ---@field direction_arrow_position MapPosition
 ---@field direction_arrow_vertices ScriptRenderVertexTarget[]
@@ -164,15 +167,10 @@ end
 
 ---@param player PlayerDataQAI
 ---@param pos MapPosition
----@param do_copy boolean?
 ---@return MapPosition
-local function flip(player, pos, do_copy)
+local function flip(player, pos)
   if player.should_flip then
-    if do_copy then
-      pos = {x = pos.y, y = pos.x}
-    else
-      pos.x, pos.y = pos.y, pos.x
-    end
+    pos.x, pos.y = pos.y, pos.x
   end
   return pos
 end
@@ -202,7 +200,20 @@ local function generate_tiles_cache(cache)
   local max_range = tech_level.range + gap
   local grid_width = tile_width + max_range * 2
   local grid_height = tile_height + max_range * 2
+
+  local count = 0
   local tiles = cache.tiles
+  local tiles_flipped = cache.tiles_flipped
+  ---@param x integer @ 1 based values.
+  ---@param y integer @ 1 based values.
+  local function add(x, y)
+    -- Convert to 0 based.
+    x = x - 1
+    y = y - 1
+    count = count + 1
+    tiles[count] = {x = x, y = y}
+    tiles_flipped[count] = {x = y, y = x}
+  end
 
   if tech_level.all_tiles then
     for y = 1, grid_height do
@@ -210,7 +221,7 @@ local function generate_tiles_cache(cache)
         if not (tech_level.range < x and x <= tech_level.range + tile_width + gap * 2
           and tech_level.range < y and y <= tech_level.range + tile_height + gap * 2)
         then
-          tiles[#tiles+1] = {x = x - 1, y = y - 1}
+          add(x, y)
         end
       end
     end
@@ -227,7 +238,7 @@ local function generate_tiles_cache(cache)
         if x > tech_level.range then
           x = x + tile_width + gap * 2
         end
-        tiles[#tiles+1] = {x = x - 1, y = y - 1}
+        add(x, y)
       end
     end
     for x = max_range + 1, max_range + tile_width do
@@ -235,22 +246,22 @@ local function generate_tiles_cache(cache)
         if y > tech_level.range then
           y = y + tile_height + gap * 2
         end
-        tiles[#tiles+1] = {x = x - 1, y = y - 1}
+        add(x, y)
       end
     end
   end
 
   if tech_level.diagonal then
     for i = 1, tech_level.range * 2 do
-      tiles[#tiles+1] = {
-        x = (i > tech_level.range and (i + tile_width + gap * 2) or i) - 1,
-        y = (i > tech_level.range and (i + tile_height + gap * 2) or i) - 1,
-      }
+      add(
+        i > tech_level.range and (i + tile_width + gap * 2) or i,
+        i > tech_level.range and (i + tile_height + gap * 2) or i
+      )
       local x = tech_level.range * 2 - i + 1
-      tiles[#tiles+1] = {
-        x = (x > tech_level.range and (x + tile_width + gap * 2) or x) - 1,
-        y = (i > tech_level.range and (i + tile_height + gap * 2) or i) - 1,
-      }
+      add(
+        x > tech_level.range and (x + tile_width + gap * 2) or x,
+        i > tech_level.range and (i + tile_height + gap * 2) or i
+      )
     end
   end
 end
@@ -343,7 +354,24 @@ end
 
 ---@param cache InserterCacheQAI
 local function generate_lines_cache(cache)
+  local count = 0
   local lines = cache.lines
+  local lines_flipped = cache.lines_flipped
+  ---@param line LineDefinitionQAI
+  local function add(line)
+    count = count + 1
+    lines[count] = line
+    lines_flipped[count] = {
+      from = {
+        x = line.from.y,
+        y = line.from.x,
+      },
+      to = {
+        x = line.to.y,
+        y = line.to.x,
+      },
+    }
+  end
 
   -- The final lines are represented as points in these grids.
   -- 0, 0 in horizontal_grid is the line going from the top left corner 1 tile to the right.
@@ -373,7 +401,7 @@ local function generate_lines_cache(cache)
     while check_and_remove_point(horizontal_grid, get_point(to_x + 1, y)) do
       to_x = to_x + 1
     end
-    lines[#lines+1] = {
+    add{
       from = {x = from_x, y = y},
       to = {x = to_x + 1, y = y},
     }
@@ -392,7 +420,7 @@ local function generate_lines_cache(cache)
     while check_and_remove_point(vertical_grid, get_point(x, to_y + 1)) do
       to_y = to_y + 1
     end
-    lines[#lines+1] = {
+    add{
       from = {x = x, y = from_y},
       to = {x = x, y = to_y + 1},
     }
@@ -513,18 +541,25 @@ local function generate_cache_for_inserter(inserter, tech_level)
     tech_level = tech_level,
     is_square = tile_width == tile_height,
     offset_from_inserter = offset_from_inserter,
+    offset_from_inserter_flipped = (nil)--[[@as any]], -- Set after the `calculate_cached_base_reach` call.
     tile_width = tile_width,
     tile_height = tile_height,
     tiles = {},
+    tiles_flipped = {},
     tiles_background_vertices = {},
     tiles_background_vertices_flipped = {},
     lines = {},
+    lines_flipped = {},
     direction_arrows = {},
     direction_arrow_vertices = {},
   }
   calculate_cached_base_reach(cache)
   offset_from_inserter.x = offset_from_inserter.x - cache.range_gap_from_center
   offset_from_inserter.y = offset_from_inserter.y - cache.range_gap_from_center
+  cache.offset_from_inserter_flipped = {
+    x = offset_from_inserter.y,
+    y = offset_from_inserter.x,
+  }
   generate_tiles_cache(cache)
   generate_tiles_background_cache(cache)
   generate_lines_cache(cache)
@@ -681,17 +716,52 @@ local function switch_to_idle(player)
 end
 
 ---@param player PlayerDataQAI
+---@return MapPosition
+local function get_offset_from_inserter(player)
+  local cache = player.target_inserter_cache
+  return player.should_flip
+    and cache.offset_from_inserter_flipped
+    or cache.offset_from_inserter
+end
+
+---@param player PlayerDataQAI
+---@return MapPosition[]
+local function get_tiles(player)
+  local cache = player.target_inserter_cache
+  return player.should_flip
+    and cache.tiles_flipped
+    or cache.tiles
+end
+
+---@param player PlayerDataQAI
+---@return LineDefinitionQAI[]
+local function get_lines(player)
+  local cache = player.target_inserter_cache
+  return player.should_flip
+    and cache.lines_flipped
+    or cache.lines
+end
+
+---@param player PlayerDataQAI
+---@return ScriptRenderVertexTarget[]
+local function get_tiles_background_vertices(player)
+  local cache = player.target_inserter_cache
+  return player.should_flip
+    and cache.tiles_background_vertices_flipped
+    or cache.tiles_background_vertices
+end
+
+---@param player PlayerDataQAI
 local function place_squares(player)
   local surface = player.target_inserter.surface
   local inserter_position = player.target_inserter.position
-  local offset_from_inserter = player.target_inserter_cache.offset_from_inserter
+  local offset_from_inserter = get_offset_from_inserter(player)
+  local left = inserter_position.x + offset_from_inserter.x
+  local top = inserter_position.y + offset_from_inserter.y
   local position = {}
-  for _, tile in pairs(player.target_inserter_cache.tiles) do
-    position.x = offset_from_inserter.x + tile.x + 0.5
-    position.y = offset_from_inserter.y + tile.y + 0.5
-    flip(player, position)
-    position.x = position.x + inserter_position.x
-    position.y = position.y + inserter_position.y
+  for _, tile in pairs(get_tiles(player)) do
+    position.x = left + tile.x + 0.5
+    position.y = top + tile.y + 0.5
     local unit_number = place_pooled_entity(global.square_pool, surface, position, player)
     player.used_squares[#player.used_squares+1] = unit_number
   end
@@ -701,16 +771,15 @@ end
 local function place_ninths(player)
   local surface = player.target_inserter.surface
   local inserter_position = player.target_inserter.position
-  local offset_from_inserter = player.target_inserter_cache.offset_from_inserter
+  local offset_from_inserter = get_offset_from_inserter(player)
+  local left = inserter_position.x + offset_from_inserter.x
+  local top = inserter_position.y + offset_from_inserter.y
   local position = {}
-  for _, tile in pairs(player.target_inserter_cache.tiles) do
+  for _, tile in pairs(get_tiles(player)) do
     for inner_x = 0, 2 do
       for inner_y = 0, 2 do
-        position.x = offset_from_inserter.x + tile.x + inner_x / 3 + 1 / 6
-        position.y = offset_from_inserter.y + tile.y + inner_y / 3 + 1 / 6
-        flip(player, position)
-        position.x = position.x + inserter_position.x
-        position.y = position.y + inserter_position.y
+        position.x = left + tile.x + inner_x / 3 + 1 / 6
+        position.y = top + tile.y + inner_y / 3 + 1 / 6
         local unit_number = place_pooled_entity(global.ninth_pool, surface, position, player)
         player.used_ninths[#player.used_ninths+1] = unit_number
       end
@@ -814,9 +883,10 @@ end
 
 ---@param player PlayerDataQAI
 local function draw_grid_lines(player)
-  local cache = player.target_inserter_cache
   local inserter_position = player.target_inserter_position
-  local offset_from_inserter = cache.offset_from_inserter
+  local offset_from_inserter = get_offset_from_inserter(player)
+  local left = inserter_position.x + offset_from_inserter.x
+  local top = inserter_position.y + offset_from_inserter.y
   local from = {}
   local to = {}
   ---@type LuaRendering.draw_line_param
@@ -829,41 +899,29 @@ local function draw_grid_lines(player)
     to = to,
   }
 
-  for _, line in pairs(cache.lines) do
-    from.x = offset_from_inserter.x + line.from.x
-    from.y = offset_from_inserter.y + line.from.y
-    to.x = offset_from_inserter.x + line.to.x
-    to.y = offset_from_inserter.y + line.to.y
-    flip(player, from)
-    flip(player, to)
-    from.x = from.x + inserter_position.x
-    from.y = from.y + inserter_position.y
-    to.x = to.x + inserter_position.x
-    to.y = to.y + inserter_position.y
+  for _, line in pairs(get_lines(player)) do
+    from.x = left + line.from.x
+    from.y = top + line.from.y
+    to.x = left + line.to.x
+    to.y = top + line.to.y
     player.line_ids[#player.line_ids+1] = rendering.draw_line(line_param)
   end
 end
 
 ---@param player PlayerDataQAI
 local function draw_grid_background(player)
-  local cache = player.target_inserter_cache
   local inserter_position = player.target_inserter_position
-  local target = {
-    x = cache.offset_from_inserter.x,
-    y = cache.offset_from_inserter.y,
-  }
-  flip(player, target)
-  target.x = target.x + inserter_position.x
-  target.y = target.y + inserter_position.y
+  local offset_from_inserter = get_offset_from_inserter(player)
   local opacity = 0.2
   player.background_polygon_id = rendering.draw_polygon{
     surface = player.target_inserter.surface,
     forces = {player.force_index},
     color = {opacity, opacity, opacity, opacity},
-    vertices = player.should_flip
-      and cache.tiles_background_vertices_flipped
-      or cache.tiles_background_vertices,
-    target = target,
+    vertices = get_tiles_background_vertices(player),
+    target = {
+      x = inserter_position.x + offset_from_inserter.x,
+      y = inserter_position.y + offset_from_inserter.y,
+    },
   }
 end
 
