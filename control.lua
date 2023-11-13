@@ -54,6 +54,8 @@ global = {}
 ---@field tiles_background_vertices ScriptRenderVertexTarget[]
 ---@field tiles_background_vertices_flipped ScriptRenderVertexTarget[]
 ---@field lines LineDefinitionQAI[]
+---@field lines_vertices ScriptRenderVertexTarget[]
+---@field lines_vertices_flipped ScriptRenderVertexTarget[]
 ---@field direction_arrows DirectionArrowDefinitionQAI[] @ Always 4.
 ---@field direction_arrow_position MapPosition
 ---@field direction_arrow_vertices ScriptRenderVertexTarget[]
@@ -92,7 +94,7 @@ global = {}
 ---@field used_squares uint[]
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
----@field line_ids uint64[]
+---@field lines_polygon_id uint64 @ `nil` when idle.
 ---@field background_polygon_id uint64 @ `nil` when idle.
 ---@field inserter_circle_id uint64 @ `nil` when idle.
 ---@field direction_arrow_id uint64 @ `nil` when idle.
@@ -346,6 +348,38 @@ local function generate_lines_cache(cache)
 end
 
 ---@param cache InserterCacheQAI
+local function generate_lines_vertices_cache(cache)
+  local count = 0
+  local vertices = cache.lines_vertices
+  local vertices_flipped = cache.lines_vertices_flipped
+  local function add(x, y)
+    count = count + 1
+    vertices[count] = {target = {x = x, y = y}}
+    vertices_flipped[count] = {target = {x = y, y = x}}
+  end
+  local pixel = 1/32
+
+  for _, line in pairs(cache.lines) do
+    -- The stupid way of doing it.
+    if line.from.y == line.to.y then -- Horizontal lines.
+      add(line.from.x - pixel, line.from.y - pixel)
+      add(line.from.x - pixel, line.from.y - pixel)
+      add(line.from.x - pixel, line.from.y + pixel)
+      add(line.to.x + pixel, line.to.y - pixel)
+      add(line.to.x + pixel, line.to.y + pixel)
+      add(line.to.x + pixel, line.to.y + pixel)
+    else -- Vertical lines.
+      add(line.from.x - pixel, line.from.y - pixel)
+      add(line.from.x - pixel, line.from.y - pixel)
+      add(line.from.x + pixel, line.from.y - pixel)
+      add(line.to.x - pixel, line.to.y + pixel)
+      add(line.to.x + pixel, line.to.y + pixel)
+      add(line.to.x + pixel, line.to.y + pixel)
+    end
+  end
+end
+
+---@param cache InserterCacheQAI
 local function generate_direction_arrow_cache(cache)
   local tile_width = cache.tile_width
   local tile_height = cache.tile_height
@@ -464,6 +498,8 @@ local function generate_cache_for_inserter(inserter, tech_level)
     tiles = {},
     tiles_background_vertices = {},
     tiles_background_vertices_flipped = {},
+    lines_vertices = {},
+    lines_vertices_flipped = {},
     lines = {},
     direction_arrows = {},
     direction_arrow_vertices = {},
@@ -474,6 +510,7 @@ local function generate_cache_for_inserter(inserter, tech_level)
   generate_tiles_cache(cache)
   generate_tiles_background_cache(cache)
   generate_lines_cache(cache)
+  generate_lines_vertices_cache(cache)
   generate_direction_arrow_cache(cache)
   return cache
 end
@@ -558,13 +595,6 @@ local function remove_used_pooled_entities(entity_pool, surface_index, used_unit
   end
 end
 
----@param ids uint64[]
-local function destroy_rendering_ids(ids)
-  for _, id in pairs(ids) do
-    rendering.destroy(id)
-  end
-end
-
 ---@param player PlayerDataQAI
 local function destroy_pickup_highlight(player)
   if player.pickup_highlight then
@@ -601,10 +631,11 @@ local function switch_to_idle(player)
   remove_used_pooled_entities(global.ninth_pool, surface_index, player.used_ninths)
   -- TODO: keep rects, arrow and grid when switching between pickup/drop states
   remove_used_pooled_entities(global.rect_pool, surface_index, player.used_rects)
-  destroy_rendering_ids(player.line_ids)
+  rendering.destroy(player.lines_polygon_id)
   rendering.destroy(player.background_polygon_id)
   rendering.destroy(player.inserter_circle_id)
   rendering.destroy(player.direction_arrow_id)
+  player.lines_polygon_id = nil
   player.background_polygon_id = nil
   player.inserter_circle_id = nil
   player.direction_arrow_id = nil
@@ -760,31 +791,16 @@ end
 ---@param player PlayerDataQAI
 local function draw_grid_lines(player)
   local cache = player.target_inserter_cache
-  local offset_from_inserter = cache.offset_from_inserter
-
-  local from = {}
-  local to = {}
-  ---@type LuaRendering.draw_line_param
-  local line_param = {
+  player.lines_polygon_id = rendering.draw_polygon{
     surface = player.target_inserter.surface,
     forces = {player.force_index},
     color = {1, 1, 1},
-    width = 1,
-    from = player.target_inserter,
-    from_offset = from,
-    to = player.target_inserter,
-    to_offset = to,
+    vertices = player.should_flip
+      and cache.lines_vertices_flipped
+      or cache.lines_vertices,
+    target = player.target_inserter,
+    target_offset = flip(player, cache.offset_from_inserter, true)--[[@as Vector]],
   }
-
-  for _, line in pairs(cache.lines) do
-    from.x = offset_from_inserter.x + line.from.x
-    from.y = offset_from_inserter.y + line.from.y
-    to.x = offset_from_inserter.x + line.to.x
-    to.y = offset_from_inserter.y + line.to.y
-    flip(player, from)
-    flip(player, to)
-    player.line_ids[#player.line_ids+1] = rendering.draw_line(line_param)
-  end
 end
 
 ---@param player PlayerDataQAI
@@ -1114,7 +1130,6 @@ local function init_player(player)
     used_squares = {},
     used_ninths = {},
     used_rects = {},
-    line_ids = {},
   }
   global.players[player.index] = player_data
   return player_data
