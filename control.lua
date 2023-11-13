@@ -664,6 +664,19 @@ local function destroy_pickup_highlight(player)
 end
 
 ---@param player PlayerDataQAI
+local function destroy_all_rendering_objects(player)
+  -- For simplicity in other parts of the code, accept this function getting called no matter what.
+  if not player.inserter_circle_id then return end
+  destroy_and_clear_rendering_ids(player.line_ids)
+  rendering.destroy(player.background_polygon_id)
+  rendering.destroy(player.inserter_circle_id)
+  rendering.destroy(player.direction_arrow_id)
+  player.background_polygon_id = nil
+  player.inserter_circle_id = nil
+  player.direction_arrow_id = nil
+end
+
+---@param player PlayerDataQAI
 local function add_active_player(player)
   local active_players = global.active_players
   active_players.count = active_players.count + 1
@@ -684,21 +697,17 @@ local function remove_active_player(player)
 end
 
 ---@param player PlayerDataQAI
-local function switch_to_idle(player)
+---@param keep_rendering boolean? @ When true, no rendering objects will get destroyed.
+local function switch_to_idle(player, keep_rendering)
   if player.state == "idle" then return end
   local surface_index = player.current_surface_index
   player.current_surface_index = nil
   remove_used_pooled_entities(global.square_pool, surface_index, player.used_squares)
   remove_used_pooled_entities(global.ninth_pool, surface_index, player.used_ninths)
-  -- TODO: keep rects, arrow and grid when switching between pickup/drop states
   remove_used_pooled_entities(global.rect_pool, surface_index, player.used_rects)
-  destroy_and_clear_rendering_ids(player.line_ids)
-  rendering.destroy(player.background_polygon_id)
-  rendering.destroy(player.inserter_circle_id)
-  rendering.destroy(player.direction_arrow_id)
-  player.background_polygon_id = nil
-  player.inserter_circle_id = nil
-  player.direction_arrow_id = nil
+  if not keep_rendering then
+    destroy_all_rendering_objects(player)
+  end
   destroy_pickup_highlight(player)
   global.inserters_in_use[player.target_inserter_unit_number] = nil
   remove_active_player(player)
@@ -927,6 +936,8 @@ end
 
 ---@param player PlayerDataQAI
 local function draw_all_rendering_objects(player)
+  -- When rendering objects were kept alive when switching to idle previously, don't create another set.
+  if player.inserter_circle_id then return end
   draw_direction_arrow(player)
   draw_circle_on_inserter(player)
   draw_grid_lines(player)
@@ -1015,9 +1026,13 @@ end
 local function switch_to_selecting_pickup(player, target_inserter, do_check_reach)
   if player.state == "selecting-pickup" and player.target_inserter == target_inserter then return end
   if player.state ~= "idle" then
-    switch_to_idle(player)
+    switch_to_idle(player, player.target_inserter == target_inserter)
   end
-  if not try_set_target_inserter(player, target_inserter, do_check_reach) then return end
+  if not try_set_target_inserter(player, target_inserter, do_check_reach) then
+    destroy_all_rendering_objects(player)
+    return
+  end
+
   place_squares(player)
   place_rects(player)
   draw_all_rendering_objects(player)
@@ -1030,9 +1045,13 @@ end
 local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
   if player.state == "selecting-drop" and player.target_inserter == target_inserter then return end
   if player.state ~= "idle" then
-    switch_to_idle(player)
+    switch_to_idle(player, player.target_inserter == target_inserter)
   end
-  if not try_set_target_inserter(player, target_inserter, do_check_reach) then return end
+  if not try_set_target_inserter(player, target_inserter, do_check_reach) then
+    destroy_all_rendering_objects(player)
+    return
+  end
+
   if player.target_inserter_cache.tech_level.drop_offset then
     place_ninths(player)
   else
