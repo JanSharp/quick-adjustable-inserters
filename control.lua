@@ -790,7 +790,8 @@ local function draw_grid_background(player)
 end
 
 ---@param player PlayerDataQAI
-local function draw_grid(player)
+local function draw_all_rendering_objects(player)
+  draw_direction_arrow(player)
   draw_circle_on_inserter(player)
   draw_grid_lines(player)
   draw_grid_background(player)
@@ -883,8 +884,7 @@ local function switch_to_selecting_pickup(player, target_inserter, do_check_reac
   if not try_set_target_inserter(player, target_inserter, do_check_reach) then return end
   place_squares(player)
   place_rects(player)
-  draw_direction_arrow(player)
-  draw_grid(player)
+  draw_all_rendering_objects(player)
   player.state = "selecting-pickup"
 end
 
@@ -903,8 +903,7 @@ local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
     place_squares(player)
   end
   place_rects(player)
-  draw_direction_arrow(player)
-  draw_grid(player)
+  draw_all_rendering_objects(player)
   create_pickup_highlight(player)
   player.state = "selecting-drop"
 end
