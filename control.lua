@@ -157,6 +157,21 @@ local function get_surface_pool(entity_pool, surface_index)
   return surface_pool
 end
 
+---@param player PlayerDataQAI
+---@param pos MapPosition
+---@param do_copy boolean?
+---@return MapPosition
+local function flip(player, pos, do_copy)
+  if player.should_flip then
+    if do_copy then
+      pos = {x = pos.y, y = pos.x}
+    else
+      pos.x, pos.y = pos.y, pos.x
+    end
+  end
+  return pos
+end
+
 ---@param cache InserterCacheQAI
 local function calculate_cached_base_reach(cache)
   local tile_width = cache.tile_width
@@ -578,21 +593,6 @@ local function switch_to_idle(player)
   if player.player.selected and entity_name_lut[player.player.selected.name] then
     player.player.selected = nil
   end
-end
-
----@param player PlayerDataQAI
----@param pos MapPosition
----@param do_copy boolean?
----@return MapPosition
-local function flip(player, pos, do_copy)
-  if player.should_flip then
-    if do_copy then
-      pos = {x = pos.y, y = pos.x}
-    else
-      pos.x, pos.y = pos.y, pos.x
-    end
-  end
-  return pos
 end
 
 ---@param player PlayerDataQAI
