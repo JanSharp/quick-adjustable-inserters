@@ -6,6 +6,7 @@
   "author": "JanSharp",
   "description": "Adjust inserters in world, without GUI.",
   "dependencies": [
-    "bobinserters >= 1.1.7"
+    "bobinserters >= 1.1.7",
+    "inserter_throughput_lib >= 0.1.0"
   ]
 }

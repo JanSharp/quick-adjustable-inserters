@@ -1,4 +1,6 @@
 
+local inserter_throughput = require("__inserter_throughput_lib__.api")
+
 ---cSpell:ignore rects
 
 ---@class GlobalDataQAI
@@ -60,6 +62,8 @@ global = {}
 ---@field direction_arrows DirectionArrowDefinitionQAI[] @ Always 4.
 ---@field direction_arrow_position MapPosition
 ---@field direction_arrow_vertices ScriptRenderVertexTarget[]
+---@field extension_speed number
+---@field rotation_speed number
 
 ---@class TechnologyLevelQAI
 ---@field range integer
@@ -103,6 +107,7 @@ global = {}
 ---@field inserter_circle_id uint64 @ `nil` when idle.
 ---@field direction_arrow_id uint64 @ `nil` when idle.
 ---@field pickup_highlight LuaEntity? @ Can be `nil` even when not idle.
+---@field inserter_speed_text_id uint64? @ Only `nil` initially, once it exists, it's never destroyed (by this mod).
 
 local ev = defines.events
 local square_entity_name = "QAI-selectable-square"
@@ -552,6 +557,8 @@ local function generate_cache_for_inserter(inserter, tech_level)
     lines_flipped = {},
     direction_arrows = {},
     direction_arrow_vertices = {},
+    extension_speed = inserter.inserter_extension_speed,
+    rotation_speed = inserter.inserter_rotation_speed,
   }
   calculate_cached_base_reach(cache)
   offset_from_inserter.x = offset_from_inserter.x - cache.range_gap_from_center
@@ -697,6 +704,14 @@ local function remove_active_player(player)
 end
 
 ---@param player PlayerDataQAI
+local function hide_inserter_speed_text(player)
+  local id = player.inserter_speed_text_id
+  if id and rendering.is_valid(id) then
+    rendering.set_visible(id, false)
+  end
+end
+
+---@param player PlayerDataQAI
 ---@param keep_rendering boolean? @ When true, no rendering objects will get destroyed.
 local function switch_to_idle(player, keep_rendering)
   if player.state == "idle" then return end
@@ -722,6 +737,7 @@ local function switch_to_idle(player, keep_rendering)
   if player.player.selected and entity_name_lut[player.player.selected.name] then
     player.player.selected = nil
   end
+  hide_inserter_speed_text(player)
 end
 
 ---@param player PlayerDataQAI
@@ -945,6 +961,27 @@ local function draw_all_rendering_objects(player)
 end
 
 ---@param player PlayerDataQAI
+---@param position MapPosition
+---@param text string
+local function set_inserter_speed_text(player, position, text)
+  local id = player.inserter_speed_text_id
+  if not id or not rendering.is_valid(id) then
+    player.inserter_speed_text_id = rendering.draw_text{
+      surface = player.current_surface_index,
+      players = {player.player_index},
+      color = {1, 1, 1},
+      target = position,
+      text = text,
+    }
+    return
+  end
+  rendering.set_text(id, text)
+  rendering.set_target(id, position)
+  rendering.set_visible(id, true)
+  rendering.bring_to_front(id)
+end
+
+---@param player PlayerDataQAI
 local function create_pickup_highlight(player)
   local inserter = player.target_inserter
   local pickup_pos = inserter.pickup_position
@@ -1089,7 +1126,8 @@ end
 
 ---@param player PlayerDataQAI
 ---@param position MapPosition
-local function set_drop_position(player, position)
+---@return MapPosition
+local function calculate_actual_drop_position(player, position)
   local cache = player.target_inserter_cache
   local tech_level = cache.tech_level
   local auto_determine_drop_offset = not tech_level.drop_offset
@@ -1122,10 +1160,50 @@ local function set_drop_position(player, position)
       or y_from_tile_center < 0 and -51/256
       or 51/256
   end
-  player.target_inserter.drop_position = {
+  return {
     x = left_top_x + math.floor(relative_x) + 0.5 + x_offset,
     y = left_top_y + math.floor(relative_y) + 0.5 + y_offset,
   }
+end
+
+---@param player PlayerDataQAI
+---@param position MapPosition
+local function set_drop_position(player, position)
+  player.target_inserter.drop_position = calculate_actual_drop_position(player, position)
+end
+
+---@param player PlayerDataQAI
+---@param position MapPosition
+---@return number items_per_second
+local function estimate_inserter_speed(player, position)
+  local cache = player.target_inserter_cache
+  local target_inserter = player.target_inserter
+  ---@type InserterThroughputDefinition
+  local def = {
+    extension_speed = cache.extension_speed,
+    rotation_speed = cache.rotation_speed,
+    stack_size = target_inserter.inserter_target_pickup_count,
+  }
+
+  if player.state == "selecting-pickup" then
+    inserter_throughput.set_from_based_on_position(
+      def,
+      target_inserter.surface,
+      player.target_inserter_position--[[@as VectorXY]],
+      position--[[@as VectorXY]]
+    )
+    inserter_throughput.set_to_based_on_inserter(def, target_inserter)
+  else
+    inserter_throughput.set_from_based_on_inserter(def, target_inserter)
+    inserter_throughput.set_to_based_on_position(
+      def,
+      target_inserter.surface,
+      player.target_inserter_position--[[@as VectorXY]],
+      calculate_actual_drop_position(player, position)--[[@as VectorXY]]
+    )
+  end
+
+  return inserter_throughput.estimate_inserter_speed(def)
 end
 
 ---@param entity LuaEntity
@@ -1298,6 +1376,25 @@ script.on_event("QAI-adjust", function(event)
     return
   end
   on_adjust_handler_lut[player.state](player, selected)
+end)
+
+script.on_event(ev.on_selected_entity_changed, function(event)
+  local player = get_player(event)
+  if not player or player.state ~= "selecting-drop" then return end
+  local selected = player.player.selected
+  local name = selected and selected.name
+  if not (name == square_entity_name or name == ninth_entity_name) ---@cast selected -nil
+    or global.pooled_entities_to_player_lut[selected.unit_number] ~= player
+  then
+    hide_inserter_speed_text(player)
+    return
+  end
+  ---@cast selected -nil
+  local position = selected.position
+  local items_per_second = estimate_inserter_speed(player, position)
+  position.x = position.x + (name == ninth_entity_name and 0.35 or 0.6)
+  position.y = position.y - 0.31
+  set_inserter_speed_text(player, position, string.format("%.3f/s", items_per_second))
 end)
 
 script.on_event(ev.on_player_changed_position, function(event)
