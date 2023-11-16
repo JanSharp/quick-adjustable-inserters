@@ -821,7 +821,7 @@ local function draw_direction_arrow(player)
   inserter_position.y = inserter_position.y + cache.offset_from_inserter.y + cache.direction_arrow_position.y
   local opacity = 0.6
   player.direction_arrow_id = rendering.draw_polygon{
-    surface = inserter.surface,
+    surface = player.current_surface_index,
     forces = {player.force_index},
     color = {opacity, opacity, opacity, opacity},
     vertices = player.target_inserter_cache.direction_arrow_vertices,
@@ -894,7 +894,7 @@ local function draw_circle_on_inserter(player)
   local offset_from_inserter = cache.offset_from_inserter
   local max_range = cache.tech_level.range + cache.range_gap_from_center
   player.inserter_circle_id = rendering.draw_circle{
-    surface = player.target_inserter.surface,
+    surface = player.current_surface_index,
     forces = {player.force_index},
     color = {1, 1, 1},
     radius = math.min(cache.tile_width, cache.tile_height) / 2 - 0.25,
@@ -916,7 +916,7 @@ local function draw_grid_lines(player)
   local to = {}
   ---@type LuaRendering.draw_line_param
   local line_param = {
-    surface = player.target_inserter.surface,
+    surface = player.current_surface_index,
     forces = {player.force_index},
     color = {1, 1, 1},
     width = 1,
@@ -939,7 +939,7 @@ local function draw_grid_background(player)
   local offset_from_inserter = get_offset_from_inserter(player)
   local opacity = 0.2
   player.background_polygon_id = rendering.draw_polygon{
-    surface = player.target_inserter.surface,
+    surface = player.current_surface_index,
     forces = {player.force_index},
     color = {opacity, opacity, opacity, opacity},
     vertices = get_tiles_background_vertices(player),
