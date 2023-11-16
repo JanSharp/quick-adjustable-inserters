@@ -1192,8 +1192,8 @@ local function estimate_inserter_speed(player, position)
     inserter_throughput.set_from_based_on_position(
       def,
       target_inserter.surface,
-      player.target_inserter_position--[[@as VectorXY]],
-      position--[[@as VectorXY]]
+      player.target_inserter_position,
+      position
     )
     inserter_throughput.set_to_based_on_inserter(def, target_inserter)
   else
@@ -1201,8 +1201,8 @@ local function estimate_inserter_speed(player, position)
     inserter_throughput.set_to_based_on_position(
       def,
       target_inserter.surface,
-      player.target_inserter_position--[[@as VectorXY]],
-      calculate_actual_drop_position(player, position)--[[@as VectorXY]]
+      player.target_inserter_position,
+      calculate_actual_drop_position(player, position)
     )
   end
 
