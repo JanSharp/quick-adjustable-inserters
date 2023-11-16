@@ -64,6 +64,7 @@ global = {}
 ---@field direction_arrow_vertices ScriptRenderVertexTarget[]
 ---@field extension_speed number
 ---@field rotation_speed number
+---@field chases_belt_items boolean
 
 ---@class TechnologyLevelQAI
 ---@field range integer
@@ -559,6 +560,7 @@ local function generate_cache_for_inserter(inserter, tech_level)
     direction_arrow_vertices = {},
     extension_speed = inserter.inserter_extension_speed,
     rotation_speed = inserter.inserter_rotation_speed,
+    chases_belt_items = inserter.inserter_chases_belt_items,
   }
   calculate_cached_base_reach(cache)
   offset_from_inserter.x = offset_from_inserter.x - cache.range_gap_from_center
@@ -1182,6 +1184,7 @@ local function estimate_inserter_speed(player, position)
   local def = {
     extension_speed = cache.extension_speed,
     rotation_speed = cache.rotation_speed,
+    chases_belt_items = cache.chases_belt_items,
     stack_size = target_inserter.inserter_target_pickup_count,
   }
 
