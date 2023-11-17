@@ -51,3 +51,4 @@
   - [x] draw square around it instead of a highlight box
   - [x] draw a line from the inserter to the pickup tile
 - [ ] slight indication for the 4 big rectangles around the grid which change direction
+- [ ] test if creating and deleting entities is faster than teleporting and changing force
