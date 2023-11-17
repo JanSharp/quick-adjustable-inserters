@@ -633,6 +633,9 @@ local function place_pooled_entity(entity_pool, surface, position, player)
   return unit_number, entity
 end
 
+-- `remove_pooled_entity` runs so often that it is absolutely worth it to move this out here.
+local zero_zero = {x = 0, y = 0}
+
 ---@param entity_pool EntityPoolQAI
 ---@param surface_index uint
 ---@param unit_number uint
@@ -646,7 +649,7 @@ local function remove_pooled_entity(entity_pool, surface_index, unit_number)
   if not entity then return end
   surface_pool.free_count = surface_pool.free_count + 1
   surface_pool.free_entities[unit_number] = entity
-  entity.teleport{x = 0, y = 0}
+  entity.teleport(zero_zero)
   entity.force = "neutral"
 end
 
