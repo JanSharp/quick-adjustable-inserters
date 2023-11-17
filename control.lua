@@ -1128,7 +1128,7 @@ local function calculate_actual_drop_position(player, position)
   local cache = player.target_inserter_cache
   local tech_level = cache.tech_level
   local auto_determine_drop_offset = not tech_level.drop_offset
-  local inserter_position = player.target_inserter.position
+  local inserter_position = player.target_inserter_position
   local offset_from_inserter = cache.offset_from_inserter
   local left_top_x = inserter_position.x + offset_from_inserter.x
   local left_top_y = inserter_position.y + offset_from_inserter.y
