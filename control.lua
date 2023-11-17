@@ -686,11 +686,12 @@ local function destroy_all_rendering_objects(player)
   -- For simplicity in other parts of the code, accept this function getting called no matter what.
   if not player.inserter_circle_id then return end
   destroy_and_clear_rendering_ids(player.line_ids)
-  rendering.destroy(player.background_polygon_id)
-  rendering.destroy(player.inserter_circle_id)
-  rendering.destroy(player.direction_arrow_id)
-  if player.pickup_highlight_id then rendering.destroy(player.pickup_highlight_id) end
-  if player.line_to_pickup_highlight_id then rendering.destroy(player.line_to_pickup_highlight_id) end
+  local destroy = rendering.destroy
+  destroy(player.background_polygon_id)
+  destroy(player.inserter_circle_id)
+  destroy(player.direction_arrow_id)
+  if player.pickup_highlight_id then destroy(player.pickup_highlight_id) end
+  if player.line_to_pickup_highlight_id then destroy(player.line_to_pickup_highlight_id) end
   player.background_polygon_id = nil
   player.inserter_circle_id = nil
   player.direction_arrow_id = nil
