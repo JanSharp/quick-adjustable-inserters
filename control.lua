@@ -1,5 +1,6 @@
 
 local inserter_throughput = require("__inserter_throughput_lib__.api")
+local vec = require("__inserter_throughput_lib__.vector")
 
 ---cSpell:ignore rects
 
@@ -51,6 +52,9 @@ global = {}
 ---@field range_gap_from_center integer
 ---@field offset_from_inserter MapPosition
 ---@field offset_from_inserter_flipped MapPosition @ Use when `player.should_flip` is true.
+---@field grid_center MapPosition
+---@field grid_center_flipped MapPosition
+---@field radius_for_circle_on_inserter number
 ---@field tile_width integer
 ---@field tile_height integer
 ---@field tiles MapPosition[]
@@ -107,7 +111,9 @@ global = {}
 ---@field background_polygon_id uint64 @ `nil` when idle.
 ---@field inserter_circle_id uint64 @ `nil` when idle.
 ---@field direction_arrow_id uint64 @ `nil` when idle.
----@field pickup_highlight LuaEntity? @ Can be `nil` even when not idle.
+---@field pickup_highlight_id uint64? @ Can be `nil` even when not idle.
+---Can be `nil` even when not idle. Can even be `nil` when `pickup_highlight_id` is not `nil`.
+---@field line_to_pickup_highlight_id uint64?
 ---@field inserter_speed_text_id uint64? @ Only `nil` initially, once it exists, it's never destroyed (by this mod).
 
 local ev = defines.events
@@ -550,6 +556,7 @@ local function generate_cache_for_inserter(inserter, tech_level)
     offset_from_inserter_flipped = (nil)--[[@as any]], -- Set after the `calculate_cached_base_reach` call.
     tile_width = tile_width,
     tile_height = tile_height,
+    radius_for_circle_on_inserter = math.min(tile_width, tile_height) / 2 - 0.25,
     tiles = {},
     tiles_flipped = {},
     tiles_background_vertices = {},
@@ -569,6 +576,15 @@ local function generate_cache_for_inserter(inserter, tech_level)
     x = offset_from_inserter.y,
     y = offset_from_inserter.x,
   }
+  cache.grid_center = {
+    x = range + cache.range_gap_from_center + (tile_width / 2),
+    y = range + cache.range_gap_from_center + (tile_height / 2),
+  }
+  cache.grid_center_flipped = {
+    x = cache.grid_center.y,
+    y = cache.grid_center.x,
+  }
+
   generate_tiles_cache(cache)
   generate_tiles_background_cache(cache)
   generate_lines_cache(cache)
@@ -666,13 +682,6 @@ local function destroy_and_clear_rendering_ids(ids)
 end
 
 ---@param player PlayerDataQAI
-local function destroy_pickup_highlight(player)
-  if player.pickup_highlight then
-    player.pickup_highlight.destroy()
-  end
-end
-
----@param player PlayerDataQAI
 local function destroy_all_rendering_objects(player)
   -- For simplicity in other parts of the code, accept this function getting called no matter what.
   if not player.inserter_circle_id then return end
@@ -680,9 +689,13 @@ local function destroy_all_rendering_objects(player)
   rendering.destroy(player.background_polygon_id)
   rendering.destroy(player.inserter_circle_id)
   rendering.destroy(player.direction_arrow_id)
+  if player.pickup_highlight_id then rendering.destroy(player.pickup_highlight_id) end
+  if player.line_to_pickup_highlight_id then rendering.destroy(player.line_to_pickup_highlight_id) end
   player.background_polygon_id = nil
   player.inserter_circle_id = nil
   player.direction_arrow_id = nil
+  player.pickup_highlight_id = nil
+  player.line_to_pickup_highlight_id = nil
 end
 
 ---@param player PlayerDataQAI
@@ -725,7 +738,6 @@ local function switch_to_idle(player, keep_rendering)
   if not keep_rendering then
     destroy_all_rendering_objects(player)
   end
-  destroy_pickup_highlight(player)
   global.inserters_in_use[player.target_inserter_unit_number] = nil
   remove_active_player(player)
   player.target_inserter_unit_number = nil
@@ -749,6 +761,15 @@ local function get_offset_from_inserter(player)
   return player.should_flip
     and cache.offset_from_inserter_flipped
     or cache.offset_from_inserter
+end
+
+---@param player PlayerDataQAI
+---@return MapPosition
+local function get_grid_center(player)
+  local cache = player.target_inserter_cache
+  return player.should_flip
+    and cache.grid_center_flipped
+    or cache.grid_center
 end
 
 ---@param player PlayerDataQAI
@@ -893,17 +914,17 @@ end
 local function draw_circle_on_inserter(player)
   local cache = player.target_inserter_cache
   local inserter_position = player.target_inserter_position
-  local offset_from_inserter = cache.offset_from_inserter
-  local max_range = cache.tech_level.range + cache.range_gap_from_center
+  local offset_from_inserter = get_offset_from_inserter(player)
+  local grid_center = get_grid_center(player)
   player.inserter_circle_id = rendering.draw_circle{
     surface = player.current_surface_index,
     forces = {player.force_index},
     color = {1, 1, 1},
-    radius = math.min(cache.tile_width, cache.tile_height) / 2 - 0.25,
+    radius = cache.radius_for_circle_on_inserter,
     width = 2,
     target = {
-      x = inserter_position.x + offset_from_inserter.x + max_range + cache.tile_width / 2,
-      y = inserter_position.y + offset_from_inserter.y + max_range + cache.tile_height / 2,
+      x = inserter_position.x + offset_from_inserter.x + grid_center.x,
+      y = inserter_position.y + offset_from_inserter.y + grid_center.y,
     },
   }
 end
@@ -984,19 +1005,50 @@ local function set_inserter_speed_text(player, position, text)
 end
 
 ---@param player PlayerDataQAI
-local function create_pickup_highlight(player)
+local function draw_pickup_highlight(player)
   local inserter = player.target_inserter
   local pickup_pos = inserter.pickup_position
-  local surface = inserter.surface
-  player.pickup_highlight = surface.create_entity{
-    name = "highlight-box",
-    position = {x = 0, y = 0},
-    bounding_box = {
-      left_top = {x = pickup_pos.x - 0.5, y = pickup_pos.y - 0.5},
-      right_bottom = {x = pickup_pos.x + 0.5, y = pickup_pos.y + 0.5},
-    },
-    box_type = "copy",
-    render_player_index = player.player_index,
+  player.pickup_highlight_id = rendering.draw_rectangle{
+    surface = player.current_surface_index,
+    forces = {player.force_index},
+    color = {0, 1, 0},
+    width = 3,
+    left_top = {x = pickup_pos.x - 0.5, y = pickup_pos.y - 0.5},
+    right_bottom = {x = pickup_pos.x + 0.5, y = pickup_pos.y + 0.5},
+  }
+end
+
+---@param player PlayerDataQAI
+local function draw_line_to_pickup_highlight(player)
+  local grid_center_position = vec.add(
+    vec.add(
+      vec.copy(player.target_inserter_position),
+      get_offset_from_inserter(player)
+    ),
+    get_grid_center(player)
+  )
+  local pickup_vector = vec.sub(player.target_inserter.pickup_position, grid_center_position)
+  local distance_from_pickup = (3/32) + vec.get_length(vec.div_scalar(
+    vec.copy(pickup_vector),
+    math.max(math.abs(pickup_vector.x), math.abs(pickup_vector.y)) * 2
+  ))
+  local distance_from_center = (2/32) + player.target_inserter_cache.radius_for_circle_on_inserter
+  local length = vec.get_length(pickup_vector) - distance_from_pickup - distance_from_center
+  if length <= 0 then return end
+
+  player.line_to_pickup_highlight_id = rendering.draw_line{
+    surface = player.current_surface_index,
+    forces = {player.force_index},
+    color = {0, 1, 0},
+    width = 2,
+    to = vec.add(
+      vec.copy(grid_center_position),
+      vec.set_length(pickup_vector, distance_from_center + length)
+    )--[[@as MapPosition]],
+    from = vec.add(
+      grid_center_position, -- No need to copy here too.
+      vec.set_length(pickup_vector, distance_from_center)
+    )--[[@as MapPosition]],
   }
 end
 
@@ -1098,7 +1150,8 @@ local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
   end
   place_rects(player)
   draw_all_rendering_objects(player)
-  create_pickup_highlight(player)
+  draw_pickup_highlight(player)
+  draw_line_to_pickup_highlight(player)
   player.state = "selecting-drop"
 end
 

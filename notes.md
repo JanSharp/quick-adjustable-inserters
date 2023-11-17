@@ -47,6 +47,7 @@
 - [x] add locale for the key bind/control
 - [ ] change default key sequence because it conflicts with bobinserters
 - [x] maybe make direction arrow a little transparent
-- [ ] change visualization when pickup has been selected
-  - [ ] draw square around it instead of a highlight box
-  - [ ] draw a line from the inserter to the pickup tile
+- [x] change visualization when pickup has been selected
+  - [x] draw square around it instead of a highlight box
+  - [x] draw a line from the inserter to the pickup tile
+- [ ] slight indication for the 4 big rectangles around the grid which change direction
