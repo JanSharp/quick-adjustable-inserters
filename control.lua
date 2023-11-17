@@ -9,9 +9,50 @@ local vec = require("__inserter_throughput_lib__.vector")
 ---@field forces table<uint8, ForceDataQAI>
 ---@field inserters_in_use table<uint32, PlayerDataQAI> @ Indexed by inserter unit_number.
 ---@field active_players PlayerDataQAI[]|{count: integer, next_index: integer}
+---@field active_animations AnimationQAI[]|{count: integer}
 ---@field selectable_entities_to_player_lut table<uint32, PlayerDataQAI> @ pooled entity unit number => player index.
 ---@field selectable_entities_by_unit_number table<uint32, LuaEntity>
 global = {}
+
+---@alias AnimationQAI
+---| AnimatedCircleQAI
+---| AnimatedRectangleQAI
+---| AnimatedLineQAI
+
+---@enum AnimationTypeQAI
+local animation_type = {
+  circle = 1,
+  rectangle = 2,
+  line = 3,
+}
+
+---@class AnimationBaseQAI
+---@field type AnimationTypeQAI
+---@field id uint64
+---@field remaining_updates integer @ Stays alive when going to 0, finishes the next update.
+---@field destroy_on_finish boolean
+
+---@class AnimatedCircleQAI : AnimationBaseQAI
+---@field color Color @ Matches the current value. Must have fields r, g, b and a.
+---@field radius number @ Matches the current value.
+---@field color_step Color @ Added each tick. Must have fields r, g, b and a.
+---@field radius_step number @ Added each tick.
+
+---@class AnimatedRectangleQAI : AnimationBaseQAI
+---@field color Color @ Matches the current value. Must have fields r, g, b and a.
+---@field left_top MapPosition @ Matches the current value.
+---@field right_bottom MapPosition @ Matches the current value.
+---@field color_step Color @ Added each tick. Must have fields r, g, b and a.
+---@field left_top_step MapPosition @ Matches the current value.
+---@field right_bottom_step MapPosition @ Matches the current value.
+
+---@class AnimatedLineQAI : AnimationBaseQAI
+---@field color Color @ Matches the current value. Must have fields r, g, b and a.
+---@field from MapPosition @ Matches the current value.
+---@field to MapPosition @ Matches the current value.
+---@field color_step Color @ Added each tick. Must have fields r, g, b and a.
+---@field from_step MapPosition @ Matches the current value.
+---@field to_step MapPosition @ Matches the current value.
 
 ---@class ForceDataQAI
 ---@field force_index uint32
@@ -135,6 +176,31 @@ local inverse_direction_lut = {
 ---@return PlayerDataQAI?
 local function get_player(event)
   return global.players[event.player_index]
+end
+
+---@param animation AnimationQAI
+local function add_animation(animation)
+  local active_animations = global.active_animations
+  active_animations.count = active_animations.count + 1
+  active_animations[active_animations.count] = animation
+end
+
+---@param animation AnimatedCircleQAI
+local function add_animated_circle(animation)
+  animation.type = animation_type.circle
+  return add_animation(animation) -- Return to make it a tail call.
+end
+
+---@param animation AnimatedRectangleQAI
+local function add_animated_rectangle(animation)
+  animation.type = animation_type.rectangle
+  return add_animation(animation) -- Return to make it a tail call.
+end
+
+---@param animation AnimatedLineQAI
+local function add_animated_line(animation)
+  animation.type = animation_type.line
+  return add_animation(animation) -- Return to make it a tail call.
 end
 
 ---@param player PlayerDataQAI
@@ -1354,7 +1420,89 @@ local function update_active_player(player)
   end
 end
 
+---@type table<AnimationTypeQAI, fun(animation: AnimationQAI)>
+local update_animation_lut
+do
+  local set_color = rendering.set_color
+  local set_radius = rendering.set_radius
+  local set_left_top = rendering.set_left_top
+  local set_right_bottom = rendering.set_right_bottom
+  local set_from = rendering.set_from
+  local set_to = rendering.set_to
+
+  update_animation_lut = {
+    ---@param animation AnimatedCircleQAI
+    [animation_type.circle] = function(animation)
+      local id = animation.id
+
+      local color = animation.color
+      local color_step = animation.color_step
+      color.r = color.r + color_step.r
+      color.b = color.b + color_step.b
+      color.g = color.g + color_step.g
+      color.a = color.a + color_step.a
+      set_color(id, color)
+
+      local radius = animation.radius + animation.radius_step
+      animation.radius = radius
+      set_radius(id, radius)
+    end,
+    ---@param animation AnimatedRectangleQAI
+    [animation_type.rectangle] = function(animation)
+      local id = animation.id
+
+      local color = animation.color
+      local color_step = animation.color_step
+      color.r = color.r + color_step.r
+      color.b = color.b + color_step.b
+      color.g = color.g + color_step.g
+      color.a = color.a + color_step.a
+      set_color(id, color)
+
+      local left_top = animation.left_top
+      local left_top_step = animation.left_top_step
+      left_top.x = left_top.x + left_top_step.x
+      left_top.y = left_top.y + left_top_step.y
+      set_left_top(id, left_top)
+
+      local right_bottom = animation.right_bottom
+      local right_bottom_step = animation.right_bottom_step
+      right_bottom.x = right_bottom.x + right_bottom_step.x
+      right_bottom.y = right_bottom.y + right_bottom_step.y
+      set_right_bottom(id, right_bottom)
+    end,
+    ---@param animation AnimatedLineQAI
+    [animation_type.line] = function(animation)
+      local id = animation.id
+
+      local color = animation.color
+      local color_step = animation.color_step
+      color.r = color.r + color_step.r
+      color.b = color.b + color_step.b
+      color.g = color.g + color_step.g
+      color.a = color.a + color_step.a
+      set_color(id, color)
+
+      local from = animation.from
+      local from_step = animation.from_step
+      from.x = from.x + from_step.x
+      from.y = from.y + from_step.y
+      set_from(id, from)
+
+      local to = animation.to
+      local to_step = animation.to_step
+      to.x = to.x + to_step.x
+      to.y = to.y + to_step.y
+      set_to(id, to)
+    end,
+  }
+end
+
+local rendering_is_valid = rendering.is_valid
+
 script.on_event(ev.on_tick, function(event)
+  local global = global -- Premature micro optimizations are bad for your health...
+
   local active_players = global.active_players
   local next_index = active_players.next_index
   local player = active_players[next_index]
@@ -1362,6 +1510,26 @@ script.on_event(ev.on_tick, function(event)
     update_active_player(player)
   else
     active_players.next_index = 1
+  end
+
+  local active_animations = global.active_animations
+  local count = active_animations.count
+  for i = count, 1, -1 do
+    local animation = active_animations[i]
+    local remaining_updates = animation.remaining_updates
+    if remaining_updates > 0 and rendering_is_valid(animation.id) then
+      animation.remaining_updates = remaining_updates - 1
+      local update_animation = update_animation_lut[animation.type]
+      update_animation(animation)
+    else
+      if animation.destroy_on_finish then
+        rendering.destroy(animation.id) -- Destroy accepts already invalid ids.
+      end
+      active_animations[i] = active_animations[count]
+      active_animations[count] = nil
+      count = count - 1
+      active_animations.count = count
+    end
   end
 end)
 
@@ -1514,6 +1682,7 @@ script.on_init(function()
     forces = {},
     inserters_in_use = {},
     active_players = {count = 0, next_index = 1},
+    active_animations = {count = 0},
     selectable_entities_to_player_lut = {},
     selectable_entities_by_unit_number = {},
   }
