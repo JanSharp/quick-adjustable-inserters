@@ -9,10 +9,8 @@ local vec = require("__inserter_throughput_lib__.vector")
 ---@field forces table<uint8, ForceDataQAI>
 ---@field inserters_in_use table<uint32, PlayerDataQAI> @ Indexed by inserter unit_number.
 ---@field active_players PlayerDataQAI[]|{count: integer, next_index: integer}
----@field pooled_entities_to_player_lut table<uint32, PlayerDataQAI> @ pooled entity unit number => player index.
----@field square_pool EntityPoolQAI
----@field ninth_pool EntityPoolQAI
----@field rect_pool EntityPoolQAI
+---@field selectable_entities_to_player_lut table<uint32, PlayerDataQAI> @ pooled entity unit number => player index.
+---@field selectable_entities_by_unit_number table<uint32, LuaEntity>
 global = {}
 
 ---@class ForceDataQAI
@@ -20,16 +18,6 @@ global = {}
 ---@field force LuaForce
 ---@field inserter_cache_lut table<string, InserterCacheQAI>
 ---@field tech_level TechnologyLevelQAI
-
----@class EntityPoolQAI
----@field entity_name string
----@field surface_pools table<uint, EntityPoolSurfaceQAI> @ surface_index => surface pool.
-
----@class EntityPoolSurfaceQAI
----@field free_count int
----@field used_count int
----@field free_entities table<uint, LuaEntity> @ unit_number => entity.
----@field used_entities table<uint, LuaEntity> @ unit_number => entity.
 
 ---@class LineDefinitionQAI
 ---@field from MapPosition
@@ -103,7 +91,8 @@ global = {}
 ---`true` for non square inserters facing west or east.
 ---Those end up pretending to be north and south, but flipped diagonally.
 ---@field should_flip boolean
----@field current_surface_index uint @  `nil` when idle.
+---@field current_surface_index uint @ `nil` when idle.
+---@field current_surface LuaSurface @ `nil` when idle.
 ---@field used_squares uint[]
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
@@ -146,35 +135,6 @@ local inverse_direction_lut = {
 ---@return PlayerDataQAI?
 local function get_player(event)
   return global.players[event.player_index]
-end
-
----@param entity_name string
----@return EntityPoolQAI
-local function new_entity_pool(entity_name)
-  ---@type EntityPoolQAI
-  local result = {
-    entity_name = entity_name,
-    surface_pools = {},
-  }
-  return result
-end
-
----@param entity_pool EntityPoolQAI
----@param surface_index uint
-local function get_surface_pool(entity_pool, surface_index)
-  local surface_pool = entity_pool.surface_pools[surface_index]
-  if surface_pool then
-    return surface_pool
-  end
-  ---@type EntityPoolSurfaceQAI
-  surface_pool = {
-    free_count = 0,
-    used_count = 0,
-    free_entities = {},
-    used_entities = {},
-  }
-  entity_pool.surface_pools[surface_index] = surface_pool
-  return surface_pool
 end
 
 ---@param player PlayerDataQAI
@@ -592,86 +552,19 @@ local function generate_cache_for_inserter(inserter, tech_level)
   return cache
 end
 
----@param entity_pool EntityPoolQAI
----@param surface LuaSurface
----@param position MapPosition
----@param player PlayerDataQAI @ Only this player should be able to interact with this pooled entity.
----@return uint unit_number
----@return LuaEntity
-local function place_pooled_entity(entity_pool, surface, position, player)
-  local surface_pool = get_surface_pool(entity_pool, player.current_surface_index)
-
-  if surface_pool.free_count ~= 0 then
-    surface_pool.free_count = surface_pool.free_count - 1
-    local unit_number, entity = next(surface_pool.free_entities)
-    if not entity.valid then
-      surface_pool.free_entities[unit_number] = nil
-    else
-      surface_pool.used_count = surface_pool.used_count + 1
-      surface_pool.free_entities[unit_number] = nil
-      surface_pool.used_entities[unit_number] = entity
-      entity.teleport(position)
-      entity.force = player.force_index
-      global.pooled_entities_to_player_lut[unit_number] = player
-      return unit_number, entity
+---@param entities uint32[]
+local function destroy_entities(entities)
+  local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
+  local selectable_entities_by_unit_number = global.selectable_entities_by_unit_number
+  for i = #entities, 1, -1 do
+    local unit_number = entities[i]
+    entities[i] = nil
+    selectable_entities_to_player_lut[unit_number] = nil
+    local entity = selectable_entities_by_unit_number[unit_number]
+    selectable_entities_by_unit_number[unit_number] = nil
+    if entity.valid then
+      entity.destroy()
     end
-  end
-
-  local entity = surface.create_entity{
-    name = entity_pool.entity_name,
-    position = position,
-    force = player.force_index,
-  }
-  if not entity then
-    error("Creating an internal entity required by Quick Adjustable Inserters failed.")
-  end
-  entity.destructible = false
-  local unit_number = entity.unit_number ---@cast unit_number -nil
-  surface_pool.used_count = surface_pool.used_count + 1
-  surface_pool.used_entities[unit_number] = entity
-  global.pooled_entities_to_player_lut[unit_number] = player
-  return unit_number, entity
-end
-
--- `remove_pooled_entity` runs so often that it is absolutely worth it to move this out here.
-local zero_zero = {x = 0, y = 0}
-
----@param entity_pool EntityPoolQAI
----@param surface_index uint
----@param unit_number uint
-local function remove_pooled_entity(entity_pool, surface_index, unit_number)
-  local surface_pool = entity_pool.surface_pools[surface_index]
-  global.pooled_entities_to_player_lut[unit_number] = nil
-  if not surface_pool then return end -- Surface has been deleted already, nothing to do.
-  surface_pool.used_count = surface_pool.used_count - 1
-  local entity = surface_pool.used_entities[unit_number]
-  surface_pool.used_entities[unit_number] = nil
-  if not entity or not entity.valid then return end
-  surface_pool.free_count = surface_pool.free_count + 1
-  surface_pool.free_entities[unit_number] = entity
-  entity.teleport(zero_zero)
-  entity.force = "neutral"
-end
-
----Call this after a surface has been deleted.
----@param entity_pool EntityPoolQAI
----@param surface_index uint
-local function cleanup_deleted_surface_pool(entity_pool, surface_index)
-  local surface_pool = entity_pool.surface_pools[surface_index]
-  if not surface_pool then return end
-  for unit_number in pairs(surface_pool.used_entities) do
-    global.pooled_entities_to_player_lut[unit_number] = nil
-  end
-  entity_pool.surface_pools[surface_index] = nil
-end
-
----@param entity_pool EntityPoolQAI
----@param surface_index uint
----@param used_unit_numbers uint[]
-local function remove_used_pooled_entities(entity_pool, surface_index, used_unit_numbers)
-  for i = 1, #used_unit_numbers do
-    remove_pooled_entity(entity_pool, surface_index, used_unit_numbers[i])
-    used_unit_numbers[i] = nil
   end
 end
 
@@ -734,11 +627,11 @@ end
 ---@param keep_rendering boolean? @ When true, no rendering objects will get destroyed.
 local function switch_to_idle(player, keep_rendering)
   if player.state == "idle" then return end
-  local surface_index = player.current_surface_index
   player.current_surface_index = nil
-  remove_used_pooled_entities(global.square_pool, surface_index, player.used_squares)
-  remove_used_pooled_entities(global.ninth_pool, surface_index, player.used_ninths)
-  remove_used_pooled_entities(global.rect_pool, surface_index, player.used_rects)
+  player.current_surface = nil
+  destroy_entities(player.used_squares)
+  destroy_entities(player.used_ninths)
+  destroy_entities(player.used_rects)
   if not keep_rendering then
     destroy_all_rendering_objects(player)
   end
@@ -805,35 +698,65 @@ end
 
 ---@param player PlayerDataQAI
 local function place_squares(player)
-  local surface = player.target_inserter.surface
-  local inserter_position = player.target_inserter.position
+  local inserter_position = player.target_inserter_position
   local offset_from_inserter = get_offset_from_inserter(player)
   local left = inserter_position.x + offset_from_inserter.x
   local top = inserter_position.y + offset_from_inserter.y
+  local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
+  local selectable_entities_by_unit_number = global.selectable_entities_by_unit_number
   local position = {}
-  for _, tile in pairs(get_tiles(player)) do
+  ---@type LuaSurface.create_entity_param
+  local arg = {
+    name = square_entity_name,
+    force = player.force_index,
+    position = position,
+  }
+  local create_entity = player.current_surface.create_entity
+  for i, tile in pairs(get_tiles(player)) do
     position.x = left + tile.x + 0.5
     position.y = top + tile.y + 0.5
-    local unit_number = place_pooled_entity(global.square_pool, surface, position, player)
-    player.used_squares[#player.used_squares+1] = unit_number
+    local entity = create_entity(arg)
+    if not entity then
+      error("Creating an internal entity required by Quick Adjustable Inserters failed.")
+    end
+    local unit_number = entity.unit_number ---@cast unit_number -nil
+    player.used_squares[i] = unit_number
+    selectable_entities_to_player_lut[unit_number] = player
+    selectable_entities_by_unit_number[unit_number] = entity
   end
 end
 
 ---@param player PlayerDataQAI
 local function place_ninths(player)
-  local surface = player.target_inserter.surface
-  local inserter_position = player.target_inserter.position
+  local inserter_position = player.target_inserter_position
   local offset_from_inserter = get_offset_from_inserter(player)
   local left = inserter_position.x + offset_from_inserter.x
   local top = inserter_position.y + offset_from_inserter.y
+  local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
+  local selectable_entities_by_unit_number = global.selectable_entities_by_unit_number
   local position = {}
+  ---@type LuaSurface.create_entity_param
+  local arg = {
+    name = ninth_entity_name,
+    force = player.force_index,
+    position = position,
+  }
+  local create_entity = player.current_surface.create_entity
+  local count = 0
   for _, tile in pairs(get_tiles(player)) do
     for inner_x = 0, 2 do
       for inner_y = 0, 2 do
         position.x = left + tile.x + inner_x / 3 + 1 / 6
         position.y = top + tile.y + inner_y / 3 + 1 / 6
-        local unit_number = place_pooled_entity(global.ninth_pool, surface, position, player)
-        player.used_ninths[#player.used_ninths+1] = unit_number
+        local entity = create_entity(arg)
+        if not entity then
+          error("Creating an internal entity required by Quick Adjustable Inserters failed.")
+        end
+        count = count + 1
+        local unit_number = entity.unit_number ---@cast unit_number -nil
+        player.used_ninths[count] = unit_number
+        selectable_entities_to_player_lut[unit_number] = player
+        selectable_entities_by_unit_number[unit_number] = entity
       end
     end
   end
@@ -872,10 +795,18 @@ local flip_direction_lut = {
 ---@param player PlayerDataQAI
 local function place_rects(player)
   local cache = player.target_inserter_cache
-  local surface = player.target_inserter.surface
-  local inserter_position = player.target_inserter.position
+  local inserter_position = player.target_inserter_position
   local offset_from_inserter = cache.offset_from_inserter
+  local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
+  local selectable_entities_by_unit_number = global.selectable_entities_by_unit_number
   local position = {}
+  ---@type LuaSurface.create_entity_param
+  local arg = {
+    name = rect_entity_name,
+    force = player.force_index,
+    position = position,
+  }
+  local create_entity = player.current_surface.create_entity
   for _, dir_arrow in pairs(cache.direction_arrows) do
     if not cache.is_square and is_east_or_west_lut[dir_arrow.direction] then goto continue end
     position.x = offset_from_inserter.x + dir_arrow.position.x
@@ -883,9 +814,15 @@ local function place_rects(player)
     flip(player, position)
     position.x = position.x + inserter_position.x
     position.y = position.y + inserter_position.y
-    local unit_number, entity = place_pooled_entity(global.rect_pool, surface, position, player)
-    entity.direction = player.should_flip and flip_direction_lut[dir_arrow.direction] or dir_arrow.direction
+    arg.direction = player.should_flip and flip_direction_lut[dir_arrow.direction] or dir_arrow.direction
+    local entity = create_entity(arg)
+    if not entity then
+      error("Creating an internal entity required by Quick Adjustable Inserters failed.")
+    end
+    local unit_number = entity.unit_number ---@cast unit_number -nil
     player.used_rects[#player.used_rects+1] = unit_number
+    selectable_entities_to_player_lut[unit_number] = player
+    selectable_entities_by_unit_number[unit_number] = entity
     ::continue::
   end
 end
@@ -1112,6 +1049,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
   player.should_flip = not player.target_inserter_cache.is_square
     and is_east_or_west_lut[target_inserter.direction]
   player.current_surface_index = target_inserter.surface_index
+  player.current_surface = target_inserter.surface
   return true
 end
 
@@ -1272,7 +1210,7 @@ end
 ---@return boolean
 local function is_selectable_for_player(entity, selectable_name, player)
   return entity.name == selectable_name
-    and global.pooled_entities_to_player_lut[entity.unit_number] == player
+    and global.selectable_entities_to_player_lut[entity.unit_number] == player
 end
 
 ---@type table<string, fun(player: PlayerDataQAI, selected: LuaEntity)>
@@ -1444,7 +1382,7 @@ script.on_event(ev.on_selected_entity_changed, function(event)
   local selected = player.player.selected
   local name = selected and selected.name
   if not (name == square_entity_name or name == ninth_entity_name) ---@cast selected -nil
-    or global.pooled_entities_to_player_lut[selected.unit_number] ~= player
+    or global.selectable_entities_to_player_lut[selected.unit_number] ~= player
   then
     hide_inserter_speed_text(player)
     return
@@ -1526,12 +1464,6 @@ script.on_event(ev.on_force_friends_changed, function(event)
   recheck_players_in_force(event.other_force)
 end)
 
-script.on_event(ev.on_surface_deleted, function(event)
-  cleanup_deleted_surface_pool(global.square_pool, event.surface_index)
-  cleanup_deleted_surface_pool(global.ninth_pool, event.surface_index)
-  cleanup_deleted_surface_pool(global.rect_pool, event.surface_index)
-end)
-
 script.on_event(ev.on_player_changed_force, function(event)
   local player = get_player(event)
   if not player then return end
@@ -1582,10 +1514,8 @@ script.on_init(function()
     forces = {},
     inserters_in_use = {},
     active_players = {count = 0, next_index = 1},
-    pooled_entities_to_player_lut = {},
-    square_pool = new_entity_pool(square_entity_name),
-    ninth_pool = new_entity_pool(ninth_entity_name),
-    rect_pool = new_entity_pool(rect_entity_name),
+    selectable_entities_to_player_lut = {},
+    selectable_entities_by_unit_number = {},
   }
   for _, force in pairs(game.forces) do
     init_force(force)
