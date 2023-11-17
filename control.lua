@@ -646,7 +646,7 @@ local function remove_pooled_entity(entity_pool, surface_index, unit_number)
   surface_pool.used_count = surface_pool.used_count - 1
   local entity = surface_pool.used_entities[unit_number]
   surface_pool.used_entities[unit_number] = nil
-  if not entity then return end
+  if not entity or not entity.valid then return end
   surface_pool.free_count = surface_pool.free_count + 1
   surface_pool.free_entities[unit_number] = entity
   entity.teleport(zero_zero)
