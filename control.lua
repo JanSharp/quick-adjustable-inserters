@@ -139,7 +139,8 @@ local animation_type = {
 ---@field used_rects uint[]
 ---@field line_ids uint64[]
 ---@field background_polygon_id uint64 @ `nil` when idle.
----@field inserter_circle_id uint64 @ `nil` when idle.
+---`nil` when idle. Can be `nil` when destroying all rendering objects due to being part of an animation.
+---@field inserter_circle_id uint64
 ---@field direction_arrow_id uint64 @ `nil` when idle.
 ---@field pickup_highlight_id uint64? @ Can be `nil` even when not idle.
 ---Can be `nil` even when not idle. Can even be `nil` when `pickup_highlight_id` is not `nil`.
@@ -150,6 +151,10 @@ local ev = defines.events
 local square_entity_name = "QAI-selectable-square"
 local ninth_entity_name = "QAI-selectable-ninth"
 local rect_entity_name = "QAI-selectable-rect"
+
+local finish_animation_frames = 16
+local finish_animation_expansion = 3/16
+local finish_animation_highlight_box_step = (finish_animation_expansion / 2) / finish_animation_frames
 
 local entity_name_lut = {
   [square_entity_name] = true,
@@ -646,11 +651,11 @@ end
 ---@param player PlayerDataQAI
 local function destroy_all_rendering_objects(player)
   -- For simplicity in other parts of the code, accept this function getting called no matter what.
-  if not player.inserter_circle_id then return end
+  if not player.background_polygon_id then return end
   destroy_and_clear_rendering_ids(player.line_ids)
   local destroy = rendering.destroy
   destroy(player.background_polygon_id)
-  destroy(player.inserter_circle_id)
+  if player.inserter_circle_id then destroy(player.inserter_circle_id) end
   destroy(player.direction_arrow_id)
   if player.pickup_highlight_id then destroy(player.pickup_highlight_id) end
   if player.line_to_pickup_highlight_id then destroy(player.line_to_pickup_highlight_id) end
@@ -1012,21 +1017,34 @@ local function set_inserter_speed_text(player, position, text)
 end
 
 ---@param player PlayerDataQAI
+---@return MapPosition left_top
+---@return MapPosition right_bottom
+local function get_pickup_box(player)
+  local pickup_pos = player.target_inserter.pickup_position
+  return {x = pickup_pos.x - 0.5, y = pickup_pos.y - 0.5},
+    {x = pickup_pos.x + 0.5, y = pickup_pos.y + 0.5}
+end
+
+---@param player PlayerDataQAI
 local function draw_pickup_highlight(player)
-  local inserter = player.target_inserter
-  local pickup_pos = inserter.pickup_position
+  local left_top, right_bottom = get_pickup_box(player)
   player.pickup_highlight_id = rendering.draw_rectangle{
     surface = player.current_surface_index,
     forces = {player.force_index},
     color = {0, 1, 0},
     width = 3,
-    left_top = {x = pickup_pos.x - 0.5, y = pickup_pos.y - 0.5},
-    right_bottom = {x = pickup_pos.x + 0.5, y = pickup_pos.y + 0.5},
+    left_top = left_top,
+    right_bottom = right_bottom,
   }
 end
 
 ---@param player PlayerDataQAI
-local function draw_line_to_pickup_highlight(player)
+---@param square_position MapPosition @ Gets modified.
+---@param square_radius number @ Half of the length of the sides of the square.
+---@return MapPosition? from
+---@return MapPosition? to
+---@return number length
+local function get_from_and_to_for_line_from_center(player, square_position, square_radius)
   local grid_center_position = vec.add(
     vec.add(
       vec.copy(player.target_inserter_position),
@@ -1034,28 +1052,37 @@ local function draw_line_to_pickup_highlight(player)
     ),
     get_grid_center(player)
   )
-  local pickup_vector = vec.sub(player.target_inserter.pickup_position, grid_center_position)
+  local pickup_vector = vec.sub(square_position, grid_center_position)
   local distance_from_pickup = (3/32) + vec.get_length(vec.div_scalar(
     vec.copy(pickup_vector),
-    math.max(math.abs(pickup_vector.x), math.abs(pickup_vector.y)) * 2
+    math.max(math.abs(pickup_vector.x), math.abs(pickup_vector.y)) / square_radius
   ))
   local distance_from_center = (2/32) + player.target_inserter_cache.radius_for_circle_on_inserter
   local length = vec.get_length(pickup_vector) - distance_from_pickup - distance_from_center
-  if length <= 0 then return end
+  if length <= 0 then return nil, nil, length end
 
+  local from = vec.add(
+    vec.copy(grid_center_position),
+    vec.set_length(pickup_vector, distance_from_center)
+  )
+  local to = vec.add(
+    grid_center_position, -- No need to copy here too.
+    vec.set_length(pickup_vector, distance_from_center + length)
+  )
+  return from--[[@as MapPosition]], to--[[@as MapPosition]], length
+end
+
+---@param player PlayerDataQAI
+local function draw_line_to_pickup_highlight(player)
+  local from, to = get_from_and_to_for_line_from_center(player, player.target_inserter.pickup_position, 0.5)
+  if not from then return end ---@cast to -nil
   player.line_to_pickup_highlight_id = rendering.draw_line{
     surface = player.current_surface_index,
     forces = {player.force_index},
     color = {0, 1, 0},
     width = 2,
-    to = vec.add(
-      vec.copy(grid_center_position),
-      vec.set_length(pickup_vector, distance_from_center + length)
-    )--[[@as MapPosition]],
-    from = vec.add(
-      grid_center_position, -- No need to copy here too.
-      vec.set_length(pickup_vector, distance_from_center)
-    )--[[@as MapPosition]],
+    from = from,
+    to = to,
   }
 end
 
@@ -1189,11 +1216,11 @@ end
 
 ---@param player PlayerDataQAI
 ---@param position MapPosition
----@return MapPosition
-local function calculate_actual_drop_position(player, position)
+---@param offset_from_tile_center number
+---@param auto_determine_drop_offset boolean? @ Should it move the drop offset away from the inserter?
+local function snap_drop_position(player, position, offset_from_tile_center, auto_determine_drop_offset)
   local cache = player.target_inserter_cache
   local tech_level = cache.tech_level
-  local auto_determine_drop_offset = not tech_level.drop_offset
   local inserter_position = player.target_inserter_position
   local offset_from_inserter = cache.offset_from_inserter
   local left_top_x = inserter_position.x + offset_from_inserter.x
@@ -1204,11 +1231,11 @@ local function calculate_actual_drop_position(player, position)
   local y_offset
   if auto_determine_drop_offset then
     local max_range = tech_level.range + cache.range_gap_from_center
-    x_offset = relative_x < max_range and -51/256
-      or (max_range + cache.tile_width) < relative_x and 51/256
+    x_offset = relative_x < max_range and -offset_from_tile_center
+      or (max_range + cache.tile_width) < relative_x and offset_from_tile_center
       or 0
-    y_offset = relative_y < max_range and -51/256
-      or (max_range + cache.tile_height) < relative_y and 51/256
+    y_offset = relative_y < max_range and -offset_from_tile_center
+      or (max_range + cache.tile_height) < relative_y and offset_from_tile_center
       or 0
   else
     -- Modulo always returns a positive number.
@@ -1217,11 +1244,11 @@ local function calculate_actual_drop_position(player, position)
     -- 51 / 256 = 0.19921875. Vanilla inserter drop positions are offset by 0.2 away from the center, however
     -- it ultimately gets rounded to 51 / 256, because of map positions. In other words, this matches vanilla.
     x_offset = x_from_tile_center == 0 and 0
-      or x_from_tile_center < 0 and -51/256
-      or 51/256
+      or x_from_tile_center < 0 and -offset_from_tile_center
+      or offset_from_tile_center
     y_offset = y_from_tile_center == 0 and 0
-      or y_from_tile_center < 0 and -51/256
-      or 51/256
+      or y_from_tile_center < 0 and -offset_from_tile_center
+      or offset_from_tile_center
   end
   return {
     x = left_top_x + math.floor(relative_x) + 0.5 + x_offset,
@@ -1231,8 +1258,187 @@ end
 
 ---@param player PlayerDataQAI
 ---@param position MapPosition
+---@return MapPosition
+local function calculate_visualized_drop_position(player, position)
+  return snap_drop_position(player, position, 85/256)
+end
+
+---@param player PlayerDataQAI
+---@param position MapPosition
+---@return MapPosition
+local function calculate_actual_drop_position(player, position)
+  local auto_determine_drop_offset = not player.target_inserter_cache.tech_level.drop_offset
+  return snap_drop_position(player, position, 51/256, auto_determine_drop_offset)
+end
+
+---@param player PlayerDataQAI
+---@param position MapPosition
 local function set_drop_position(player, position)
   player.target_inserter.drop_position = calculate_actual_drop_position(player, position)
+end
+
+---@return Color
+local function get_finish_animation_color()
+  return {r = 0, g = 1, b = 0, a = 1}
+end
+
+---@return Color
+local function get_finish_animation_color_step()
+  return {r = 0, g = -1 / finish_animation_frames, b = 0, a = -1 / finish_animation_frames}
+end
+
+---@param player PlayerDataQAI
+---@param position MapPosition
+local function play_drop_highlight_animation(player, position)
+  local color = get_finish_animation_color()
+  local left_top = {x = position.x - 43/256, y = position.y - 43/256} -- 43/256 ~= 1/6
+  local right_bottom = {x = position.x + 43/256, y = position.y + 43/256}
+  local id = rendering.draw_rectangle{
+    surface = player.current_surface_index,
+    forces = {player.force_index},
+    color = color,
+    width = 3,
+    left_top = left_top,
+    right_bottom = right_bottom,
+  }
+
+  local step = finish_animation_highlight_box_step
+  add_animated_rectangle{
+    id = id,
+    remaining_updates = finish_animation_frames - 1,
+    destroy_on_finish = true,
+    color = color,
+    left_top = left_top,
+    right_bottom = right_bottom,
+    color_step = get_finish_animation_color_step(),
+    left_top_step = {x = -step, y = -step},
+    right_bottom_step = {x = step, y = step},
+  }
+end
+
+---@param from MapPosition
+---@param to MapPosition
+---@param length number
+---@return integer frames
+---@return MapPosition step_vector
+local function get_frames_and_step_vector_for_line_to_highlight(from, to, length)
+  local final_length = length - finish_animation_expansion
+  local length_step = finish_animation_expansion / finish_animation_frames
+  local frames = math.max(1, finish_animation_frames - math.floor(math.max(0, -final_length) / length_step))
+  local step_vector = vec.set_length(vec.sub(vec.copy(to), from), length_step / 2)
+  return frames, step_vector--[[@as MapPosition]]
+end
+
+---@param player PlayerDataQAI
+---@param position MapPosition
+local function play_line_to_drop_highlight_animation(player, position)
+  local from, to, length = get_from_and_to_for_line_from_center(
+    player,
+    vec.copy(position)--[[@as MapPosition]],
+    43/256
+  )
+  if not from then return end ---@cast to -nil
+
+  local color = get_finish_animation_color()
+  local id = rendering.draw_line{
+    surface = player.current_surface_index,
+    forces = {player.force_index},
+    color = color,
+    width = 2,
+    from = from,
+    to = to,
+  }
+
+  local frames, step_vector = get_frames_and_step_vector_for_line_to_highlight(from, to, length)
+  add_animated_line{
+    type = animation_type.line,
+    id = id,
+    remaining_updates = frames - 1,
+    destroy_on_finish = true,
+    color = color,
+    from = from,
+    to = to,
+    color_step = get_finish_animation_color_step(),
+    from_step = step_vector,
+    to_step = vec.mul_scalar(vec.copy(step_vector), -1)--[[@as MapPosition]],
+  }
+end
+
+---@param player PlayerDataQAI
+local function play_circle_on_inserter_animation(player)
+  if not rendering.is_valid(player.inserter_circle_id) then return end
+  local color = get_finish_animation_color()
+  rendering.set_color(player.inserter_circle_id, color)
+  add_animated_circle{
+    id = player.inserter_circle_id,
+    remaining_updates = finish_animation_frames - 1,
+    destroy_on_finish = true,
+    color = color,
+    radius = player.target_inserter_cache.radius_for_circle_on_inserter,
+    color_step = get_finish_animation_color_step(),
+    radius_step = (finish_animation_expansion / 2) / finish_animation_frames,
+  }
+  player.inserter_circle_id = nil -- Destroying is now handled by the animation.
+end
+
+---@param player PlayerDataQAI
+local function play_pickup_highlight_animation(player)
+  if not rendering.is_valid(player.pickup_highlight_id) then return end
+  local step = (finish_animation_expansion / 2) / finish_animation_frames
+  local left_top, right_bottom = get_pickup_box(player)
+  add_animated_rectangle{
+    id = player.pickup_highlight_id,
+    remaining_updates = finish_animation_frames - 1,
+    destroy_on_finish = true,
+    color = get_finish_animation_color(),
+    left_top = left_top,
+    right_bottom = right_bottom,
+    color_step = get_finish_animation_color_step(),
+    left_top_step = {x = -step, y = -step},
+    right_bottom_step = {x = step, y = step},
+  }
+  player.pickup_highlight_id = nil -- Destroying is now handled by the animation.
+end
+
+---@param player PlayerDataQAI
+local function play_line_to_pickup_highlight_animation(player)
+  if not rendering.is_valid(player.line_to_pickup_highlight_id) then return end
+  local from, to, length = get_from_and_to_for_line_from_center(
+    player,
+    player.target_inserter.pickup_position,
+    0.5
+  )
+  -- The pickup position might have changed since the last time we checked.
+  if not from then ---@cast to -nil
+    rendering.destroy(player.line_to_pickup_highlight_id)
+    player.line_to_pickup_highlight_id = nil
+    return
+  end
+
+  local frames, step_vector = get_frames_and_step_vector_for_line_to_highlight(from, to, length)
+  add_animated_line{
+    id = player.line_to_pickup_highlight_id,
+    remaining_updates = frames - 1,
+    destroy_on_finish = true,
+    color = get_finish_animation_color(),
+    from = from,
+    to = to,
+    color_step = get_finish_animation_color_step(),
+    from_step = step_vector,
+    to_step = vec.mul_scalar(vec.copy(step_vector), -1)--[[@as MapPosition]],
+  }
+  player.line_to_pickup_highlight_id = nil -- Destroying is now handled by the animation.
+end
+
+---@param player PlayerDataQAI
+local function play_finish_animation(player)
+  if game.tick_paused then return end
+  local drop_position = calculate_visualized_drop_position(player, player.target_inserter.drop_position)
+  play_drop_highlight_animation(player, drop_position)
+  play_line_to_drop_highlight_animation(player, drop_position)
+  play_circle_on_inserter_animation(player)
+  play_pickup_highlight_animation(player)
+  play_line_to_pickup_highlight_animation(player)
 end
 
 ---@param player PlayerDataQAI
@@ -1312,6 +1518,7 @@ local on_adjust_handler_lut = {
     if not validate_target_inserter(player) then return end
     if selected.type == "inserter" then
       if selected == player.target_inserter then
+        play_finish_animation(player)  -- Before switching to idle because some rendering objects get reused.
         switch_to_idle(player)
       else
         switch_to_selecting_pickup(player, selected, true)
@@ -1322,6 +1529,7 @@ local on_adjust_handler_lut = {
       or is_selectable_for_player(selected, ninth_entity_name, player)
     then
       set_drop_position(player, selected.position)
+      play_finish_animation(player) -- Before switching to idle because some rendering objects get reused.
       switch_to_idle(player)
       return
     end

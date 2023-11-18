@@ -12,9 +12,10 @@
   - [x] make inserter caches per force
 - [x] don't do anything if the inserter doesn't support runtime changeable vectors
 - [ ] maybe add some animations
-  - [ ] happy little popup at both the pickup and drop positions (squares getting bigger and transparent)
-  - [ ] with it lines connecting the 2, and a circle on the inserter base itself
-  - [ ] do it in a way where there isn't any overlapping lines, so transparency doesn't screw us
+  - [x] happy little popup at both the pickup and drop positions (squares getting bigger and transparent)
+  - [x] with it lines connecting the 2, and a circle on the inserter base itself
+  - [x] do it in a way where there isn't any overlapping lines, so transparency doesn't screw us
+  - [ ] maybe fade the grid lines and background and the direction arrow in and out, very rapidly
 - [x] maybe add very transparent white rendering in each tile that you can actually interact with
   - [x] generate vertices for a polygon and save it in cache, so the entire background is just 1 polygon
 - [x] ~~speaking of, what if the entire grid was just a polygon that's cached~~
