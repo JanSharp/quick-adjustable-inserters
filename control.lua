@@ -146,6 +146,9 @@ local animation_type = {
 ---Can be `nil` even when not idle. Can even be `nil` when `pickup_highlight_id` is not `nil`.
 ---@field line_to_pickup_highlight_id uint64?
 ---@field inserter_speed_text_id uint64? @ Only `nil` initially, once it exists, it's never destroyed (by this mod).
+---@field show_throughput_on_drop boolean
+---@field show_throughput_on_pickup boolean
+---@field show_throughput_on_inserter boolean
 
 local ev = defines.events
 local square_entity_name = "QAI-selectable-square"
@@ -719,7 +722,6 @@ local function switch_to_idle(player, keep_rendering)
   if player.player.selected and entity_name_lut[player.player.selected.name] then
     player.player.selected = nil
   end
-  hide_inserter_speed_text(player)
 end
 
 ---@param player PlayerDataQAI
@@ -1002,7 +1004,8 @@ local function set_inserter_speed_text(player, position, text)
   local id = player.inserter_speed_text_id
   if not id or not rendering.is_valid(id) then
     player.inserter_speed_text_id = rendering.draw_text{
-      surface = player.current_surface_index,
+      -- Can't use `player.current_surface_index` because that's nil when idle.
+      surface = player.player.surface_index,
       players = {player.player_index},
       color = {1, 1, 1},
       target = position,
@@ -1014,6 +1017,110 @@ local function set_inserter_speed_text(player, position, text)
   rendering.set_target(id, position)
   rendering.set_visible(id, true)
   rendering.bring_to_front(id)
+end
+
+local calculate_actual_drop_position
+
+---@param player PlayerDataQAI
+---@param selected_position MapPosition @ Position of the selected square or ninth.
+---@return number items_per_second
+local function estimate_inserter_speed(player, selected_position)
+  local cache = player.target_inserter_cache
+  local target_inserter = player.target_inserter
+  ---@type InserterThroughputDefinition
+  local def = {
+    extension_speed = cache.extension_speed,
+    rotation_speed = cache.rotation_speed,
+    chases_belt_items = cache.chases_belt_items,
+    stack_size = target_inserter.inserter_target_pickup_count,
+  }
+
+  if player.state == "selecting-pickup" then
+    inserter_throughput.set_from_based_on_position(
+      def,
+      target_inserter.surface,
+      player.target_inserter_position,
+      selected_position
+    )
+    inserter_throughput.set_to_based_on_inserter(def, target_inserter)
+  else
+    inserter_throughput.set_from_based_on_inserter(def, target_inserter)
+    inserter_throughput.set_to_based_on_position(
+      def,
+      target_inserter.surface,
+      player.target_inserter_position,
+      calculate_actual_drop_position(player, selected_position)
+    )
+  end
+
+  return inserter_throughput.estimate_inserter_speed(def)
+end
+
+---@param inserter LuaEntity
+local function estimate_inserter_speed_for_inserter(inserter)
+  local prototype = inserter.prototype
+  ---@type InserterThroughputDefinition
+  local def = {
+    extension_speed = prototype.inserter_extension_speed,
+    rotation_speed = prototype.inserter_rotation_speed,
+    chases_belt_items = prototype.inserter_chases_belt_items,
+    stack_size = inserter.inserter_target_pickup_count,
+  }
+  inserter_throughput.set_from_based_on_inserter(def, inserter)
+  inserter_throughput.set_to_based_on_inserter(def, inserter)
+  return inserter_throughput.estimate_inserter_speed(def)
+end
+
+---@param player PlayerDataQAI
+---@param inserter LuaEntity
+local function update_inserter_speed_text_using_inserter(player, inserter)
+  local items_per_second = estimate_inserter_speed_for_inserter(inserter)
+  local selection_box = inserter.selection_box
+  local position = {
+    x = selection_box.right_bottom.x + 0.15,
+    y = (selection_box.left_top.y + selection_box.right_bottom.y) / 2 - 0.31,
+  }
+  set_inserter_speed_text(player, position, string.format("%.3f/s", items_per_second))
+  return
+end
+
+---@param player PlayerDataQAI
+local function update_inserter_speed_text(player)
+  local selected = player.player.selected
+  if not selected then
+    hide_inserter_speed_text(player)
+    return
+  end
+
+  if player.show_throughput_on_inserter
+    and selected.type == "inserter"
+    and selected.force.is_friend(player.force_index)
+  then
+    update_inserter_speed_text_using_inserter(player, selected)
+    return
+  end
+
+  if player.state == "idle"
+    or player.state == "selecting-pickup" and not player.show_throughput_on_pickup
+    or player.state == "selecting-drop" and not player.show_throughput_on_drop
+  then
+    hide_inserter_speed_text(player)
+    return
+  end
+
+  local name = selected.name
+  if not (name == square_entity_name or name == ninth_entity_name) ---@cast selected -nil
+    or global.selectable_entities_to_player_lut[selected.unit_number] ~= player
+  then
+    hide_inserter_speed_text(player)
+    return
+  end
+
+  local position = selected.position
+  local items_per_second = estimate_inserter_speed(player, position)
+  position.x = position.x + (name == ninth_entity_name and 0.35 or 0.6)
+  position.y = position.y - 0.31
+  set_inserter_speed_text(player, position, string.format("%.3f/s", items_per_second))
 end
 
 ---@param player PlayerDataQAI
@@ -1266,7 +1373,7 @@ end
 ---@param player PlayerDataQAI
 ---@param position MapPosition
 ---@return MapPosition
-local function calculate_actual_drop_position(player, position)
+function calculate_actual_drop_position(player, position)
   local auto_determine_drop_offset = not player.target_inserter_cache.tech_level.drop_offset
   return snap_drop_position(player, position, 51/256, auto_determine_drop_offset)
 end
@@ -1441,41 +1548,6 @@ local function play_finish_animation(player)
   play_line_to_pickup_highlight_animation(player)
 end
 
----@param player PlayerDataQAI
----@param position MapPosition
----@return number items_per_second
-local function estimate_inserter_speed(player, position)
-  local cache = player.target_inserter_cache
-  local target_inserter = player.target_inserter
-  ---@type InserterThroughputDefinition
-  local def = {
-    extension_speed = cache.extension_speed,
-    rotation_speed = cache.rotation_speed,
-    chases_belt_items = cache.chases_belt_items,
-    stack_size = target_inserter.inserter_target_pickup_count,
-  }
-
-  if player.state == "selecting-pickup" then
-    inserter_throughput.set_from_based_on_position(
-      def,
-      target_inserter.surface,
-      player.target_inserter_position,
-      position
-    )
-    inserter_throughput.set_to_based_on_inserter(def, target_inserter)
-  else
-    inserter_throughput.set_from_based_on_inserter(def, target_inserter)
-    inserter_throughput.set_to_based_on_position(
-      def,
-      target_inserter.surface,
-      player.target_inserter_position,
-      calculate_actual_drop_position(player, position)
-    )
-  end
-
-  return inserter_throughput.estimate_inserter_speed(def)
-end
-
 ---@param entity LuaEntity
 ---@param selectable_name string
 ---@param player PlayerDataQAI
@@ -1592,9 +1664,33 @@ local function init_force(force)
   return force_data
 end
 
+---@param player PlayerDataQAI
+---@param setting_name string
+---@param field_name string
+local function update_show_throughput_on_player(player, setting_name, field_name)
+  local new_value = settings.get_player_settings(player.player_index)[setting_name].value--[[@as boolean]]
+  if new_value == player[field_name] then return end
+  player[field_name] = new_value
+  update_inserter_speed_text(player)
+end
+
+---@type table<string, fun(player: PlayerDataQAI)>
+local update_setting_lut = {
+  ["QAI-show-throughput-on-inserter"] = function(player)
+    update_show_throughput_on_player(player, "QAI-show-throughput-on-inserter", "show_throughput_on_inserter")
+  end,
+  ["QAI-show-throughput-on-pickup"] = function(player)
+    update_show_throughput_on_player(player, "QAI-show-throughput-on-pickup", "show_throughput_on_pickup")
+  end,
+  ["QAI-show-throughput-on-drop"] = function(player)
+    update_show_throughput_on_player(player, "QAI-show-throughput-on-drop", "show_throughput_on_drop")
+  end,
+}
+
 ---@param player LuaPlayer
 ---@return PlayerDataQAI
 local function init_player(player)
+  local player_settings = settings.get_player_settings(player)
   ---@type PlayerDataQAI
   local player_data = {
     player = player,
@@ -1605,6 +1701,9 @@ local function init_player(player)
     used_ninths = {},
     used_rects = {},
     line_ids = {},
+    show_throughput_on_inserter = player_settings["QAI-show-throughput-on-inserter"].value--[[@as boolean]],
+    show_throughput_on_pickup = player_settings["QAI-show-throughput-on-pickup"].value--[[@as boolean]],
+    show_throughput_on_drop = player_settings["QAI-show-throughput-on-drop"].value--[[@as boolean]],
   }
   global.players[player.index] = player_data
   return player_data
@@ -1625,6 +1724,7 @@ local function update_active_player(player)
     or position.y ~= prev_position.y
   then
     switch_to_idle_and_back(player, true)
+    update_inserter_speed_text(player)
   end
 end
 
@@ -1754,21 +1854,16 @@ end)
 
 script.on_event(ev.on_selected_entity_changed, function(event)
   local player = get_player(event)
-  if not player or player.state ~= "selecting-drop" then return end
-  local selected = player.player.selected
-  local name = selected and selected.name
-  if not (name == square_entity_name or name == ninth_entity_name) ---@cast selected -nil
-    or global.selectable_entities_to_player_lut[selected.unit_number] ~= player
-  then
-    hide_inserter_speed_text(player)
-    return
-  end
-  ---@cast selected -nil
-  local position = selected.position
-  local items_per_second = estimate_inserter_speed(player, position)
-  position.x = position.x + (name == ninth_entity_name and 0.35 or 0.6)
-  position.y = position.y - 0.31
-  set_inserter_speed_text(player, position, string.format("%.3f/s", items_per_second))
+  if not player then return end
+  update_inserter_speed_text(player)
+end)
+
+script.on_event(ev.on_runtime_mod_setting_changed, function(event)
+  local update_setting = update_setting_lut[event.setting]
+  if not update_setting then return end
+  local player = get_player(event)
+  if not player then return end
+  update_setting(player)
 end)
 
 script.on_event(ev.on_player_changed_position, function(event)
@@ -1782,17 +1877,26 @@ script.on_event(ev.on_player_changed_position, function(event)
   end
 end)
 
-script.on_event(ev.on_player_rotated_entity, function(event)
-  local player = global.inserters_in_use[event.entity.unit_number] ---@cast player PlayerDataQAI
-  if not player then return end
-  switch_to_idle_and_back(player)
-end)
-
-script.on_event(ev.script_raised_teleported, function(event)
-  local player = global.inserters_in_use[event.entity.unit_number] ---@cast player PlayerDataQAI
-  if not player then return end
-  switch_to_idle_and_back(player, true)
-end)
+for _, data in pairs{
+  {event_name = ev.on_player_rotated_entity, do_check_reach = false},
+  {event_name = ev.script_raised_teleported, do_check_reach = true},
+}
+do
+  local do_check_reach = data.do_check_reach
+  ---@param event EventData.on_player_rotated_entity|EventData.script_raised_teleported
+  script.on_event(data.event_name, function(event)
+    local player = get_player(event)
+    if player then
+      -- If this is an inserter and another player also has that inserter selected, the text won't update for
+      -- them. Making it update for them is not worth the performance cost or complexity.
+      update_inserter_speed_text(player)
+    end
+    player = global.inserters_in_use[event.entity.unit_number] ---@cast player PlayerDataQAI
+    if player then
+      switch_to_idle_and_back(player, do_check_reach)
+    end
+  end)
+end
 
 for _, destroy_event in pairs{
   ev.on_entity_died,
@@ -1845,6 +1949,7 @@ script.on_event(ev.on_player_changed_force, function(event)
   if not player then return end
   player.force_index = player.player.force_index--[[@as uint8]]
   switch_to_idle_and_back(player)
+  update_inserter_speed_text(player)
 end)
 
 script.on_configuration_changed(function(event)

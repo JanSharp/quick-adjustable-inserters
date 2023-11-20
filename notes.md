@@ -21,8 +21,9 @@
 - [x] ~~speaking of, what if the entire grid was just a polygon that's cached~~
   - [x] see polygon-for-lines branch, the "lines" end up changing thickness inconsistently and disappear, while lines drawn using draw_line are consistent and have a minimal thickness of 1 pixel, even fully zoomed out
 - [x] estimate inserter speed
-- [ ] per player setting to disable inserter speed estimation entirely
-- [ ] per player setting to show estimated inserter throughput when hovering any inserter
+- [x] per player setting to disable inserter speed estimation entirely
+- [x] per player setting to show estimated inserter throughput when hovering any inserter
+- [ ] per player setting to always use auto drop offset, even when near inserters have been researched
 - [ ] highlight drop positions which would be the fastest for the entity under the currently selected drop target selection
 - [ ] add feature where you can place the inserter using this mods key bind and it will automatically uses the same pickup and drop vectors as the last modified inserter, if they have the same dimensions.
 - [ ] maybe add another key bind to place an inserter and instantly enter the configuration mode
