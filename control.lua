@@ -1221,7 +1221,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
 
   local cache = force.inserter_cache_lut[target_inserter.name]
   if not cache then
-    return show_error(player, target_inserter, {"qai.cant-change-inserter-at-runtime"})
+    return show_error(player, target_inserter, {"QAI.cant-change-inserter-at-runtime"})
   end
 
   -- Specifically check if the force of the inserter is friends with the player. Friendship is one directional.
@@ -1235,7 +1235,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
 
   local unit_number = target_inserter.unit_number ---@cast unit_number -nil
   if global.inserters_in_use[unit_number] then
-    return show_error(player, target_inserter, {"qai.only-one-player-can-adjust"})
+    return show_error(player, target_inserter, {"QAI.only-one-player-can-adjust"})
   end
 
   global.inserters_in_use[unit_number] = player
