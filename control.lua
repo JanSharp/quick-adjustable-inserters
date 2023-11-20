@@ -149,6 +149,7 @@ local animation_type = {
 ---@field show_throughput_on_drop boolean
 ---@field show_throughput_on_pickup boolean
 ---@field show_throughput_on_inserter boolean
+---@field always_use_auto_drop_offset boolean
 
 local ev = defines.events
 local square_entity_name = "QAI-selectable-square"
@@ -1273,6 +1274,12 @@ local function switch_to_selecting_pickup(player, target_inserter, do_check_reac
 end
 
 ---@param player PlayerDataQAI
+---@return boolean
+local function should_use_auto_drop_offset(player)
+  return player.always_use_auto_drop_offset or not player.target_inserter_cache.tech_level.drop_offset
+end
+
+---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
 ---@param do_check_reach boolean?
 local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
@@ -1285,10 +1292,10 @@ local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
     return
   end
 
-  if player.target_inserter_cache.tech_level.drop_offset then
-    place_ninths(player)
-  else
+  if should_use_auto_drop_offset(player) then
     place_squares(player)
+  else
+    place_ninths(player)
   end
   place_rects(player)
   draw_all_rendering_objects(player)
@@ -1374,8 +1381,7 @@ end
 ---@param position MapPosition
 ---@return MapPosition
 function calculate_actual_drop_position(player, position)
-  local auto_determine_drop_offset = not player.target_inserter_cache.tech_level.drop_offset
-  return snap_drop_position(player, position, 51/256, auto_determine_drop_offset)
+  return snap_drop_position(player, position, 51/256, should_use_auto_drop_offset(player))
 end
 
 ---@param player PlayerDataQAI
@@ -1685,6 +1691,12 @@ local update_setting_lut = {
   ["QAI-show-throughput-on-drop"] = function(player)
     update_show_throughput_on_player(player, "QAI-show-throughput-on-drop", "show_throughput_on_drop")
   end,
+  ["QAI-always-use-auto-drop-offset"] = function(player)
+    local new_value = settings.get_player_settings(player.player_index)["QAI-always-use-auto-drop-offset"].value--[[@as boolean]]
+    if new_value == player.always_use_auto_drop_offset then return end
+    player.always_use_auto_drop_offset = new_value
+    switch_to_idle_and_back(player)
+  end,
 }
 
 ---@param player LuaPlayer
@@ -1704,6 +1716,7 @@ local function init_player(player)
     show_throughput_on_inserter = player_settings["QAI-show-throughput-on-inserter"].value--[[@as boolean]],
     show_throughput_on_pickup = player_settings["QAI-show-throughput-on-pickup"].value--[[@as boolean]],
     show_throughput_on_drop = player_settings["QAI-show-throughput-on-drop"].value--[[@as boolean]],
+    always_use_auto_drop_offset = player_settings["QAI-always-use-auto-drop-offset"].value--[[@as boolean]],
   }
   global.players[player.index] = player_data
   return player_data

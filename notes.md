@@ -23,7 +23,7 @@
 - [x] estimate inserter speed
 - [x] per player setting to disable inserter speed estimation entirely
 - [x] per player setting to show estimated inserter throughput when hovering any inserter
-- [ ] per player setting to always use auto drop offset, even when near inserters have been researched
+- [x] per player setting to always use auto drop offset, even when near inserters have been researched
 - [ ] highlight drop positions which would be the fastest for the entity under the currently selected drop target selection
 - [ ] add feature where you can place the inserter using this mods key bind and it will automatically uses the same pickup and drop vectors as the last modified inserter, if they have the same dimensions.
 - [ ] maybe add another key bind to place an inserter and instantly enter the configuration mode
