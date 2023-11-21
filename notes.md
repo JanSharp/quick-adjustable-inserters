@@ -52,6 +52,6 @@
 - [x] change visualization when pickup has been selected
   - [x] draw square around it instead of a highlight box
   - [x] draw a line from the inserter to the pickup tile
-- [ ] slight indication for the 4 big rectangles around the grid which change direction
+- [x] slight indication for the 4 big rectangles around the grid which change direction
 - [x] test if creating and deleting entities is faster than teleporting and changing force
   - [x] yes it is. With pooling hitting the key bind 3 times on an inserter takes 2.57 ms, without pooling it takes 1.7 ms

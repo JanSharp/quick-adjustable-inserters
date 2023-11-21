@@ -404,8 +404,18 @@ local function generate_lines_cache(cache)
   local count = 0
   local lines = cache.lines
   local lines_flipped = cache.lines_flipped
+  ---How many lines within a tile can be drawn?
+  local resolution = 2
+  local line_part_length = 1 / resolution
+  ---Extra tiles needed to be able to draw lines indicating the selection boxes for direction arrows.
+  ---Because points must be >= 0. So this is the arrow height when north and south, otherwise it is the width.
+  local extra_tiles = 2
   ---@param line LineDefinitionQAI
   local function add(line)
+    line.from.y = line.from.y / resolution - extra_tiles
+    line.from.x = line.from.x / resolution - extra_tiles
+    line.to.y = line.to.y / resolution - extra_tiles
+    line.to.x = line.to.x / resolution - extra_tiles
     count = count + 1
     lines[count] = line
     lines_flipped[count] = {
@@ -420,21 +430,61 @@ local function generate_lines_cache(cache)
     }
   end
 
+  ---Get a point that is actually relative to the top left corner of the grid.
+  ---@param x integer
+  ---@param y integer
+  ---@return integer point
+  local function get_shifted_point(x, y)
+    return get_point((x + extra_tiles) * resolution, (y + extra_tiles) * resolution)
+  end
+
   -- The final lines are represented as points in these grids.
-  -- 0, 0 in horizontal_grid is the line going from the top left corner 1 tile to the right.
-  -- 0, 0 in vertical_grid is the line going from the top left corner 1 tile downwards.
+  -- shifted 0, 0 in horizontal_grid is the line going from the top left corner 1 tile to the right.
+  -- shifted 0, 0 in vertical_grid is the line going from the top left corner 1 tile downwards.
   ---@type table<uint32, true>
   local horizontal_grid = {}
   ---@type table<uint32, true>
   local vertical_grid = {}
 
+  -- Define grid lines.
   for _, tile in pairs(cache.tiles) do
-    horizontal_grid[get_point(tile.x, tile.y)] = true
-    horizontal_grid[get_point(tile.x, tile.y + 1)] = true
-    vertical_grid[get_point(tile.x, tile.y)] = true
-    vertical_grid[get_point(tile.x + 1, tile.y)] = true
+    for i = 0, 1 - line_part_length, line_part_length do
+      horizontal_grid[get_shifted_point(tile.x + i, tile.y)] = true
+      horizontal_grid[get_shifted_point(tile.x + i, tile.y + 1)] = true
+      vertical_grid[get_shifted_point(tile.x, tile.y + i)] = true
+      vertical_grid[get_shifted_point(tile.x + 1, tile.y + i)] = true
+    end
   end
 
+  -- Define direction arrow highlight lines.
+  local max_range = cache.tech_level.range + cache.range_gap_from_center
+  local grid_width = max_range * 2 + cache.tile_width
+  local grid_height = max_range * 2 + cache.tile_height
+  local arrow_width = 3 -- For north and south, otherwise it would be height.
+  local from_top = max_range - (arrow_width - cache.tile_height) / 2
+  local from_left = max_range - (arrow_width - cache.tile_width) / 2
+  for i = 0, 1 do
+    local x = i * (grid_width + extra_tiles * 2 - line_part_length) - extra_tiles
+    local y = i * (grid_height + extra_tiles * 2 - line_part_length) - extra_tiles
+    if cache.is_square then
+      horizontal_grid[get_shifted_point(x, from_top)] = true
+      horizontal_grid[get_shifted_point(x, from_top + arrow_width)] = true
+    end
+    vertical_grid[get_shifted_point(from_left, y)] = true
+    vertical_grid[get_shifted_point(from_left + arrow_width, y)] = true
+  end
+  for i = 0, 1 do
+    local x = i * (grid_width + extra_tiles * 2) - extra_tiles
+    local y = i * (grid_height + extra_tiles * 2) - extra_tiles
+    for j = 0, arrow_width - line_part_length, arrow_width - line_part_length do
+      if cache.is_square then
+        vertical_grid[get_shifted_point(x, from_top + j)] = true
+      end
+      horizontal_grid[get_shifted_point(from_left + j, y)] = true
+    end
+  end
+
+  -- Combine horizontal lines.
   while true do
     local point = next(horizontal_grid)
     if not point then break end
@@ -454,6 +504,7 @@ local function generate_lines_cache(cache)
     }
   end
 
+  -- Combine vertical lines. Copy paste from horizontal with flipped axis.
   while true do
     local point = next(vertical_grid)
     if not point then break end
