@@ -45,6 +45,7 @@
 - [x] maybe continuously check if the target inserter is still valid, so if the entity disappears without an event, we still clean up reasonably soon.
 - [x] maybe add a rendering circle on the inserter itself
 - [x] maybe detect inserters that are by default diagonal and allow them to be diagonal first, then perpendicular after research
+- [ ] maybe check if an inserter's default drop offset is far, center or near and use that information for auto determined drop positions
 - [x] add locale for invisible entities
 - [x] change all rendering to target a position, not the entity. That way being tick paused in the editor and having mods do weird stuff without raising an event doesn't make this mod look weird
 - [x] add locale for the key bind/control
