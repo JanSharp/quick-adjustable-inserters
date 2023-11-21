@@ -840,7 +840,8 @@ local function switch_to_idle(player, keep_rendering)
   player.target_inserter_force_index = nil
   player.should_flip = nil
   player.state = "idle"
-  if player.player.selected and entity_name_lut[player.player.selected.name] then
+  local selected = player.player.selected
+  if selected and entity_name_lut[selected.name] then
     player.player.selected = nil
   end
 end
