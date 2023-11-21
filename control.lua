@@ -978,6 +978,23 @@ local function add_grid_fade_in_animation(id, opacity, color_step)
   }
 end
 
+---@param id uint64
+---@param opacity number
+---@param color_step Color
+---@param color Color @ Each component will be multiplied by opacity.
+local function add_non_white_grid_fade_in_animation(id, opacity, color_step, color)
+  color.r = color.r * opacity
+  color.g = color.g * opacity
+  color.b = color.b * opacity
+  color.a = color.a * opacity
+  return add_animated_color{ -- Return to make it a tail call.
+    id = id,
+    remaining_updates = grid_fade_in_frames - 1,
+    color = color,
+    color_step = color_step,
+  }
+end
+
 ---@param player PlayerDataQAI
 local function draw_direction_arrow(player)
   local inserter = player.target_inserter
@@ -1293,14 +1310,21 @@ end
 ---@param player PlayerDataQAI
 local function draw_pickup_highlight(player)
   local left_top, right_bottom = get_pickup_box(player)
-  player.pickup_highlight_id = rendering.draw_rectangle{
+  local do_animate, opacity, color_step = get_color_for_potential_animation(1)
+  color_step.r = 0
+  color_step.b = 0
+  local id = rendering.draw_rectangle{
     surface = player.current_surface_index,
     forces = {player.force_index},
-    color = {0, 1, 0},
+    color = color_step,
     width = 3,
     left_top = left_top,
     right_bottom = right_bottom,
   }
+  player.pickup_highlight_id = id
+  if do_animate then
+    add_non_white_grid_fade_in_animation(id, opacity, color_step, {r = 0, g = 1, b = 0, a = 1})
+  end
 end
 
 ---@param player PlayerDataQAI
@@ -1341,14 +1365,21 @@ end
 local function draw_line_to_pickup_highlight(player)
   local from, to = get_from_and_to_for_line_from_center(player, player.target_inserter.pickup_position, 0.5)
   if not from then return end ---@cast to -nil
-  player.line_to_pickup_highlight_id = rendering.draw_line{
+  local do_animate, opacity, color_step = get_color_for_potential_animation(1)
+  color_step.r = 0
+  color_step.b = 0
+  local id = rendering.draw_line{
     surface = player.current_surface_index,
     forces = {player.force_index},
-    color = {0, 1, 0},
+    color = color_step,
     width = 2,
     from = from,
     to = to,
   }
+  player.line_to_pickup_highlight_id = id
+  if do_animate then
+    add_non_white_grid_fade_in_animation(id, opacity, color_step, {r = 0, g = 1, b = 0, a = 1})
+  end
 end
 
 ---@param player PlayerDataQAI
