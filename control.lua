@@ -1073,9 +1073,11 @@ local function set_direction(player, new_direction)
   local drop_position = inserter.drop_position
   -- However, the actual internal direction of inserters appears to be the direction they are picking up from.
   -- This confuses me, so I'm pretending it's the other way around and only flipping it when writing/reading.
-  inserter.direction = inverse_direction_lut[new_direction]
+  local actual_direction = inverse_direction_lut[new_direction]
+  inserter.direction = actual_direction
   inserter.pickup_position = pickup_position
   inserter.drop_position = drop_position
+  player.target_inserter_direction = actual_direction
 end
 
 ---@param player PlayerDataQAI
