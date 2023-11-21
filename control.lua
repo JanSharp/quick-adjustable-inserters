@@ -18,12 +18,14 @@ global = {}
 ---| AnimatedCircleQAI
 ---| AnimatedRectangleQAI
 ---| AnimatedLineQAI
+---| AnimatedColorQAI
 
 ---@enum AnimationTypeQAI
 local animation_type = {
   circle = 1,
   rectangle = 2,
   line = 3,
+  color = 4,
 }
 
 ---@class AnimationBaseQAI
@@ -53,6 +55,10 @@ local animation_type = {
 ---@field color_step Color @ Added each tick. Must have fields r, g, b and a.
 ---@field from_step MapPosition @ Matches the current value.
 ---@field to_step MapPosition @ Matches the current value.
+
+---@class AnimatedColorQAI : AnimationBaseQAI
+---@field color Color @ Matches the current value. Must have fields r, g, b and a.
+---@field color_step Color @ Added each tick. Must have fields r, g, b and a.
 
 ---@class ForceDataQAI
 ---@field force_index uint32
@@ -160,6 +166,10 @@ local rect_entity_name = "QAI-selectable-rect"
 local finish_animation_frames = 16
 local finish_animation_expansion = 3/16
 local finish_animation_highlight_box_step = (finish_animation_expansion / 2) / finish_animation_frames
+local grid_fade_in_frames = 8 -- Valid values are those where 1 / grid_fade_in_frames keeps all precision.
+local grid_fade_out_frames = 12
+local grid_background_opacity = 0.2
+local direction_arrow_opacity = 0.6
 
 local entity_name_lut = {
   [square_entity_name] = true,
@@ -210,6 +220,12 @@ end
 ---@param animation AnimatedLineQAI
 local function add_animated_line(animation)
   animation.type = animation_type.line
+  return add_animation(animation) -- Return to make it a tail call.
+end
+
+---@param animation AnimatedColorQAI
+local function add_animated_color(animation)
+  animation.type = animation_type.color
   return add_animation(animation) -- Return to make it a tail call.
 end
 
@@ -710,6 +726,36 @@ local function destroy_entities(entities)
 end
 
 ---@param ids uint64[]
+local function animate_lines_disappearing(ids)
+  local opacity = 1 / grid_fade_out_frames
+  local color_step = {r = -opacity, g = -opacity, b = -opacity, a = -opacity}
+  for i = #ids, 1, -1 do
+    add_animated_color{
+      id = ids[i],
+      remaining_updates = grid_fade_out_frames - 1,
+      destroy_on_finish = true,
+      color = {r = 1, g = 1, b = 1, a = 1},
+      color_step = color_step,
+    }
+    ids[i] = nil
+  end
+end
+
+---@param id uint64
+---@param current_opacity number
+local function animate_id_disappearing(id, current_opacity)
+  local opacity = current_opacity / grid_fade_out_frames
+  local color_step = {r = -opacity, g = -opacity, b = -opacity, a = -opacity}
+  add_animated_color{
+    id = id,
+    remaining_updates = grid_fade_out_frames - 1,
+    destroy_on_finish = true,
+    color = {r = current_opacity, g = current_opacity, b = current_opacity, a = current_opacity},
+    color_step = color_step,
+  }
+end
+
+---@param ids uint64[]
 local function destroy_and_clear_rendering_ids(ids)
   local destroy = rendering.destroy
   for i = #ids, 1, -1 do
@@ -722,11 +768,19 @@ end
 local function destroy_all_rendering_objects(player)
   -- For simplicity in other parts of the code, accept this function getting called no matter what.
   if not player.background_polygon_id then return end
-  destroy_and_clear_rendering_ids(player.line_ids)
   local destroy = rendering.destroy
-  destroy(player.background_polygon_id)
-  if player.inserter_circle_id then destroy(player.inserter_circle_id) end
-  destroy(player.direction_arrow_id)
+  local do_animate = not game.tick_paused
+  if do_animate then
+    animate_lines_disappearing(player.line_ids)
+    animate_id_disappearing(player.background_polygon_id, grid_background_opacity)
+    animate_id_disappearing(player.direction_arrow_id, direction_arrow_opacity)
+    if player.inserter_circle_id then animate_id_disappearing(player.inserter_circle_id, 1) end
+  else
+    destroy_and_clear_rendering_ids(player.line_ids)
+    destroy(player.background_polygon_id)
+    destroy(player.direction_arrow_id)
+    if player.inserter_circle_id then destroy(player.inserter_circle_id) end
+  end
   if player.pickup_highlight_id then destroy(player.pickup_highlight_id) end
   if player.line_to_pickup_highlight_id then destroy(player.line_to_pickup_highlight_id) end
   player.background_polygon_id = nil
@@ -902,6 +956,28 @@ local function place_ninths(player)
   end
 end
 
+---@param full_opacity number
+---@return boolean do_animate
+---@return number opacity
+---@return Color color_step
+local function get_color_for_potential_animation(full_opacity)
+  local do_animate = not game.tick_paused
+  local opacity = do_animate and (full_opacity / grid_fade_in_frames) or full_opacity
+  return do_animate, opacity, {r = opacity, g = opacity, b = opacity, a = opacity}
+end
+
+---@param id uint64
+---@param opacity number
+---@param color_step Color
+local function add_grid_fade_in_animation(id, opacity, color_step)
+  return add_animated_color{ -- Return to make it a tail call.
+    id = id,
+    remaining_updates = grid_fade_in_frames - 1,
+    color = {r = opacity, g = opacity, b = opacity, a = opacity},
+    color_step = color_step,
+  }
+end
+
 ---@param player PlayerDataQAI
 local function draw_direction_arrow(player)
   local inserter = player.target_inserter
@@ -909,15 +985,18 @@ local function draw_direction_arrow(player)
   local cache = player.target_inserter_cache
   inserter_position.x = inserter_position.x + cache.offset_from_inserter.x + cache.direction_arrow_position.x
   inserter_position.y = inserter_position.y + cache.offset_from_inserter.y + cache.direction_arrow_position.y
-  local opacity = 0.6
+  local do_animate, opacity, color_step = get_color_for_potential_animation(direction_arrow_opacity)
   player.direction_arrow_id = rendering.draw_polygon{
     surface = player.current_surface_index,
     forces = {player.force_index},
-    color = {opacity, opacity, opacity, opacity},
+    color = color_step,
     vertices = player.target_inserter_cache.direction_arrow_vertices,
     orientation = inserter.orientation,
     target = inserter_position,
   }
+  if do_animate then
+    add_grid_fade_in_animation(player.direction_arrow_id, opacity, color_step)
+  end
 end
 
 ---@param player PlayerDataQAI
@@ -997,10 +1076,11 @@ local function draw_circle_on_inserter(player)
   local inserter_position = player.target_inserter_position
   local offset_from_inserter = get_offset_from_inserter(player)
   local grid_center = get_grid_center(player)
+  local do_animate, opacity, color_step = get_color_for_potential_animation(1)
   player.inserter_circle_id = rendering.draw_circle{
     surface = player.current_surface_index,
     forces = {player.force_index},
-    color = {1, 1, 1},
+    color = color_step,
     radius = cache.radius_for_circle_on_inserter,
     width = 2,
     target = {
@@ -1008,6 +1088,9 @@ local function draw_circle_on_inserter(player)
       y = inserter_position.y + offset_from_inserter.y + grid_center.y,
     },
   }
+  if do_animate then
+    add_grid_fade_in_animation(player.inserter_circle_id, opacity, color_step)
+  end
 end
 
 ---@param player PlayerDataQAI
@@ -1018,11 +1101,12 @@ local function draw_grid_lines(player)
   local top = inserter_position.y + offset_from_inserter.y
   local from = {}
   local to = {}
+  local do_animate, opacity, color_step = get_color_for_potential_animation(1)
   ---@type LuaRendering.draw_line_param
   local line_param = {
     surface = player.current_surface_index,
     forces = {player.force_index},
-    color = {1, 1, 1},
+    color = color_step,
     width = 1,
     from = from,
     to = to,
@@ -1033,7 +1117,11 @@ local function draw_grid_lines(player)
     from.y = top + line.from.y
     to.x = left + line.to.x
     to.y = top + line.to.y
-    player.line_ids[#player.line_ids+1] = rendering.draw_line(line_param)
+    local id = rendering.draw_line(line_param)
+    player.line_ids[#player.line_ids+1] = id
+    if do_animate then
+      add_grid_fade_in_animation(id, opacity, color_step)
+    end
   end
 end
 
@@ -1041,17 +1129,20 @@ end
 local function draw_grid_background(player)
   local inserter_position = player.target_inserter_position
   local offset_from_inserter = get_offset_from_inserter(player)
-  local opacity = 0.2
+  local do_animate, opacity, color_step = get_color_for_potential_animation(grid_background_opacity)
   player.background_polygon_id = rendering.draw_polygon{
     surface = player.current_surface_index,
     forces = {player.force_index},
-    color = {opacity, opacity, opacity, opacity},
+    color = color_step,
     vertices = get_tiles_background_vertices(player),
     target = {
       x = inserter_position.x + offset_from_inserter.x,
       y = inserter_position.y + offset_from_inserter.y,
     },
   }
+  if do_animate then
+    add_grid_fade_in_animation(player.background_polygon_id, opacity, color_step)
+  end
 end
 
 ---@param player PlayerDataQAI
@@ -1881,6 +1972,18 @@ do
       to.x = to.x + to_step.x
       to.y = to.y + to_step.y
       set_to(id, to)
+    end,
+    ---@param animation AnimatedColorQAI
+    [animation_type.color] = function(animation)
+      local id = animation.id
+
+      local color = animation.color
+      local color_step = animation.color_step
+      color.r = color.r + color_step.r
+      color.b = color.b + color_step.b
+      color.g = color.g + color_step.g
+      color.a = color.a + color_step.a
+      set_color(id, color)
     end,
   }
 end
