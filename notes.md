@@ -27,9 +27,9 @@
 - [x] per player setting to always use auto drop offset, even when near inserters have been researched
 - [ ] highlight drop positions which would be the fastest for the entity under the currently selected drop target selection
 - [x] ~~add feature where you can place the inserter using this mods key bind and it will automatically uses the same pickup and drop vectors as the last modified inserter, if they have the same dimensions.~~ You wouldn't be able to click and drag with this, so no that's bad. Use bobinserters GUI for this, or just use blueprints and or copy paste.
-- [ ] add feature where using the key bind while holding an inserter in hand places it and instantly enters configuration mode
-  - [ ] upon entering, clear the cursor
-  - [ ] upon leaving, restore the cursor, if possible and if it didn't change through other means in the mean time
+- [x] add feature where using the key bind while holding an inserter in hand places it and instantly enters configuration mode
+  - [x] upon entering, clear the cursor
+  - [x] upon leaving, restore the cursor, if possible and if it didn't change through other means in the mean time
 - [ ] support ghosts, if possible (I think it is)
 - [x] support inserters of any size, and off grid
 - [x] handle multiplayer

@@ -91,6 +91,7 @@ local animation_type = {
 ---@field grid_center MapPosition
 ---@field grid_center_flipped MapPosition
 ---@field radius_for_circle_on_inserter number
+---@field placeable_off_grid boolean
 ---@field tile_width integer
 ---@field tile_height integer
 ---@field tiles MapPosition[]
@@ -126,6 +127,7 @@ local animation_type = {
 ---I'm guessing. But that's worth the performance improvement of having this cached for all the performance
 ---critical code paths using it. (Same applies to force merging, probably.)
 ---@field force_index uint8
+---@field last_used_direction defines.direction @ Direction of last adjusted inserter or pipetted entity.
 ---@field state PlayerStateQAI
 ---@field index_in_active_players integer @ `nil` when idle.
 ---`nil` when idle. Must be stored, because we can switch to idle _after_ an entity has been invalidated.
@@ -157,6 +159,8 @@ local animation_type = {
 ---@field show_throughput_on_pickup boolean
 ---@field show_throughput_on_inserter boolean
 ---@field always_use_auto_drop_offset boolean
+---@field pipette_when_done boolean?
+---@field reactivate_inserter_when_done boolean?
 
 local ev = defines.events
 local square_entity_name = "QAI-selectable-square"
@@ -190,6 +194,20 @@ local inverse_direction_lut = {
   [defines.direction.east] = defines.direction.west,
   [defines.direction.south] = defines.direction.north,
   [defines.direction.west] = defines.direction.east,
+}
+
+local rotate_direction_lut = {
+  [defines.direction.north] = defines.direction.east,
+  [defines.direction.east] = defines.direction.south,
+  [defines.direction.south] = defines.direction.west,
+  [defines.direction.west] = defines.direction.north,
+}
+
+local reverse_rotate_direction_lut = {
+  [defines.direction.north] = defines.direction.west,
+  [defines.direction.east] = defines.direction.north,
+  [defines.direction.south] = defines.direction.east,
+  [defines.direction.west] = defines.direction.south,
 }
 
 ---@param event EventData|{player_index: uint}
@@ -632,7 +650,8 @@ local function generate_cache_for_inserter(inserter, tech_level)
   local tile_width
   local tile_height
   local offset_from_inserter
-  if inserter.flags["placeable-off-grid"] then
+  local placeable_off_grid = inserter.flags["placeable-off-grid"] or false
+  if placeable_off_grid then
     local col_width = col_box.right_bottom.x - col_box.left_top.x
     local col_height = col_box.right_bottom.y - col_box.left_top.y
     tile_width = math.ceil(col_width)
@@ -671,6 +690,7 @@ local function generate_cache_for_inserter(inserter, tech_level)
     is_square = tile_width == tile_height,
     offset_from_inserter = offset_from_inserter,
     offset_from_inserter_flipped = (nil)--[[@as any]], -- Set after the `calculate_cached_base_reach` call.
+    placeable_off_grid = placeable_off_grid,
     tile_width = tile_width,
     tile_height = tile_height,
     radius_for_circle_on_inserter = math.min(tile_width, tile_height) / 2 - 0.25,
@@ -818,6 +838,9 @@ local function hide_inserter_speed_text(player)
   end
 end
 
+---This function can raise an event, so make sure to expect the world to be in any state after calling it.
+---This includes the state of this mod. Calling switch_to_idle does not mean that the player's state will
+---actually be idle afterwards.
 ---@param player PlayerDataQAI
 ---@param keep_rendering boolean? @ When true, no rendering objects will get destroyed.
 local function switch_to_idle(player, keep_rendering)
@@ -833,6 +856,7 @@ local function switch_to_idle(player, keep_rendering)
   global.inserters_in_use[player.target_inserter_unit_number] = nil
   remove_active_player(player)
   player.target_inserter_unit_number = nil
+  local target_inserter = player.target_inserter
   player.target_inserter = nil
   player.target_inserter_cache = nil
   player.target_inserter_position = nil
@@ -843,6 +867,22 @@ local function switch_to_idle(player, keep_rendering)
   local selected = player.player.selected
   if selected and entity_name_lut[selected.name] then
     player.player.selected = nil
+  end
+
+  if keep_rendering then return end
+
+  if player.reactivate_inserter_when_done then
+    player.reactivate_inserter_when_done = nil
+    if target_inserter.valid then
+      target_inserter.active = true
+    end
+  end
+
+  if player.pipette_when_done then
+    player.pipette_when_done = nil
+    if target_inserter.valid then
+      player.player.pipette_entity(target_inserter)
+    end
   end
 end
 
@@ -1079,6 +1119,7 @@ local function set_direction(player, new_direction)
   inserter.pickup_position = pickup_position
   inserter.drop_position = drop_position
   player.target_inserter_direction = actual_direction
+  player.last_used_direction = actual_direction
 end
 
 ---@param player PlayerDataQAI
@@ -1436,7 +1477,9 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
   player.target_inserter = target_inserter
   player.target_inserter_cache = cache
   player.target_inserter_position = target_inserter.position
-  player.target_inserter_direction = target_inserter.direction
+  local direction = target_inserter.direction
+  player.target_inserter_direction = direction
+  player.last_used_direction = direction
   player.target_inserter_force_index = target_inserter.force_index
   player.should_flip = not player.target_inserter_cache.is_square
     and is_east_or_west_lut[target_inserter.direction]
@@ -1452,6 +1495,7 @@ local function switch_to_selecting_pickup(player, target_inserter, do_check_reac
   if player.state == "selecting-pickup" and player.target_inserter == target_inserter then return end
   if player.state ~= "idle" then
     switch_to_idle(player, player.target_inserter == target_inserter)
+    if not target_inserter.valid or player.state ~= "idle" then return end
   end
   if not try_set_target_inserter(player, target_inserter, do_check_reach) then
     destroy_all_rendering_objects(player)
@@ -1477,6 +1521,7 @@ local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
   if player.state == "selecting-drop" and player.target_inserter == target_inserter then return end
   if player.state ~= "idle" then
     switch_to_idle(player, player.target_inserter == target_inserter)
+    if not target_inserter.valid or player.state ~= "idle" then return end
   end
   if not try_set_target_inserter(player, target_inserter, do_check_reach) then
     destroy_all_rendering_objects(player)
@@ -1502,6 +1547,7 @@ local function switch_to_idle_and_back(player, do_check_reach)
   local target_inserter = player.target_inserter
   local selecting_pickup = player.state == "selecting-pickup"
   switch_to_idle(player)
+  if not target_inserter.valid or player.state ~= "idle" then return end
   if selecting_pickup then
     switch_to_selecting_pickup(player, target_inserter, do_check_reach)
   else
@@ -1745,6 +1791,44 @@ local function play_finish_animation(player)
   play_line_to_pickup_highlight_animation(player)
 end
 
+---@param player PlayerDataQAI
+---@param position MapPosition
+---@param inserter_prototype LuaEntityPrototype
+---@param cache InserterCacheQAI
+local function try_place_held_inserter_and_adjust_it(player, position, inserter_prototype, cache)
+  ---@type LuaPlayer.can_build_from_cursor_param|LuaPlayer.build_from_cursor_param
+  local args = {
+    position = position,
+    direction = player.last_used_direction,
+  }
+  local actual_player = player.player
+  if not actual_player.can_build_from_cursor(args--[[@as LuaPlayer.can_build_from_cursor_param]]) then return end
+  actual_player.build_from_cursor(args--[[@as LuaPlayer.build_from_cursor_param]])
+  -- This appears to match the game's snapping logic perfectly.
+  -- And we must do this here in order for find_entity to actually find the inserter we just placed, because
+  -- find_entity goes by collision boxes and inserters do not take up entire tiles. Basically nothing does.
+  -- Note that if it went by position we'd also have to do this. So that detail doesn't really matter.
+  if not cache.placeable_off_grid then
+    position.x = (inserter_prototype.tile_width % 2) == 0
+      and math.floor(position.x + 0.5) -- even
+      or math.floor(position.x) + 0.5 -- odd
+    position.y = (inserter_prototype.tile_height % 2) == 0
+      and math.floor(position.y + 0.5) -- even
+      or math.floor(position.y) + 0.5 -- odd
+  end
+  local inserter = actual_player.surface.find_entity(inserter_prototype.name, position)
+  if not inserter then return end
+  if not actual_player.clear_cursor() then return end
+  -- Docs say clear_cursor raises an event in the current tick, not instantly, but a valid check does not hurt.
+  if not inserter.valid then return end
+  switch_to_selecting_pickup(player, inserter)
+  player.pipette_when_done = true
+  if inserter.active then -- If another mod already deactivated it then this mod shall not reactivate it.
+    inserter.active = false
+    player.reactivate_inserter_when_done = true
+  end
+end
+
 ---@param entity LuaEntity
 ---@param selectable_name string
 ---@param player PlayerDataQAI
@@ -1899,6 +1983,7 @@ local function init_player(player)
     player = player,
     player_index = player.index,
     force_index = player.force_index--[[@as uint8]],
+    last_used_direction = defines.direction.north,
     state = "idle",
     used_squares = {},
     used_ninths = {},
@@ -2060,12 +2145,64 @@ end)
 script.on_event("QAI-adjust", function(event)
   local player = get_player(event)
   if not player then return end
+  local cursor = player.player.cursor_stack
+  if cursor and cursor.valid_for_read then
+    local place_result = cursor.prototype.place_result
+    if place_result and place_result.type == "inserter" then
+      local force = global.forces[player.player.force_index]
+      local cache = force and force.inserter_cache_lut[place_result.name]
+      if cache then
+        try_place_held_inserter_and_adjust_it(player, event.cursor_position, place_result, cache)
+        return
+      end
+    end
+  end
+
   local selected = player.player.selected
   if not selected then
     switch_to_idle(player)
     return
   end
   on_adjust_handler_lut[player.state](player, selected)
+end)
+
+script.on_event("QAI-rotate", function(event)
+  local player = get_player(event)
+  if not player then return end
+  local cursor = player.player.cursor_stack
+  if cursor and cursor.valid_for_read then
+    player.last_used_direction = rotate_direction_lut[player.last_used_direction]
+  end
+end)
+
+script.on_event("QAI-reverse-rotate", function(event)
+  local player = get_player(event)
+  if not player then return end
+  local cursor = player.player.cursor_stack
+  if cursor and cursor.valid_for_read then
+    player.last_used_direction = reverse_rotate_direction_lut[player.last_used_direction]
+  end
+end)
+
+script.on_event(ev.on_player_pipette, function(event)
+  local player = get_player(event)
+  if not player then return end
+  -- If a mod called player.pipette_entity then this will likely be wrong, however the event does not tell us
+  -- the entity that was pipetted, so this is the best guess.
+  local selected = player.player.selected
+  if not selected then return end
+  local direction = selected.direction
+  if not inverse_direction_lut[direction] then return end
+  player.last_used_direction = direction
+end)
+
+script.on_event(ev.on_player_cursor_stack_changed, function(event)
+  local player = get_player(event)
+  if not player then return end
+  local cursor = player.player.cursor_stack
+  if not cursor or cursor.valid_for_read then
+    player.pipette_when_done = false
+  end
 end)
 
 script.on_event(ev.on_selected_entity_changed, function(event)
@@ -2170,12 +2307,16 @@ end)
 
 script.on_configuration_changed(function(event)
   -- Ignore the event if this mod has just been added, since on_init ran already anyway.
-  if not event.mod_changes["quick_adjustable_inserters"]
-    or event.mod_changes["quick_adjustable_inserters"].old_version
-  then
-    for _, force in pairs(global.forces) do
-      update_tech_level_for_force(force)
-    end
+  local mod_changes = event.mod_changes["quick_adjustable_inserters"]
+  if mod_changes and not mod_changes.old_version then return end
+
+  -- Do this before updating forces, because updating forces potentially involves changing player states.
+  for _, player in pairs(global.players) do
+    player.pipette_when_done = nil
+  end
+
+  for _, force in pairs(global.forces) do
+    update_tech_level_for_force(force)
   end
 end)
 

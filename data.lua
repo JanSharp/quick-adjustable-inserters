@@ -45,6 +45,20 @@ data:extend{
     action = "lua",
     key_sequence = "CONTROL + SHIFT + R",
   },
+  {
+    type = "custom-input",
+    name = "QAI-rotate",
+    action = "lua",
+    key_sequence = "",
+    linked_game_control = "rotate",
+  },
+  {
+    type = "custom-input",
+    name = "QAI-reverse-rotate",
+    action = "lua",
+    key_sequence = "",
+    linked_game_control = "reverse-rotate",
+  },
   make_selectable{
     name = "QAI-selectable-square",
     selection_box = {{-0.5, -0.5}, {0.5, 0.5}},
