@@ -71,6 +71,7 @@ local animation_type = {
 ---@class InserterCacheQAI
 ---@field prototype LuaEntityPrototype
 ---@field tech_level TechnologyLevelQAI
+---@field diagonal_by_default boolean
 ---Defines how to calculate the left top position of the grid when given an inserter entity. By adding
 ---this value to the inserter's position, the left top position - the grid origin - has been found. All
 ---other positions in this definition are then relative to this calculated position.\
@@ -228,13 +229,20 @@ local function calculate_cached_base_reach(cache)
   local tile_height = cache.tile_height
   local pickup_position = cache.prototype.inserter_pickup_position ---@cast pickup_position -nil
   local drop_position = cache.prototype.inserter_drop_position ---@cast drop_position -nil
+  local pickup_x = math.abs(pickup_position[1])
+  local pickup_y = math.abs(pickup_position[2])
+  local drop_x = math.abs(drop_position[1])
+  local drop_y = math.abs(drop_position[2])
+
   cache.base_range = math.ceil(math.max(
-    math.abs(pickup_position[1]) - (tile_width / 2),
-    math.abs(pickup_position[2]) - (tile_height / 2),
-    math.abs(drop_position[1]) - (tile_width / 2),
-    math.abs(drop_position[2]) - (tile_height / 2)
+    pickup_x - (tile_width / 2),
+    pickup_y - (tile_height / 2),
+    drop_x - (tile_width / 2),
+    drop_y - (tile_height / 2)
   ))
   cache.range_gap_from_center = math.max(0, cache.base_range - cache.tech_level.range)
+
+  cache.diagonal_by_default = math.abs(pickup_x - pickup_y) < 1/16 and math.abs(drop_x - drop_y) < 1/16
 end
 
 ---@param cache InserterCacheQAI
@@ -275,11 +283,18 @@ local function generate_tiles_cache(cache)
     return
   end
 
-  assert(tech_level.perpendicular or tech_level.diagonal, "Having both perpendicular and diagonal be \z
-    disabled means there nowhere for an inserter to pickup from or drop to, which makes no sense."
+  local perpendicular = tech_level.perpendicular
+  local diagonal = tech_level.diagonal
+  assert(perpendicular or diagonal, "Having both perpendicular and diagonal be disabled means there is \z
+    nowhere for an inserter to pickup from or drop to, which makes no sense."
   )
 
-  if tech_level.perpendicular then
+  if cache.diagonal_by_default and perpendicular ~= diagonal then
+    perpendicular = not perpendicular
+    diagonal = not diagonal
+  end
+
+  if perpendicular then
     for y = max_range + 1, max_range + tile_height do
       for x = 1, tech_level.range * 2 do
         if x > tech_level.range then
@@ -298,7 +313,7 @@ local function generate_tiles_cache(cache)
     end
   end
 
-  if tech_level.diagonal then
+  if diagonal then
     for i = 1, tech_level.range * 2 do
       add(
         i > tech_level.range and (i + tile_width + gap * 2) or i,
