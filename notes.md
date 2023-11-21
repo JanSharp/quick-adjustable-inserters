@@ -8,7 +8,7 @@
 - [x] impl only perpendicular
 - [x] impl only perpendicular and diagonal
 - [x] detect and support inserters with already longer base range than 1
-- [x] support the technologies from bobinsters
+- [x] support the technologies from bobinserters
   - [x] make inserter caches per force
 - [x] don't do anything if the inserter doesn't support runtime changeable vectors
 - [ ] maybe add some animations
@@ -25,8 +25,8 @@
 - [x] per player setting to show estimated inserter throughput when hovering any inserter
 - [x] per player setting to always use auto drop offset, even when near inserters have been researched
 - [ ] highlight drop positions which would be the fastest for the entity under the currently selected drop target selection
-- [ ] add feature where you can place the inserter using this mods key bind and it will automatically uses the same pickup and drop vectors as the last modified inserter, if they have the same dimensions.
-- [ ] maybe add another key bind to place an inserter and instantly enter the configuration mode
+- [x] ~~add feature where you can place the inserter using this mods key bind and it will automatically uses the same pickup and drop vectors as the last modified inserter, if they have the same dimensions.~~ You wouldn't be able to click and drag with this, so no that's bad. Use bobinserters GUI for this, or just use blueprints and or copy paste.
+- [ ] add feature where using the key bind while holding an inserter in hand places it and instantly enters configuration mode
   - [ ] upon entering, clear the cursor
   - [ ] upon leaving, restore the cursor, if possible and if it didn't change through other means in the mean time
 - [ ] support ghosts, if possible (I think it is)
