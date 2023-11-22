@@ -25,6 +25,7 @@
 - [x] per player setting to disable inserter speed estimation entirely
 - [x] per player setting to show estimated inserter throughput when hovering any inserter
 - [x] per player setting to always use auto drop offset, even when near inserters have been researched
+- [ ] shortcut to toggle near inserters, remove above setting
 - [ ] highlight drop positions which would be the fastest for the entity under the currently selected drop target selection
 - [x] ~~add feature where you can place the inserter using this mods key bind and it will automatically uses the same pickup and drop vectors as the last modified inserter, if they have the same dimensions.~~ You wouldn't be able to click and drag with this, so no that's bad. Use bobinserters GUI for this, or just use blueprints and or copy paste.
 - [x] add feature where using the key bind while holding an inserter in hand places it and instantly enters configuration mode
@@ -58,3 +59,7 @@
 - [x] slight indication for the 4 big rectangles around the grid which change direction
 - [x] test if creating and deleting entities is faster than teleporting and changing force
   - [x] yes it is. With pooling hitting the key bind 3 times on an inserter takes 2.57 ms, without pooling it takes 1.7 ms
+- [ ] thumbnail
+- [ ] readme/description
+- [ ] tips and tricks simulations
+- [ ] don't restore when rotating and similar
