@@ -159,6 +159,7 @@ local animation_type = {
 ---@field show_throughput_on_pickup boolean
 ---@field show_throughput_on_inserter boolean
 ---@field always_use_auto_drop_offset boolean
+---@field pipette_after_place_and_adjust boolean
 ---@field pipette_when_done boolean?
 ---@field reactivate_inserter_when_done boolean?
 
@@ -880,7 +881,7 @@ local function switch_to_idle(player, keep_rendering)
 
   if player.pipette_when_done then
     player.pipette_when_done = nil
-    if target_inserter.valid then
+    if player.pipette_after_place_and_adjust and target_inserter.valid then
       player.player.pipette_entity(target_inserter)
     end
   end
@@ -1972,6 +1973,10 @@ local update_setting_lut = {
     player.always_use_auto_drop_offset = new_value
     switch_to_idle_and_back(player)
   end,
+  ["QAI-pipette-after-place-and-adjust"] = function(player)
+    local new_value = settings.get_player_settings(player.player_index)["QAI-pipette-after-place-and-adjust"].value--[[@as boolean]]
+    player.pipette_after_place_and_adjust = new_value
+  end,
 }
 
 ---@param player LuaPlayer
@@ -1993,6 +1998,7 @@ local function init_player(player)
     show_throughput_on_pickup = player_settings["QAI-show-throughput-on-pickup"].value--[[@as boolean]],
     show_throughput_on_drop = player_settings["QAI-show-throughput-on-drop"].value--[[@as boolean]],
     always_use_auto_drop_offset = player_settings["QAI-always-use-auto-drop-offset"].value--[[@as boolean]],
+    pipette_after_place_and_adjust = player_settings["QAI-pipette-after-place-and-adjust"].value--[[@as boolean]],
   }
   global.players[player.index] = player_data
   return player_data

@@ -29,4 +29,11 @@ data:extend({
     setting_type = "runtime-per-user",
     default_value = false,
   },
+  {
+    type = "bool-setting",
+    name = "QAI-pipette-after-place-and-adjust",
+    order = "e",
+    setting_type = "runtime-per-user",
+    default_value = true,
+  },
 })
