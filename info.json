@@ -8,5 +8,11 @@
   "dependencies": [
     "bobinserters >= 1.1.7",
     "inserter_throughput_lib >= 0.1.0"
-  ]
+  ],
+
+  "package": {
+    "ignore": [
+      "notes.md"
+    ]
+  }
 }
