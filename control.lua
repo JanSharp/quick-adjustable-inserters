@@ -10,7 +10,9 @@ local vec = require("__inserter_throughput_lib__.vector")
 ---@field inserters_in_use table<uint32, PlayerDataQAI> @ Indexed by inserter unit_number.
 ---@field active_players PlayerDataQAI[]|{count: integer, next_index: integer}
 ---@field active_animations AnimationQAI[]|{count: integer}
----@field selectable_entities_to_player_lut table<uint32, PlayerDataQAI> @ pooled entity unit number => player index.
+---Selectable entity unit number => player data.
+---@field selectable_entities_to_player_lut table<uint32, PlayerDataQAI>
+---Selectable entity unit number => entity with that unit number.
 ---@field selectable_entities_by_unit_number table<uint32, LuaEntity>
 global = {}
 
