@@ -851,6 +851,8 @@ local function hide_inserter_speed_text(player)
   end
 end
 
+local update_inserter_speed_text
+
 ---This function can raise an event, so make sure to expect the world to be in any state after calling it.
 ---This includes the state of this mod. Calling switch_to_idle does not mean that the player's state will
 ---actually be idle afterwards.
@@ -882,6 +884,8 @@ local function switch_to_idle(player, keep_rendering)
   if selected and entity_name_lut[selected.name] then
     player.player.selected = nil
   end
+
+  update_inserter_speed_text(player)
 
   if keep_rendering then return end
 
@@ -1318,7 +1322,7 @@ local function update_inserter_speed_text_using_inserter(player, inserter)
 end
 
 ---@param player PlayerDataQAI
-local function update_inserter_speed_text(player)
+function update_inserter_speed_text(player)
   local selected = player.player.selected
   if not selected then
     hide_inserter_speed_text(player)
@@ -1520,6 +1524,7 @@ local function switch_to_selecting_pickup(player, target_inserter, do_check_reac
   place_rects(player)
   draw_all_rendering_objects(player)
   player.state = "selecting-pickup"
+  update_inserter_speed_text(player)
 end
 
 ---@param player PlayerDataQAI
@@ -1552,6 +1557,7 @@ local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
   draw_pickup_highlight(player)
   draw_line_to_pickup_highlight(player)
   player.state = "selecting-drop"
+  update_inserter_speed_text(player)
 end
 
 ---@param player PlayerDataQAI
