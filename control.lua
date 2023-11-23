@@ -851,6 +851,38 @@ local function hide_inserter_speed_text(player)
   end
 end
 
+---@param inserter LuaEntity
+local function reactivate_inserter(inserter)
+  if inserter.valid then
+    inserter.active = true
+  end
+end
+
+---@param player PlayerDataQAI
+---@param target_inserter LuaEntity
+local function forget_about_restoring(player, target_inserter)
+  player.reactivate_inserter_when_done = nil
+  reactivate_inserter(target_inserter)
+  player.pipette_when_done = nil
+end
+
+---Can raise an event.
+---@param player PlayerDataQAI
+---@param target_inserter LuaEntity
+local function restore_after_adjustment(player, target_inserter)
+  if player.reactivate_inserter_when_done then
+    player.reactivate_inserter_when_done = nil
+    reactivate_inserter(target_inserter)
+  end
+
+  if player.pipette_when_done then
+    player.pipette_when_done = nil
+    if player.pipette_after_place_and_adjust and target_inserter.valid then
+      player.player.pipette_entity(target_inserter)
+    end
+  end
+end
+
 local update_inserter_speed_text
 
 ---This function can raise an event, so make sure to expect the world to be in any state after calling it.
@@ -858,7 +890,8 @@ local update_inserter_speed_text
 ---actually be idle afterwards.
 ---@param player PlayerDataQAI
 ---@param keep_rendering boolean? @ When true, no rendering objects will get destroyed.
-local function switch_to_idle(player, keep_rendering)
+---@param do_not_restore boolean? @ When true, do not script enable the inserter and do not pipette it.
+local function switch_to_idle(player, keep_rendering, do_not_restore)
   if player.state == "idle" then return end
   player.current_surface_index = nil
   player.current_surface = nil
@@ -887,20 +920,8 @@ local function switch_to_idle(player, keep_rendering)
 
   update_inserter_speed_text(player)
 
-  if keep_rendering then return end
-
-  if player.reactivate_inserter_when_done then
-    player.reactivate_inserter_when_done = nil
-    if target_inserter.valid then
-      target_inserter.active = true
-    end
-  end
-
-  if player.pipette_when_done then
-    player.pipette_when_done = nil
-    if player.pipette_after_place_and_adjust and target_inserter.valid then
-      player.player.pipette_entity(target_inserter)
-    end
+  if not do_not_restore then
+    restore_after_adjustment(player, target_inserter)
   end
 end
 
@@ -1509,16 +1530,33 @@ end
 ---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
 ---@param do_check_reach boolean?
-local function switch_to_selecting_pickup(player, target_inserter, do_check_reach)
-  if player.state == "selecting-pickup" and player.target_inserter == target_inserter then return end
+---@return boolean success
+local function ensure_is_idle_and_try_set_target_inserter(player, target_inserter, do_check_reach)
+  local prev_target_inserter = player.target_inserter
   if player.state ~= "idle" then
-    switch_to_idle(player, player.target_inserter == target_inserter)
-    if not target_inserter.valid or player.state ~= "idle" then return end
+    local is_same_inserter = prev_target_inserter == target_inserter
+    if not is_same_inserter then
+      forget_about_restoring(player, prev_target_inserter)
+    end
+    switch_to_idle(player, is_same_inserter, true)
+    if not target_inserter.valid or player.state ~= "idle" then return false end
   end
   if not try_set_target_inserter(player, target_inserter, do_check_reach) then
     destroy_all_rendering_objects(player)
-    return
+    if prev_target_inserter then
+      restore_after_adjustment(player, prev_target_inserter)
+    end
+    return false
   end
+  return true
+end
+
+---@param player PlayerDataQAI
+---@param target_inserter LuaEntity
+---@param do_check_reach boolean?
+local function switch_to_selecting_pickup(player, target_inserter, do_check_reach)
+  if player.state == "selecting-pickup" and player.target_inserter == target_inserter then return end
+  if not ensure_is_idle_and_try_set_target_inserter(player, target_inserter, do_check_reach) then return end
 
   place_squares(player)
   place_rects(player)
@@ -1538,14 +1576,7 @@ end
 ---@param do_check_reach boolean?
 local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
   if player.state == "selecting-drop" and player.target_inserter == target_inserter then return end
-  if player.state ~= "idle" then
-    switch_to_idle(player, player.target_inserter == target_inserter)
-    if not target_inserter.valid or player.state ~= "idle" then return end
-  end
-  if not try_set_target_inserter(player, target_inserter, do_check_reach) then
-    destroy_all_rendering_objects(player)
-    return
-  end
+  if not ensure_is_idle_and_try_set_target_inserter(player, target_inserter, do_check_reach) then return end
 
   if should_use_auto_drop_offset(player) then
     place_squares(player)
@@ -1566,8 +1597,11 @@ local function switch_to_idle_and_back(player, do_check_reach)
   if player.state == "idle" then return end
   local target_inserter = player.target_inserter
   local selecting_pickup = player.state == "selecting-pickup"
-  switch_to_idle(player)
-  if not target_inserter.valid or player.state ~= "idle" then return end
+  switch_to_idle(player, false, true)
+  if not target_inserter.valid or player.state ~= "idle" then
+    forget_about_restoring(player, target_inserter)
+    return
+  end
   if selecting_pickup then
     switch_to_selecting_pickup(player, target_inserter, do_check_reach)
   else
