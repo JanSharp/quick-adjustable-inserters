@@ -158,7 +158,6 @@ local animation_type = {
 ---@field show_throughput_on_drop boolean
 ---@field show_throughput_on_pickup boolean
 ---@field show_throughput_on_inserter boolean
----@field always_use_auto_drop_offset boolean
 ---@field pipette_after_place_and_adjust boolean
 ---@field pipette_when_done boolean?
 ---@field reactivate_inserter_when_done boolean?
@@ -1512,7 +1511,7 @@ end
 ---@param player PlayerDataQAI
 ---@return boolean
 local function should_use_auto_drop_offset(player)
-  return player.always_use_auto_drop_offset or not player.target_inserter_cache.tech_level.drop_offset
+  return not player.target_inserter_cache.tech_level.drop_offset
 end
 
 ---@param player PlayerDataQAI
@@ -1967,12 +1966,6 @@ local update_setting_lut = {
   ["QAI-show-throughput-on-drop"] = function(player)
     update_show_throughput_on_player(player, "QAI-show-throughput-on-drop", "show_throughput_on_drop")
   end,
-  ["QAI-always-use-auto-drop-offset"] = function(player)
-    local new_value = settings.get_player_settings(player.player_index)["QAI-always-use-auto-drop-offset"].value--[[@as boolean]]
-    if new_value == player.always_use_auto_drop_offset then return end
-    player.always_use_auto_drop_offset = new_value
-    switch_to_idle_and_back(player)
-  end,
   ["QAI-pipette-after-place-and-adjust"] = function(player)
     local new_value = settings.get_player_settings(player.player_index)["QAI-pipette-after-place-and-adjust"].value--[[@as boolean]]
     player.pipette_after_place_and_adjust = new_value
@@ -1997,7 +1990,6 @@ local function init_player(player)
     show_throughput_on_inserter = player_settings["QAI-show-throughput-on-inserter"].value--[[@as boolean]],
     show_throughput_on_pickup = player_settings["QAI-show-throughput-on-pickup"].value--[[@as boolean]],
     show_throughput_on_drop = player_settings["QAI-show-throughput-on-drop"].value--[[@as boolean]],
-    always_use_auto_drop_offset = player_settings["QAI-always-use-auto-drop-offset"].value--[[@as boolean]],
     pipette_after_place_and_adjust = player_settings["QAI-pipette-after-place-and-adjust"].value--[[@as boolean]],
   }
   global.players[player.index] = player_data
