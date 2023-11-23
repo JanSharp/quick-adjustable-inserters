@@ -156,10 +156,12 @@ local animation_type = {
 ---@field pickup_highlight_id uint64? @ Can be `nil` even when not idle.
 ---Can be `nil` even when not idle. Can even be `nil` when `pickup_highlight_id` is not `nil`.
 ---@field line_to_pickup_highlight_id uint64?
+---@field default_drop_highlight LuaEntity? @ Can be `nil` even when not idle.
 ---@field inserter_speed_text_id uint64? @ Only `nil` initially, once it exists, it's never destroyed (by this mod).
 ---@field show_throughput_on_drop boolean
 ---@field show_throughput_on_pickup boolean
 ---@field show_throughput_on_inserter boolean
+---@field highlight_default_drop_offset boolean
 ---@field pipette_after_place_and_adjust boolean
 ---@field pipette_when_done boolean?
 ---@field reactivate_inserter_when_done boolean?
@@ -747,6 +749,15 @@ local function destroy_entities(entities)
   end
 end
 
+---@param player PlayerDataQAI
+local function destroy_default_drop_highlight(player)
+  local entity = player.default_drop_highlight
+  player.default_drop_highlight = nil
+  if entity and entity.valid then
+    entity.destroy()
+  end
+end
+
 ---@param ids uint64[]
 local function animate_lines_disappearing(ids)
   local opacity = 1 / grid_fade_out_frames
@@ -852,6 +863,7 @@ local function switch_to_idle(player, keep_rendering)
   destroy_entities(player.used_squares)
   destroy_entities(player.used_ninths)
   destroy_entities(player.used_rects)
+  destroy_default_drop_highlight(player)
   if not keep_rendering then
     destroy_all_rendering_objects(player)
   end
@@ -1619,8 +1631,68 @@ end
 ---@param player PlayerDataQAI
 ---@param position MapPosition
 ---@return MapPosition
+local function calculate_visualized_default_drop_position(player, position)
+  return snap_drop_position(player, position, 85/256, true)
+end
+
+---@param player PlayerDataQAI
+---@param position MapPosition
+---@return MapPosition
 function calculate_actual_drop_position(player, position)
   return snap_drop_position(player, position, 51/256, should_use_auto_drop_offset(player))
+end
+
+local update_default_drop_highlight
+do
+  local left_top = {x = 0, y = 0}
+  local right_bottom = {x = 0, y = 0}
+  ---@type LuaSurface.create_entity_param
+  local create_entity_arg = {
+    name = "highlight-box",
+    render_player_index = 0, -- Set in the actual function.
+    position = {x = 0, y = 0}, -- Required but not used since bounding_box is set.
+    bounding_box = {
+      left_top = left_top,
+      right_bottom = right_bottom,
+    },
+    box_type = "electricity",
+  }
+
+  ---@param player PlayerDataQAI
+  function update_default_drop_highlight(player)
+    if not player.highlight_default_drop_offset then return end
+    if player.state ~= "selecting-drop" then return end
+
+    local selected = player.player.selected
+    if not selected
+      or (selected.name ~= ninth_entity_name and selected.name ~= square_entity_name)
+      or global.selectable_entities_to_player_lut[selected.unit_number] ~= player
+    then
+      destroy_default_drop_highlight(player)
+      return
+    end
+
+    local position = calculate_visualized_default_drop_position(player, selected.position)
+    local existing_highlight = player.default_drop_highlight
+    if existing_highlight and existing_highlight.valid then -- Guaranteed to be on the surface of the inserter.
+      local existing_position = existing_highlight.position
+      if existing_position.x == position.x and existing_position.y == position.y then
+        return
+      end
+    end
+
+    -- "highlight-box"es cannot be teleported, so they have to be destroyed and recreated.
+    destroy_default_drop_highlight(player)
+
+    if not player.current_surface.valid then return end
+
+    create_entity_arg.render_player_index = player.player_index
+    left_top.x = position.x - 3/32
+    left_top.y = position.y - 3/32
+    right_bottom.x = position.x + 3/32
+    right_bottom.y = position.y + 3/32
+    player.default_drop_highlight = player.current_surface.create_entity(create_entity_arg)
+  end
 end
 
 ---@param player PlayerDataQAI
@@ -1968,6 +2040,16 @@ local update_setting_lut = {
   ["QAI-show-throughput-on-drop"] = function(player)
     update_show_throughput_on_player(player, "QAI-show-throughput-on-drop", "show_throughput_on_drop")
   end,
+  ["QAI-highlight-default-drop-offset"] = function(player)
+    local new_value = settings.get_player_settings(player.player_index)["QAI-highlight-default-drop-offset"].value--[[@as boolean]]
+    if new_value == player.highlight_default_drop_offset then return end
+    player.highlight_default_drop_offset = new_value
+    if player.highlight_default_drop_offset then
+      update_default_drop_highlight(player)
+    else
+      destroy_default_drop_highlight(player)
+    end
+  end,
   ["QAI-pipette-after-place-and-adjust"] = function(player)
     local new_value = settings.get_player_settings(player.player_index)["QAI-pipette-after-place-and-adjust"].value--[[@as boolean]]
     player.pipette_after_place_and_adjust = new_value
@@ -1992,6 +2074,7 @@ local function init_player(player)
     show_throughput_on_inserter = player_settings["QAI-show-throughput-on-inserter"].value--[[@as boolean]],
     show_throughput_on_pickup = player_settings["QAI-show-throughput-on-pickup"].value--[[@as boolean]],
     show_throughput_on_drop = player_settings["QAI-show-throughput-on-drop"].value--[[@as boolean]],
+    highlight_default_drop_offset = player_settings["QAI-highlight-default-drop-offset"].value--[[@as boolean]],
     pipette_after_place_and_adjust = player_settings["QAI-pipette-after-place-and-adjust"].value--[[@as boolean]],
   }
   global.players[player.index] = player_data
@@ -2208,6 +2291,7 @@ end)
 script.on_event(ev.on_selected_entity_changed, function(event)
   local player = get_player(event)
   if not player then return end
+  update_default_drop_highlight(player)
   update_inserter_speed_text(player)
 end)
 

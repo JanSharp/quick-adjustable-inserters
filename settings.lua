@@ -23,6 +23,13 @@ data:extend({
   },
   {
     type = "bool-setting",
+    name = "QAI-highlight-default-drop-offset",
+    order = "d",
+    setting_type = "runtime-per-user",
+    default_value = false,
+  },
+  {
+    type = "bool-setting",
     name = "QAI-pipette-after-place-and-adjust",
     order = "e",
     setting_type = "runtime-per-user",
