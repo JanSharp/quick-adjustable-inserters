@@ -67,6 +67,6 @@
 - [ ] readme/description
 - [ ] tips and tricks simulations
 - [x] don't restore when rotating and similar
-- [ ] try using render_player_index for selectable entities. See if the selection box shows up for other players as well
+- [x] ~~try using render_player_index for selectable entities. See if the selection box shows up for other players as well~~ Tried it, they are still selectable for other players, so this is not an option
 - [ ] look into renai transportation and see if it needs special support just for fun
 - [ ] wait, but why do we not get a selection changed event with selected being nil when we move the cursor off of a selectable entity from this mod and pressing the adjust key bind in the same tick, causing it to delete the previously selected entity?
