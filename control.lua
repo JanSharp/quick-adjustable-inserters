@@ -1691,8 +1691,6 @@ local function snap_drop_position(player, position, offset_from_tile_center, aut
     -- Modulo always returns a positive number.
     local x_from_tile_center = (relative_x % 1) - 0.5
     local y_from_tile_center = (relative_y % 1) - 0.5
-    -- 51 / 256 = 0.19921875. Vanilla inserter drop positions are offset by 0.2 away from the center, however
-    -- it ultimately gets rounded to 51 / 256, because of map positions. In other words, this matches vanilla.
     x_offset = x_from_tile_center == 0 and 0
       or x_from_tile_center < 0 and -offset_from_tile_center
       or offset_from_tile_center
@@ -1724,6 +1722,8 @@ end
 ---@param position MapPosition
 ---@return MapPosition
 function calculate_actual_drop_position(player, position)
+  -- 51 / 256 = 0.19921875. Vanilla inserter drop positions are offset by 0.2 away from the center, however
+  -- it ultimately gets rounded to 51 / 256, because of map positions. In other words, this matches vanilla.
   return snap_drop_position(player, position, 51/256, should_use_auto_drop_offset(player))
 end
 
