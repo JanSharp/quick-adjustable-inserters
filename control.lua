@@ -1,6 +1,6 @@
 
-local inserter_throughput = require("__inserter_throughput_lib__.api")
-local vec = require("__inserter_throughput_lib__.vector")
+local inserter_throughput = require("__inserter-throughput-lib__.api")
+local vec = require("__inserter-throughput-lib__.vector")
 
 ---cSpell:ignore rects
 
@@ -2431,7 +2431,7 @@ end)
 
 script.on_configuration_changed(function(event)
   -- Ignore the event if this mod has just been added, since on_init ran already anyway.
-  local mod_changes = event.mod_changes["quick_adjustable_inserters"]
+  local mod_changes = event.mod_changes["quick-adjustable-inserters"]
   if mod_changes and not mod_changes.old_version then return end
 
   -- Do this before updating forces, because updating forces potentially involves changing player states.
