@@ -2335,6 +2335,20 @@ script.on_event(ev.on_selected_entity_changed, function(event)
   update_inserter_speed_text(player)
 end)
 
+script.on_event(ev.on_entity_settings_pasted, function(event)
+  local player = get_player(event)
+  if player then
+    -- It won't update for other players hovering the inserter. It is not worth adding logic for that.
+    update_inserter_speed_text(player)
+  end
+  local destination = event.destination
+  if destination.type ~= "inserter" then return end
+  player = global.inserters_in_use[destination.unit_number]
+  if not player then return end
+  switch_to_idle_and_back(player)
+  update_inserter_speed_text(player)
+end)
+
 script.on_event(ev.on_runtime_mod_setting_changed, function(event)
   local update_setting = update_setting_lut[event.setting]
   if not update_setting then return end

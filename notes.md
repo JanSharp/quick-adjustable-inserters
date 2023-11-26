@@ -22,7 +22,7 @@
 - [x] ~~speaking of, what if the entire grid was just a polygon that's cached~~
   - [x] see polygon-for-lines branch, the "lines" end up changing thickness inconsistently and disappear, while lines drawn using draw_line are consistent and have a minimal thickness of 1 pixel, even fully zoomed out
 - [x] estimate inserter
-- [ ] update inserter speed text when pasting settings to an inserter
+- [x] update inserter speed text when pasting settings to an inserter
 - [ ] maybe position the inserter speed text next to the square the ninth is in instead of directly next to the ninth. Should make comparing numbers easier
 - [x] per player setting to disable inserter speed estimation entirely
 - [x] per player setting to show estimated inserter throughput when hovering any inserter
