@@ -80,14 +80,14 @@ local animation_type = {
 ---@field prototype LuaEntityPrototype
 ---@field tech_level TechnologyLevelQAI
 ---@field diagonal_by_default boolean
+---@field is_square boolean @ When false, `vertical_offset_from_inserter ~= horizontal_offset_from_inserter`.
+---@field base_range integer
+---@field range_gap_from_center integer
 ---Defines how to calculate the left top position of the grid when given an inserter entity. By adding
 ---this value to the inserter's position, the left top position - the grid origin - has been found. All
 ---other positions in this definition are then relative to this calculated position.\
 ---For inserters placable off grid, the tiles, lines and simply everything from this mod will also be off
 ---grid.
----@field is_square boolean @ When false, `vertical_offset_from_inserter ~= horizontal_offset_from_inserter`.
----@field base_range integer
----@field range_gap_from_center integer
 ---@field offset_from_inserter MapPosition
 ---@field offset_from_inserter_flipped MapPosition @ Use when `player.should_flip` is true.
 ---@field grid_center MapPosition
