@@ -163,8 +163,12 @@ local animation_type = {
 ---@field show_throughput_on_inserter boolean
 ---@field highlight_default_drop_offset boolean
 ---@field pipette_after_place_and_adjust boolean
+---@field pipette_copies_vectors boolean
 ---@field pipette_when_done boolean?
 ---@field reactivate_inserter_when_done boolean?
+---@field pipetted_inserter_name string?
+---@field pipetted_pickup_vector MapPosition @ `nil` when `pipetted_inserter_name` is `nil`.
+---@field pipetted_drop_vector MapPosition @ `nil` when `pipetted_inserter_name` is `nil`.
 
 local ev = defines.events
 local square_entity_name = "QAI-selectable-square"
@@ -193,6 +197,7 @@ local techs_we_care_about = {
   ["more-inserters-2"] = true,
 }
 
+---Can also be used to check if a given direction is a supported direction by this mod.
 local inverse_direction_lut = {
   [defines.direction.north] = defines.direction.south,
   [defines.direction.east] = defines.direction.west,
@@ -212,6 +217,22 @@ local reverse_rotate_direction_lut = {
   [defines.direction.east] = defines.direction.north,
   [defines.direction.south] = defines.direction.east,
   [defines.direction.west] = defines.direction.south,
+}
+
+---Rotate something that's facing north to a given direction.
+local rotation_matrix_lut = {
+  [defines.direction.north] = vec.new_identity_matrix(),
+  [defines.direction.east] = vec.rotation_matrix_by_orientation(0.25),
+  [defines.direction.south] = vec.rotation_matrix_by_orientation(0.5),
+  [defines.direction.west] = vec.rotation_matrix_by_orientation(0.75),
+}
+
+---Rotate something that's facing a given direction to the north.
+local reverse_rotation_matrix_lut = {
+  [defines.direction.north] = vec.new_identity_matrix(),
+  [defines.direction.east] = vec.rotation_matrix_by_orientation(-0.25),
+  [defines.direction.south] = vec.rotation_matrix_by_orientation(-0.5),
+  [defines.direction.west] = vec.rotation_matrix_by_orientation(-0.75),
 }
 
 ---@param event EventData|{player_index: uint}
@@ -733,6 +754,12 @@ local function generate_cache_for_inserter(inserter, tech_level)
   return cache
 end
 
+---@param entity LuaEntity
+---@param name string
+local function is_entity_or_ghost(entity, name)
+  return entity.name == name or entity.type == "entity-ghost" and entity.ghost_name == name
+end
+
 ---@param entities uint32[]
 local function destroy_entities(entities)
   local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
@@ -866,6 +893,17 @@ local function forget_about_restoring(player, target_inserter)
   player.pipette_when_done = nil
 end
 
+---@param player PlayerDataQAI
+---@param inserter_name string
+---@param inserter LuaEntity
+local function save_pipetted_vectors(player, inserter_name, inserter)
+  local rotation = reverse_rotation_matrix_lut[inserter.direction]
+  local position = inserter.position
+  player.pipetted_inserter_name = inserter_name
+  player.pipetted_pickup_vector = vec.transform_by_matrix(rotation, vec.sub(inserter.pickup_position, position))
+  player.pipetted_drop_vector = vec.transform_by_matrix(rotation, vec.sub(inserter.drop_position, position))
+end
+
 ---Can raise an event.
 ---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
@@ -877,10 +915,17 @@ local function restore_after_adjustment(player, target_inserter)
 
   if player.pipette_when_done then
     player.pipette_when_done = nil
-    if player.pipette_after_place_and_adjust and target_inserter.valid then
-      player.player.pipette_entity(target_inserter)
+    if not player.pipette_after_place_and_adjust or not target_inserter.valid then goto leave_pipette end
+    local name = player.pipette_copies_vectors and target_inserter.name
+    player.player.pipette_entity(target_inserter)
+    if not player.pipette_copies_vectors or not target_inserter.valid then goto leave_pipette end
+    local cursor = player.player.cursor_stack
+    local place_result = cursor and cursor.valid_for_read and cursor.prototype.place_result
+    if place_result and place_result.name == name then
+      save_pipetted_vectors(player, name--[[@as string]], target_inserter)
     end
   end
+  ::leave_pipette::
 end
 
 local update_inserter_speed_text
@@ -2069,6 +2114,13 @@ local function update_show_throughput_on_player(player, setting_name, field_name
   update_inserter_speed_text(player)
 end
 
+---@param player PlayerDataQAI
+local function clear_pipetted_inserter_data(player)
+  player.pipetted_inserter_name = nil
+  player.pipetted_pickup_vector = nil
+  player.pipetted_drop_vector = nil
+end
+
 ---@type table<string, fun(player: PlayerDataQAI)>
 local update_setting_lut = {
   ["QAI-show-throughput-on-inserter"] = function(player)
@@ -2094,6 +2146,14 @@ local update_setting_lut = {
     local new_value = settings.get_player_settings(player.player_index)["QAI-pipette-after-place-and-adjust"].value--[[@as boolean]]
     player.pipette_after_place_and_adjust = new_value
   end,
+  ["QAI-pipette-copies-vectors"] = function(player)
+    local new_value = settings.get_player_settings(player.player_index)["QAI-pipette-copies-vectors"].value--[[@as boolean]]
+    if new_value == player.pipette_copies_vectors then return end
+    player.pipette_copies_vectors = new_value
+    if not player.pipette_copies_vectors then
+      clear_pipetted_inserter_data(player)
+    end
+  end,
 }
 
 ---@param player LuaPlayer
@@ -2116,6 +2176,7 @@ local function init_player(player)
     show_throughput_on_drop = player_settings["QAI-show-throughput-on-drop"].value--[[@as boolean]],
     highlight_default_drop_offset = player_settings["QAI-highlight-default-drop-offset"].value--[[@as boolean]],
     pipette_after_place_and_adjust = player_settings["QAI-pipette-after-place-and-adjust"].value--[[@as boolean]],
+    pipette_copies_vectors = player_settings["QAI-pipette-copies-vectors"].value--[[@as boolean]],
   }
   global.players[player.index] = player_data
   return player_data
@@ -2317,15 +2378,34 @@ script.on_event(ev.on_player_pipette, function(event)
   local direction = selected.direction
   if not inverse_direction_lut[direction] then return end
   player.last_used_direction = direction
+
+  if not player.pipette_copies_vectors or selected.type ~= "inserter" then return end
+  local force = global.forces[player.force_index]
+  if not force then return end
+  local name = selected.name
+  local cache = force.inserter_cache_lut[name]
+  if not cache then return end
+  save_pipetted_vectors(player, name, selected)
 end)
 
 script.on_event(ev.on_player_cursor_stack_changed, function(event)
   local player = get_player(event)
   if not player then return end
   local cursor = player.player.cursor_stack
-  if not cursor or cursor.valid_for_read then
-    player.pipette_when_done = false
+  if not cursor then
+    player.pipette_when_done = nil
+    clear_pipetted_inserter_data(player)
+    return
   end
+  if cursor.valid_for_read then
+    player.pipette_when_done = nil
+    if player.pipetted_inserter_name and cursor.name ~= player.pipetted_inserter_name then
+      clear_pipetted_inserter_data(player)
+    end
+    return
+  end
+  -- Not valid for read.
+  clear_pipetted_inserter_data(player)
 end)
 
 script.on_event(ev.on_selected_entity_changed, function(event)
@@ -2406,6 +2486,23 @@ do
   })
 end
 
+script.on_event(ev.on_built_entity, function(event)
+  local player = get_player(event)
+  if not player then return end
+  local expected_name = player.pipetted_inserter_name
+  if not expected_name then return end
+  local entity = event.created_entity
+  if not is_entity_or_ghost(entity, expected_name) then return end
+  local direction = entity.direction
+  if not inverse_direction_lut[direction] then return end
+  local rotation = rotation_matrix_lut[direction]
+  local position = entity.position
+  local pickup_vector = vec.transform_by_matrix(rotation, vec.copy(player.pipetted_pickup_vector))
+  local drop_vector = vec.transform_by_matrix(rotation, vec.copy(player.pipetted_drop_vector))
+  entity.pickup_position = vec.add(pickup_vector, position)
+  entity.drop_position = vec.add(drop_vector, position)
+end)
+
 script.on_event({ev.on_research_finished, ev.on_research_reversed}, function(event)
   local research = event.research
   if not techs_we_care_about[research.name] then return end
@@ -2451,6 +2548,7 @@ script.on_configuration_changed(function(event)
   -- Do this before updating forces, because updating forces potentially involves changing player states.
   for _, player in pairs(global.players) do
     player.pipette_when_done = nil
+    clear_pipetted_inserter_data(player)
   end
 
   for _, force in pairs(global.forces) do

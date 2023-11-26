@@ -35,4 +35,11 @@ data:extend({
     setting_type = "runtime-per-user",
     default_value = true,
   },
+  {
+    type = "bool-setting",
+    name = "QAI-pipette-copies-vectors",
+    order = "f",
+    setting_type = "runtime-per-user",
+    default_value = false,
+  },
 })
