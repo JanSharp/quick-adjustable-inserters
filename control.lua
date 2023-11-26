@@ -1441,7 +1441,7 @@ local function get_from_and_to_for_line_from_center(player, square_position, squ
     grid_center_position, -- No need to copy here too.
     vec.set_length(pickup_vector, distance_from_center + length)
   )
-  return from--[[@as MapPosition]], to--[[@as MapPosition]], length
+  return from, to, length
 end
 
 ---@param player PlayerDataQAI
@@ -1790,7 +1790,7 @@ local function get_frames_and_step_vector_for_line_to_highlight(from, to, length
   local length_step = finish_animation_expansion / finish_animation_frames
   local frames = math.max(1, finish_animation_frames - math.floor(math.max(0, -final_length) / length_step))
   local step_vector = vec.set_length(vec.sub(vec.copy(to), from), length_step / 2)
-  return frames, step_vector--[[@as MapPosition]]
+  return frames, step_vector
 end
 
 ---@param player PlayerDataQAI
@@ -1798,7 +1798,7 @@ end
 local function play_line_to_drop_highlight_animation(player, position)
   local from, to, length = get_from_and_to_for_line_from_center(
     player,
-    vec.copy(position)--[[@as MapPosition]],
+    vec.copy(position),
     43/256
   )
   if not from then return end ---@cast to -nil
@@ -1824,7 +1824,7 @@ local function play_line_to_drop_highlight_animation(player, position)
     to = to,
     color_step = get_finish_animation_color_step(),
     from_step = step_vector,
-    to_step = vec.mul_scalar(vec.copy(step_vector), -1)--[[@as MapPosition]],
+    to_step = vec.mul_scalar(vec.copy(step_vector), -1),
   }
 end
 
@@ -1889,7 +1889,7 @@ local function play_line_to_pickup_highlight_animation(player)
     to = to,
     color_step = get_finish_animation_color_step(),
     from_step = step_vector,
-    to_step = vec.mul_scalar(vec.copy(step_vector), -1)--[[@as MapPosition]],
+    to_step = vec.mul_scalar(vec.copy(step_vector), -1),
   }
   player.line_to_pickup_highlight_id = nil -- Destroying is now handled by the animation.
 end
