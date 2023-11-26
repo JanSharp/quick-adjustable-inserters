@@ -1911,6 +1911,7 @@ end
 
 ---@param player PlayerDataQAI
 local function play_line_to_pickup_highlight_animation(player)
+  if not player.line_to_pickup_highlight_id then return end
   if not rendering.is_valid(player.line_to_pickup_highlight_id) then return end
   local from, to, length = get_from_and_to_for_line_from_center(
     player,
