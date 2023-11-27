@@ -76,3 +76,11 @@
 - [ ] add own technologies with the same names and own custom icons
 - [ ] add startup settings just like bobinserters, even with the same name, but only if they don't exist already
 - [ ] use "cardinal" instead of "perpendicular"
+- [ ] maybe add remote interface and api
+  - [ ] api file which checks for the existence remote interfaces containing a certain name, and calls all of them (that is to support for example smart inserters implementing the same interface, and being enabled at the same time)
+    - [ ] put the MIT license directly in the api file so others can copy it into their code. This allows for mods to implement the interface and replace quick adjustable inserters entirely without other mods using the api to have to change anything. It would "just work"
+  - [ ] change which technologies unlock what
+  - [ ] add more or less range
+  - [ ] trigger build & adjust
+  - [ ] trigger adjust key bind on a given entity
+  - [ ] trigger switch_to_idle_and_back
