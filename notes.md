@@ -75,6 +75,8 @@
 - [ ] change hard dependency on bobinserters to hidden optional (for mod load order)
 - [ ] add own technologies with the same names and own custom icons
 - [ ] add startup settings just like bobinserters, even with the same name, but only if they don't exist already
+- [ ] add logic in data updates and final fixes to enable runtime adjustable vectors
+- [ ] maybe add startup setting to normalize pickup vectors, snapping them to tile centers
 - [ ] use "cardinal" instead of "perpendicular"
 - [ ] maybe add remote interface and api
   - [ ] api file which checks for the existence remote interfaces containing a certain name, and calls all of them (that is to support for example smart inserters implementing the same interface, and being enabled at the same time)
