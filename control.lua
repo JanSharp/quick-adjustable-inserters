@@ -1532,15 +1532,12 @@ local function draw_line_to_pickup_highlight(player)
 end
 
 ---@param player PlayerDataQAI
----@param target_inserter LuaEntity
 ---@param message LocalisedString
 ---@return false
-local function show_error(player, target_inserter, message)
-  target_inserter.surface.create_entity{
-    name = "flying-text",
+local function show_error(player, message)
+  player.player.create_local_flying_text{
+    create_at_cursor = true,
     text = message,
-    position = target_inserter.position,
-    render_player_index = player.player_index,
   }
   player.player.play_sound{path = "utility/cannot_build"}
   return false
@@ -1559,21 +1556,21 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
 
   local cache = force.inserter_cache_lut[target_inserter.name]
   if not cache then
-    return show_error(player, target_inserter, {"QAI.cant-change-inserter-at-runtime"})
+    return show_error(player, {"QAI.cant-change-inserter-at-runtime"})
   end
 
   -- Specifically check if the force of the inserter is friends with the player. Friendship is one directional.
   if not target_inserter.force.is_friend(player.force_index) then
-    return show_error(player, target_inserter, {"cant-rotate-enemy-structures"})
+    return show_error(player, {"cant-rotate-enemy-structures"})
   end
 
   if do_check_reach and not player.player.can_reach_entity(target_inserter) then
-    return show_error(player, target_inserter, {"cant-reach"})
+    return show_error(player, {"cant-reach"})
   end
 
   local unit_number = target_inserter.unit_number ---@cast unit_number -nil
   if global.inserters_in_use[unit_number] then
-    return show_error(player, target_inserter, {"QAI.only-one-player-can-adjust"})
+    return show_error(player, {"QAI.only-one-player-can-adjust"})
   end
 
   global.inserters_in_use[unit_number] = player
