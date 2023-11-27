@@ -80,6 +80,7 @@ local animation_type = {
 ---@field prototype LuaEntityPrototype
 ---@field tech_level TechnologyLevelQAI
 ---@field diagonal_by_default boolean
+---@field default_drop_offset_multiplier -1|0|1 @ -1 = near, 0 = center, 1 = far. Vanilla is all far, fyi.
 ---@field is_square boolean @ When false, `vertical_offset_from_inserter ~= horizontal_offset_from_inserter`.
 ---@field base_range integer
 ---@field range_gap_from_center integer
@@ -94,8 +95,8 @@ local animation_type = {
 ---@field grid_center_flipped MapPosition
 ---@field radius_for_circle_on_inserter number
 ---@field placeable_off_grid boolean
----@field tile_width integer
----@field tile_height integer
+---@field tile_width integer @ The width of the open inner grid, occupied by the collision box of the inserter.
+---@field tile_height integer @ The height of the open inner grid, occupied by the collision box of the inserter.
 ---@field tiles MapPosition[]
 ---@field tiles_flipped MapPosition[]
 ---@field tiles_background_vertices ScriptRenderVertexTarget[]
@@ -283,7 +284,7 @@ local function flip(player, pos)
 end
 
 ---@param cache InserterCacheQAI
-local function calculate_cached_base_reach(cache)
+local function calculate_pickup_and_drop_position_related_cache(cache)
   local tile_width = cache.tile_width
   local tile_height = cache.tile_height
   local pickup_position = cache.prototype.inserter_pickup_position ---@cast pickup_position -nil
@@ -302,6 +303,26 @@ local function calculate_cached_base_reach(cache)
   cache.range_gap_from_center = math.max(0, cache.base_range - cache.tech_level.range)
 
   cache.diagonal_by_default = math.abs(pickup_x - pickup_y) < 1/16 and math.abs(drop_x - drop_y) < 1/16
+
+  -- Remember, drop_x and drop_y are absolute (so positive) values.
+  local drop_vector = {
+    x = drop_x,
+    y = drop_y,
+  }
+  -- Using prototype values here instead of cached, because cached values actually have different meaning.
+  local offset_vector = {
+    x = ((drop_x + (cache.prototype.tile_width % 2) / 2) % 1) - 0.5,
+    y = ((drop_y + (cache.prototype.tile_height % 2) / 2) % 1) - 0.5,
+  }
+  -- What this basically does is project the offset vector which originates from the center of the target tile
+  -- onto the drop vector. The resulting number can be interpreted as the length of said projected vector,
+  -- where it being negative means the offset vector is generally pointing towards the inserter.
+  local projected_offset = vec.dot_product(drop_vector, offset_vector) / vec.get_length(drop_vector)
+  -- Vanilla's drop offset is ~0.2, so 0.1 being the threshold between near/far and center seems logical.
+  cache.default_drop_offset_multiplier
+    = projected_offset < -0.1 and -1
+      or projected_offset <= 0.1 and 0
+      or 1
 end
 
 ---@param cache InserterCacheQAI
@@ -731,7 +752,7 @@ local function generate_cache_for_inserter(inserter, tech_level)
     rotation_speed = inserter.inserter_rotation_speed,
     chases_belt_items = inserter.inserter_chases_belt_items,
   }
-  calculate_cached_base_reach(cache)
+  calculate_pickup_and_drop_position_related_cache(cache)
   offset_from_inserter.x = offset_from_inserter.x - cache.range_gap_from_center
   offset_from_inserter.y = offset_from_inserter.y - cache.range_gap_from_center
   cache.offset_from_inserter_flipped = {
@@ -1680,6 +1701,7 @@ local function snap_drop_position(player, position, offset_from_tile_center, aut
   local x_offset
   local y_offset
   if auto_determine_drop_offset then
+    offset_from_tile_center = offset_from_tile_center * cache.default_drop_offset_multiplier
     local max_range = tech_level.range + cache.range_gap_from_center
     x_offset = relative_x < max_range and -offset_from_tile_center
       or (max_range + cache.tile_width) < relative_x and offset_from_tile_center
