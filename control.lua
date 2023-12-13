@@ -172,9 +172,9 @@ local animation_type = {
 ---@field pipetted_drop_vector MapPosition @ `nil` when `pipetted_inserter_name` is `nil`.
 
 local ev = defines.events
-local square_entity_name = "QAI-selectable-square"
-local ninth_entity_name = "QAI-selectable-ninth"
-local rect_entity_name = "QAI-selectable-rect"
+local square_entity_name = "qai-selectable-square"
+local ninth_entity_name = "qai-selectable-ninth"
+local rect_entity_name = "qai-selectable-rect"
 
 local finish_animation_frames = 16
 local finish_animation_expansion = 3/16
@@ -1556,7 +1556,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
 
   local cache = force.inserter_cache_lut[target_inserter.name]
   if not cache then
-    return show_error(player, {"QAI.cant-change-inserter-at-runtime"})
+    return show_error(player, {"qai.cant-change-inserter-at-runtime"})
   end
 
   -- Specifically check if the force of the inserter is friends with the player. Friendship is one directional.
@@ -1570,7 +1570,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
 
   local unit_number = target_inserter.unit_number ---@cast unit_number -nil
   if global.inserters_in_use[unit_number] then
-    return show_error(player, {"QAI.only-one-player-can-adjust"})
+    return show_error(player, {"qai.only-one-player-can-adjust"})
   end
 
   global.inserters_in_use[unit_number] = player
@@ -2143,17 +2143,17 @@ end
 
 ---@type table<string, fun(player: PlayerDataQAI)>
 local update_setting_lut = {
-  ["QAI-show-throughput-on-inserter"] = function(player)
-    update_show_throughput_on_player(player, "QAI-show-throughput-on-inserter", "show_throughput_on_inserter")
+  ["qai-show-throughput-on-inserter"] = function(player)
+    update_show_throughput_on_player(player, "qai-show-throughput-on-inserter", "show_throughput_on_inserter")
   end,
-  ["QAI-show-throughput-on-pickup"] = function(player)
-    update_show_throughput_on_player(player, "QAI-show-throughput-on-pickup", "show_throughput_on_pickup")
+  ["qai-show-throughput-on-pickup"] = function(player)
+    update_show_throughput_on_player(player, "qai-show-throughput-on-pickup", "show_throughput_on_pickup")
   end,
-  ["QAI-show-throughput-on-drop"] = function(player)
-    update_show_throughput_on_player(player, "QAI-show-throughput-on-drop", "show_throughput_on_drop")
+  ["qai-show-throughput-on-drop"] = function(player)
+    update_show_throughput_on_player(player, "qai-show-throughput-on-drop", "show_throughput_on_drop")
   end,
-  ["QAI-highlight-default-drop-offset"] = function(player)
-    local new_value = settings.get_player_settings(player.player_index)["QAI-highlight-default-drop-offset"].value--[[@as boolean]]
+  ["qai-highlight-default-drop-offset"] = function(player)
+    local new_value = settings.get_player_settings(player.player_index)["qai-highlight-default-drop-offset"].value--[[@as boolean]]
     if new_value == player.highlight_default_drop_offset then return end
     player.highlight_default_drop_offset = new_value
     if player.highlight_default_drop_offset then
@@ -2162,12 +2162,12 @@ local update_setting_lut = {
       destroy_default_drop_highlight(player)
     end
   end,
-  ["QAI-pipette-after-place-and-adjust"] = function(player)
-    local new_value = settings.get_player_settings(player.player_index)["QAI-pipette-after-place-and-adjust"].value--[[@as boolean]]
+  ["qai-pipette-after-place-and-adjust"] = function(player)
+    local new_value = settings.get_player_settings(player.player_index)["qai-pipette-after-place-and-adjust"].value--[[@as boolean]]
     player.pipette_after_place_and_adjust = new_value
   end,
-  ["QAI-pipette-copies-vectors"] = function(player)
-    local new_value = settings.get_player_settings(player.player_index)["QAI-pipette-copies-vectors"].value--[[@as boolean]]
+  ["qai-pipette-copies-vectors"] = function(player)
+    local new_value = settings.get_player_settings(player.player_index)["qai-pipette-copies-vectors"].value--[[@as boolean]]
     if new_value == player.pipette_copies_vectors then return end
     player.pipette_copies_vectors = new_value
     if not player.pipette_copies_vectors then
@@ -2191,12 +2191,12 @@ local function init_player(player)
     used_ninths = {},
     used_rects = {},
     line_ids = {},
-    show_throughput_on_inserter = player_settings["QAI-show-throughput-on-inserter"].value--[[@as boolean]],
-    show_throughput_on_pickup = player_settings["QAI-show-throughput-on-pickup"].value--[[@as boolean]],
-    show_throughput_on_drop = player_settings["QAI-show-throughput-on-drop"].value--[[@as boolean]],
-    highlight_default_drop_offset = player_settings["QAI-highlight-default-drop-offset"].value--[[@as boolean]],
-    pipette_after_place_and_adjust = player_settings["QAI-pipette-after-place-and-adjust"].value--[[@as boolean]],
-    pipette_copies_vectors = player_settings["QAI-pipette-copies-vectors"].value--[[@as boolean]],
+    show_throughput_on_inserter = player_settings["qai-show-throughput-on-inserter"].value--[[@as boolean]],
+    show_throughput_on_pickup = player_settings["qai-show-throughput-on-pickup"].value--[[@as boolean]],
+    show_throughput_on_drop = player_settings["qai-show-throughput-on-drop"].value--[[@as boolean]],
+    highlight_default_drop_offset = player_settings["qai-highlight-default-drop-offset"].value--[[@as boolean]],
+    pipette_after_place_and_adjust = player_settings["qai-pipette-after-place-and-adjust"].value--[[@as boolean]],
+    pipette_copies_vectors = player_settings["qai-pipette-copies-vectors"].value--[[@as boolean]],
   }
   global.players[player.index] = player_data
   return player_data
@@ -2346,7 +2346,7 @@ script.on_event(ev.on_tick, function(event)
   end
 end)
 
-script.on_event("QAI-adjust", function(event)
+script.on_event("qai-adjust", function(event)
   local player = get_player(event)
   if not player then return end
   local cursor = player.player.cursor_stack
@@ -2370,7 +2370,7 @@ script.on_event("QAI-adjust", function(event)
   on_adjust_handler_lut[player.state](player, selected)
 end)
 
-script.on_event("QAI-rotate", function(event)
+script.on_event("qai-rotate", function(event)
   local player = get_player(event)
   if not player then return end
   local cursor = player.player.cursor_stack
@@ -2379,7 +2379,7 @@ script.on_event("QAI-rotate", function(event)
   end
 end)
 
-script.on_event("QAI-reverse-rotate", function(event)
+script.on_event("qai-reverse-rotate", function(event)
   local player = get_player(event)
   if not player then return end
   local cursor = player.player.cursor_stack

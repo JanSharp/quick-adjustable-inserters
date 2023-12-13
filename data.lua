@@ -41,37 +41,37 @@ end
 data:extend{
   {
     type = "custom-input",
-    name = "QAI-adjust",
+    name = "qai-adjust",
     action = "lua",
     key_sequence = "CONTROL + SHIFT + R",
   },
   {
     type = "custom-input",
-    name = "QAI-rotate",
+    name = "qai-rotate",
     action = "lua",
     key_sequence = "",
     linked_game_control = "rotate",
   },
   {
     type = "custom-input",
-    name = "QAI-reverse-rotate",
+    name = "qai-reverse-rotate",
     action = "lua",
     key_sequence = "",
     linked_game_control = "reverse-rotate",
   },
   make_selectable{
-    name = "QAI-selectable-square",
+    name = "qai-selectable-square",
     selection_box = {{-0.5, -0.5}, {0.5, 0.5}},
     tile_width = 1,
     tile_height = 1,
   },
   make_selectable{
-    name = "QAI-selectable-ninth",
+    name = "qai-selectable-ninth",
     -- 256 / 3 = 85.33333333333333, 86 to round up instead of down to ensure gaps are filled
     selection_box = {{-86 / 256 / 2, -86 / 256 / 2}, {86 / 256 / 2, 86 / 256 / 2}},
   },
   make_selectable{
-    name = "QAI-selectable-rect",
+    name = "qai-selectable-rect",
     selection_box = {{-1.5, -1}, {1.5, 1}},
   },
 }
