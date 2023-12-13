@@ -86,3 +86,4 @@
   - [ ] trigger build & adjust
   - [ ] trigger adjust key bind on a given entity
   - [ ] trigger switch_to_idle_and_back
+- [ ] make all qai prefixes lowercase, outside of type names of course
