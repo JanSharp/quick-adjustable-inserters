@@ -87,3 +87,4 @@
   - [ ] trigger adjust key bind on a given entity
   - [ ] trigger switch_to_idle_and_back
 - [x] make all qai prefixes lowercase, outside of type names of course
+- [ ] maybe always script disable while adjusting
