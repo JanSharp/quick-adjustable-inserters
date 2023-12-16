@@ -42,6 +42,13 @@ data:extend({
     setting_type = "runtime-per-user",
     default_value = false,
   },
+  {
+    type = "bool-setting",
+    name = "qai-normalize-default-vectors",
+    order = "d",
+    setting_type = "startup",
+    default_value = true,
+  },
 })
 
 ---@generic T

@@ -80,7 +80,7 @@
 - [x] add logic in data updates and final fixes to enable runtime adjustable vectors
   - [x] remember which ones were touched in data updates and don't touch them again in final fixes
   - [x] ignore hidden inserters
-- [ ] maybe add startup setting to normalize pickup vectors, snapping them to tile centers
+- [x] maybe add startup setting to normalize pickup vectors, snapping them to tile centers
 - [x] use "cardinal" instead of "perpendicular"
 - [ ] maybe add remote interface and api
   - [ ] api file which checks for the existence remote interfaces containing a certain name, and calls all of them (that is to support for example smart inserters implementing the same interface, and being enabled at the same time)

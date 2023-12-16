@@ -96,14 +96,6 @@ local function add_if_it_does_not_exist(prototype_type, name, prototype_getter)
   return prototype
 end
 
----A non existent setting is treated as `true`.
----@param name string @ Name of a bool setting.
----@return boolean
-local function check_setting(name)
-  local setting = settings.startup[name]
-  return not setting or setting.value--[[@as boolean]]
-end
-
 add_if_it_does_not_exist("technology", "near-inserters", function()
   return {
     type = "technology",
@@ -123,7 +115,7 @@ add_if_it_does_not_exist("technology", "near-inserters", function()
   }--[[@as data.TechnologyPrototype]]
 end)
 
-if check_setting("bobmods-inserters-long1") then
+if data_core.check_setting("bobmods-inserters-long1", true) then
   add_if_it_does_not_exist("technology", "long-inserters-1", function()
     return {
       type = "technology",
@@ -144,7 +136,9 @@ if check_setting("bobmods-inserters-long1") then
   end)
 end
 
-if check_setting("bobmods-inserters-long1") and check_setting("bobmods-inserters-long2") then
+if data_core.check_setting("bobmods-inserters-long1", true)
+  and data_core.check_setting("bobmods-inserters-long2", true)
+then
   add_if_it_does_not_exist("technology", "long-inserters-2", function()
     return {
       type = "technology",
@@ -191,7 +185,7 @@ add_if_it_does_not_exist("technology", "more-inserters-1", function()
   }--[[@as data.TechnologyPrototype]]
 end)
 
-if check_setting("bobmods-inserters-more2") then
+if data_core.check_setting("bobmods-inserters-more2", true) then
   add_if_it_does_not_exist("technology", "more-inserters-2", function()
     return {
       type = "technology",
