@@ -30,7 +30,7 @@
 - [x] ~~shortcut to toggle near inserters, remove above setting~~ see below
 - [x] per player setting to highlight default/auto drop offset, which uses a little blue selection box
 - [x] per player setting to make Q pick cause newly placed inserters (ghost or alive) to have the same pickup and drop offsets
-- [ ] highlight drop positions which would be the fastest for the entity under the currently selected drop target selection
+- [x] ~~highlight drop positions which would be the fastest for the entity under the currently selected drop target selection~~ Decided against this because with an inserter already placed, plus the pickup position already selected, the fastest drop position is incredibly obvious. And in cases where it isn't 100% obvious, moving the cursor between a few drop positions and looking at the estimated throughput speeds makes it clear as well. So ultimately this is not needed, and would be a lot of logic, plus a significant performance impact on_selected_entity_changed.
 - [x] ~~add feature where you can place the inserter using this mods key bind and it will automatically uses the same pickup and drop vectors as the last modified inserter, if they have the same dimensions.~~ You wouldn't be able to click and drag with this, so no that's bad. Use bobinserters GUI for this, or just use blueprints and or copy paste.
 - [x] add feature where using the key bind while holding an inserter in hand places it and instantly enters configuration mode
   - [x] upon entering, clear the cursor
