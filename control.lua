@@ -2075,6 +2075,16 @@ local on_adjust_handler_lut = {
   end,
 }
 
+---@param player PlayerDataQAI
+---@param selected_entity LuaEntity?
+local function adjust(player, selected_entity)
+  if not selected_entity then
+    switch_to_idle(player)
+    return
+  end
+  on_adjust_handler_lut[player.state](player, selected_entity)
+end
+
 ---@param force ForceDataQAI
 local function update_inserter_cache(force)
   force.inserter_cache_lut = {}
@@ -2202,6 +2212,15 @@ local function init_player(player)
   }
   global.players[player.index] = player_data
   return player_data
+end
+
+---@param player_index integer
+---@return PlayerDataQAI?
+local function get_or_init_player(player_index)
+  local player_data = global.players[player_index]
+  if player_data then return player_data end
+  local player = game.get_player(player_index)
+  return player and init_player(player) or nil
 end
 
 ---@param player PlayerDataQAI
@@ -2364,12 +2383,7 @@ script.on_event("qai-adjust", function(event)
     end
   end
 
-  local selected = player.player.selected
-  if not selected then
-    switch_to_idle(player)
-    return
-  end
-  on_adjust_handler_lut[player.state](player, selected)
+  adjust(player, player.player.selected)
 end)
 
 script.on_event("qai-rotate", function(event)
@@ -2621,3 +2635,19 @@ script.on_init(function()
     init_player(player)
   end
 end)
+
+remote.add_interface("qai", {
+  ---@param player_index integer
+  switch_to_idle = function(player_index)
+    local player = get_or_init_player(player_index)
+    if not player then return end
+    switch_to_idle(player)
+  end,
+  ---@param player_index integer
+  ---@param selected_entity LuaEntity?
+  adjust = function(player_index, selected_entity)
+    local player = get_or_init_player(player_index)
+    if not player then return end
+    adjust(player, selected_entity)
+  end,
+})

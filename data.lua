@@ -1,4 +1,7 @@
 
+-- This file is not shipped with the final package, so pcall require it is.
+pcall(require, "__quick-adjustable-inserters__.data_for_auto_screenshots")
+
 local function make_selectable(params)
   return {
     type = "simple-entity-with-owner",
@@ -75,3 +78,118 @@ data:extend{
     selection_box = {{-1.5, -1}, {1.5, 1}},
   },
 }
+
+---@generic T : data.PrototypeBase
+---@param prototype_type string
+---@param name string
+---@param prototype_getter fun(): T
+---@return T
+local function add_if_it_does_not_exist(prototype_type, name, prototype_getter)
+  local prototype = data.raw[prototype_type] and data.raw[prototype_type][name]
+  if prototype then return prototype end
+  prototype = prototype_getter()
+  data:extend{prototype}
+  return prototype
+end
+
+add_if_it_does_not_exist("technology", "near-inserters", function()
+  return {
+    type = "technology",
+    name = "near-inserters",
+    icon = "__quick-adjustable-inserters__/graphics/technology/near-inserters.png",
+    icon_size = 256, icon_mipmaps = 1,
+    prerequisites = {"logistics"},
+    effects = {},
+    unit = {
+      count = 25,
+      ingredients = {{"automation-science-pack", 1}},
+      time = 15,
+    },
+    order = "a-d",
+  }--[[@as data.TechnologyPrototype]]
+end)
+
+add_if_it_does_not_exist("technology", "long-inserters-1", function()
+  return {
+    type = "technology",
+    name = "long-inserters-1",
+    icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-1.png",
+    icon_size = 256, icon_mipmaps = 1,
+    prerequisites = {"logistics"},
+    effects = {},
+    unit = {
+      count = 20,
+      ingredients = {{"automation-science-pack", 1}},
+      time = 15,
+    },
+    order = "a-e-a",
+  }--[[@as data.TechnologyPrototype]]
+end)
+
+add_if_it_does_not_exist("technology", "long-inserters-2", function()
+  return {
+    type = "technology",
+    name = "long-inserters-2",
+    icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-2.png",
+    icon_size = 256, icon_mipmaps = 1,
+    prerequisites = {"long-inserters-1", "chemical-science-pack"},
+    effects = {},
+    unit = {
+      count = 50,
+      ingredients = {
+        {"automation-science-pack", 1},
+        {"logistic-science-pack", 1},
+        {"chemical-science-pack", 1},
+      },
+      time = 30,
+    },
+    order = "a-e-b",
+  }--[[@as data.TechnologyPrototype]]
+end)
+
+add_if_it_does_not_exist("technology", "more-inserters-1", function()
+  return {
+    type = "technology",
+    name = "more-inserters-1",
+    icon = "__quick-adjustable-inserters__/graphics/technology/more-inserters-1.png",
+    icon_size = 256, icon_mipmaps = 1,
+    prerequisites = {"logistics-2"},
+    effects = {},
+    unit = {
+      count = 25,
+      ingredients = {
+        {"automation-science-pack", 1},
+        {"logistic-science-pack", 1},
+      },
+      time = 30,
+    },
+    order = "c-n-a",
+  }--[[@as data.TechnologyPrototype]]
+end)
+
+add_if_it_does_not_exist("technology", "more-inserters-2", function()
+  return {
+    type = "technology",
+    name = "more-inserters-2",
+    icon = "__quick-adjustable-inserters__/graphics/technology/more-inserters-2.png",
+    icon_size = 256, icon_mipmaps = 1,
+    prerequisites = {"more-inserters-1", "logistics-3"},
+    effects = {},
+    unit = {
+      count = 50,
+      ingredients = {
+        {"automation-science-pack", 1},
+        {"logistic-science-pack", 1},
+        {"chemical-science-pack", 1},
+        {"production-science-pack", 1},
+      },
+      time = 30,
+    },
+    order = "c-n-b",
+  }--[[@as data.TechnologyPrototype]]
+end)
+
+-- HACK: this is super temporary, see notes.md
+for _, inserter in pairs(data.raw["inserter"]) do
+  inserter.allow_custom_vectors = true
+end

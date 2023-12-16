@@ -6,13 +6,16 @@
   "author": "JanSharp",
   "description": "Adjust inserters in world, without GUI.",
   "dependencies": [
-    "bobinserters >= 1.1.7",
+    "(?)bobinserters",
     "inserter-throughput-lib >= 0.1.0"
   ],
 
   "package": {
     "ignore": [
-      "notes.md"
+      "data_for_auto_screenshots.lua",
+      "notes.md",
+      "scenario-scripts/**/*",
+      "scenarios/**/*"
     ]
   }
 }

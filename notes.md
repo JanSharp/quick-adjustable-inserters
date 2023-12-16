@@ -64,7 +64,7 @@
 - [x] slight indication for the 4 big rectangles around the grid which change direction
 - [x] test if creating and deleting entities is faster than teleporting and changing force
   - [x] yes it is. With pooling hitting the key bind 3 times on an inserter takes 2.57 ms, without pooling it takes 1.7 ms
-- [ ] thumbnail
+- [x] thumbnail
 - [ ] readme/description
 - [ ] tips and tricks simulations
 - [x] don't restore when rotating and similar
@@ -72,10 +72,13 @@
 - [ ] look into renai transportation and see if it needs special support just for fun
 - [ ] wait, but why do we not get a selection changed event with selected being nil when we move the cursor off of a selectable entity from this mod and pressing the adjust key bind in the same tick, causing it to delete the previously selected entity?
 - [ ] look into smart inserters and see how hard compatibility with that mod would be
-- [ ] change hard dependency on bobinserters to hidden optional (for mod load order)
-- [ ] add own technologies with the same names and own custom icons
+- [x] change hard dependency on bobinserters to hidden optional (for mod load order)
+- [x] add own technologies with the same names and own custom icons
+  - [ ] revisit icons, probably using the inserter tech icon and adding something to it in gimp
 - [ ] add startup settings just like bobinserters, even with the same name, but only if they don't exist already
 - [ ] add logic in data updates and final fixes to enable runtime adjustable vectors
+  - [ ] remember which ones were touched in data updates and don't touch them again in final fixes
+  - [ ] ignore hidden inserters
 - [ ] maybe add startup setting to normalize pickup vectors, snapping them to tile centers
 - [ ] use "cardinal" instead of "perpendicular"
 - [ ] maybe add remote interface and api
@@ -84,7 +87,13 @@
   - [ ] change which technologies unlock what
   - [ ] add more or less range
   - [ ] trigger build & adjust
-  - [ ] trigger adjust key bind on a given entity
+  - [x] trigger adjust key bind on a given entity
+  - [x] trigger switch_to_idle (even though adjusting on a nil entity already does that)
   - [ ] trigger switch_to_idle_and_back
 - [x] make all qai prefixes lowercase, outside of type names of course
 - [ ] maybe always script disable while adjusting
+- [ ] do not use rotate locale, just make your own for not being able to adjust enemy structures
+- [ ] maybe add nothing technology effects/modifies with descriptions
+- [ ] or just add technology descriptions
+- [ ] use both the selection box and collision box to determine the size of the inserter
+- [ ] auto detect more range technologies, simply by going sequentially (long-inserters-1, long-inserters-2, long-inserters-3, ...)
