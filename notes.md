@@ -24,6 +24,7 @@
 - [x] estimate inserter
 - [x] update inserter speed text when pasting settings to an inserter
 - [ ] maybe position the inserter speed text next to the square the ninth is in instead of directly next to the ninth. Should make comparing numbers easier
+- [ ] maybe add white highlight box on the entity that would be targeted if the selected position were to be chosen (it's also the entity used for inserter throughput estimation)
 - [x] per player setting to disable inserter speed estimation entirely
 - [x] per player setting to show estimated inserter throughput when hovering any inserter
 - [x] ~~per player setting to always use auto drop offset, even when near inserters have been researched~~ see below
