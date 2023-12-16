@@ -93,7 +93,7 @@
   - [ ] trigger switch_to_idle_and_back
 - [x] make all qai prefixes lowercase, outside of type names of course
 - [ ] maybe always script disable while adjusting
-- [ ] do not use rotate locale, just make your own for not being able to adjust enemy structures
+- [x] do not use rotate locale, just make your own for not being able to adjust enemy structures
 - [ ] maybe add nothing technology effects/modifies with descriptions
 - [x] or just add technology descriptions
 - [ ] use both the selection box and collision box to determine the size of the inserter

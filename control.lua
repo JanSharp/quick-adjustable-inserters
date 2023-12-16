@@ -1561,7 +1561,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
 
   -- Specifically check if the force of the inserter is friends with the player. Friendship is one directional.
   if not target_inserter.force.is_friend(player.force_index) then
-    return show_error(player, {"cant-rotate-enemy-structures"})
+    return show_error(player, {"qai.cant-adjust-enemy-inserters"})
   end
 
   if do_check_reach and not player.player.can_reach_entity(target_inserter) then
