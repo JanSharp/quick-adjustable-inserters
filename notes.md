@@ -75,7 +75,7 @@
 - [x] change hard dependency on bobinserters to hidden optional (for mod load order)
 - [x] add own technologies with the same names and own custom icons
   - [ ] revisit icons, probably using the inserter tech icon and adding something to it in gimp
-  - [ ] locale name and descriptions
+  - [x] locale name and descriptions
 - [x] add startup settings just like bobinserters, even with the same name, but only if they don't exist already
 - [ ] add logic in data updates and final fixes to enable runtime adjustable vectors
   - [ ] remember which ones were touched in data updates and don't touch them again in final fixes
@@ -95,7 +95,7 @@
 - [ ] maybe always script disable while adjusting
 - [ ] do not use rotate locale, just make your own for not being able to adjust enemy structures
 - [ ] maybe add nothing technology effects/modifies with descriptions
-- [ ] or just add technology descriptions
+- [x] or just add technology descriptions
 - [ ] use both the selection box and collision box to determine the size of the inserter
 - [ ] auto detect more range technologies, simply by going sequentially (long-inserters-1, long-inserters-2, long-inserters-3, ...)
 - [ ] map setting to "only allow mirrored". Select the pickup position, and the drop off position has to be in the tile on the opposite side, such that those 2 tiles are mirrored at the inserter's center

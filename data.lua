@@ -104,6 +104,8 @@ add_if_it_does_not_exist("technology", "near-inserters", function()
   return {
     type = "technology",
     name = "near-inserters",
+    localised_name = {"technology-name.qai-near-inserters"},
+    localised_description = {"technology-description.qai-near-inserters"},
     icon = "__quick-adjustable-inserters__/graphics/technology/near-inserters.png",
     icon_size = 256, icon_mipmaps = 1,
     prerequisites = {"logistics"},
@@ -122,6 +124,8 @@ if check_setting("bobmods-inserters-long1") then
     return {
       type = "technology",
       name = "long-inserters-1",
+      localised_name = {"technology-name.qai-long-inserters-1"},
+      localised_description = {"technology-description.qai-long-inserters-1"},
       icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-1.png",
       icon_size = 256, icon_mipmaps = 1,
       prerequisites = {"logistics"},
@@ -141,6 +145,8 @@ if check_setting("bobmods-inserters-long1") and check_setting("bobmods-inserters
     return {
       type = "technology",
       name = "long-inserters-2",
+      localised_name = {"technology-name.qai-long-inserters-2"},
+      localised_description = {"technology-description.qai-long-inserters-2"},
       icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-2.png",
       icon_size = 256, icon_mipmaps = 1,
       prerequisites = {"long-inserters-1", "chemical-science-pack"},
@@ -163,6 +169,8 @@ add_if_it_does_not_exist("technology", "more-inserters-1", function()
   return {
     type = "technology",
     name = "more-inserters-1",
+    localised_name = {"technology-name.qai-more-inserters-1"},
+    localised_description = {"technology-description.qai-more-inserters-1"},
     icon = "__quick-adjustable-inserters__/graphics/technology/more-inserters-1.png",
     icon_size = 256, icon_mipmaps = 1,
     prerequisites = {"logistics-2"},
@@ -184,6 +192,8 @@ if check_setting("bobmods-inserters-more2") then
     return {
       type = "technology",
       name = "more-inserters-2",
+      localised_name = {"technology-name.qai-more-inserters-2"},
+      localised_description = {"technology-description.qai-more-inserters-2"},
       icon = "__quick-adjustable-inserters__/graphics/technology/more-inserters-2.png",
       icon_size = 256, icon_mipmaps = 1,
       prerequisites = {"more-inserters-1", "logistics-3"},
