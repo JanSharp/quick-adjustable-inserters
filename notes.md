@@ -5,8 +5,8 @@
 - [x] switch to idle and back when player changes force
 - [x] add player reach restriction
 - [x] impl disabled custom drop vectors
-- [x] impl only perpendicular
-- [x] impl only perpendicular and diagonal
+- [x] impl only cardinal
+- [x] impl only cardinal and diagonal
 - [x] detect and support inserters with already longer base range than 1
 - [x] support the technologies from bobinserters
   - [x] make inserter caches per force
@@ -51,7 +51,7 @@
 - [x] listen to destroy events to switch to idle as soon as possible
 - [x] maybe continuously check if the target inserter is still valid, so if the entity disappears without an event, we still clean up reasonably soon.
 - [x] maybe add a rendering circle on the inserter itself
-- [x] maybe detect inserters that are by default diagonal and allow them to be diagonal first, then perpendicular after research
+- [x] maybe detect inserters that are by default diagonal and allow them to be diagonal first, then cardinal after research
 - [x] maybe check if an inserter's default drop offset is far, center or near and use that information for auto determined drop positions. More exotic industries support, basically.
 - [x] add locale for invisible entities
 - [x] change all rendering to target a position, not the entity. That way being tick paused in the editor and having mods do weird stuff without raising an event doesn't make this mod look weird
@@ -81,7 +81,7 @@
   - [ ] remember which ones were touched in data updates and don't touch them again in final fixes
   - [ ] ignore hidden inserters
 - [ ] maybe add startup setting to normalize pickup vectors, snapping them to tile centers
-- [ ] use "cardinal" instead of "perpendicular"
+- [x] use "cardinal" instead of "perpendicular"
 - [ ] maybe add remote interface and api
   - [ ] api file which checks for the existence remote interfaces containing a certain name, and calls all of them (that is to support for example smart inserters implementing the same interface, and being enabled at the same time)
     - [ ] put the MIT license directly in the api file so others can copy it into their code. This allows for mods to implement the interface and replace quick adjustable inserters entirely without other mods using the api to have to change anything. It would "just work"

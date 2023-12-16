@@ -113,9 +113,9 @@ local animation_type = {
 ---@class TechnologyLevelQAI
 ---@field range integer
 ---@field drop_offset boolean
----@field perpendicular boolean @ Meaning horizontal and vertical. Couldn't find a better term.
+---@field cardinal boolean @ Meaning horizontal and vertical. Couldn't find a better term.
 ---@field diagonal boolean
----@field all_tiles boolean @ When true, `perpendicular` and `diagonal` are implied to also be true.
+---@field all_tiles boolean @ When true, `cardinal` and `diagonal` are implied to also be true.
 
 ---@alias PlayerStateQAI
 ---| "idle"
@@ -363,18 +363,18 @@ local function generate_tiles_cache(cache)
     return
   end
 
-  local perpendicular = tech_level.perpendicular
+  local cardinal = tech_level.cardinal
   local diagonal = tech_level.diagonal
-  assert(perpendicular or diagonal, "Having both perpendicular and diagonal be disabled means there is \z
+  assert(cardinal or diagonal, "Having both cardinal and diagonal be disabled means there is \z
     nowhere for an inserter to pickup from or drop to, which makes no sense."
   )
 
-  if cache.diagonal_by_default and perpendicular ~= diagonal then
-    perpendicular = not perpendicular
+  if cache.diagonal_by_default and cardinal ~= diagonal then
+    cardinal = not cardinal
     diagonal = not diagonal
   end
 
-  if perpendicular then
+  if cardinal then
     for y = max_range + 1, max_range + tile_height do
       for x = 1, tech_level.range * 2 do
         if x > tech_level.range then
@@ -2114,7 +2114,7 @@ local function update_tech_level_for_force(force)
     or long_inserters_1 and long_inserters_1.researched and 2
     or 1
   tech_level.drop_offset = near_inserters and near_inserters.researched or false
-  tech_level.perpendicular = true
+  tech_level.cardinal = true
   tech_level.all_tiles = more_inserters_2 and more_inserters_2.researched or false
   tech_level.diagonal = tech_level.all_tiles or more_inserters_1 and more_inserters_1.researched or false
   update_inserter_cache(force)

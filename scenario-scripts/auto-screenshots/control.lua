@@ -228,7 +228,7 @@ add_action(function()
   set_tech_level(global.force, {
     range = 3,
     drop_offset = false,
-    perpendicular = true,
+    cardinal = true,
     diagonal = true,
     all_tiles = false,
   })
@@ -291,7 +291,7 @@ add_actions_for_tech_icon_screenshot(
   {
     range = 1,
     drop_offset = true,
-    perpendicular = true,
+    cardinal = true,
     diagonal = false,
     all_tiles = false,
   }
@@ -304,7 +304,7 @@ add_actions_for_tech_icon_screenshot(
   {
     range = 2,
     drop_offset = false,
-    perpendicular = true,
+    cardinal = true,
     diagonal = false,
     all_tiles = false,
   }
@@ -317,7 +317,7 @@ add_actions_for_tech_icon_screenshot(
   {
     range = 3,
     drop_offset = false,
-    perpendicular = true,
+    cardinal = true,
     diagonal = false,
     all_tiles = false,
   }
@@ -330,7 +330,7 @@ add_actions_for_tech_icon_screenshot(
   {
     range = 3,
     drop_offset = false,
-    perpendicular = true,
+    cardinal = true,
     diagonal = true,
     all_tiles = false,
   }
@@ -343,7 +343,7 @@ add_actions_for_tech_icon_screenshot(
   {
     range = 3,
     drop_offset = false,
-    perpendicular = true,
+    cardinal = true,
     diagonal = true,
     all_tiles = true,
   }
