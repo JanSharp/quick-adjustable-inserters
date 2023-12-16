@@ -1466,7 +1466,7 @@ local function draw_pickup_highlight(player)
     surface = player.current_surface_index,
     forces = {player.force_index},
     color = color_step,
-    width = 3,
+    width = 2.999,
     left_top = left_top,
     right_bottom = right_bottom,
   }
@@ -1819,13 +1819,15 @@ end
 ---@param position MapPosition
 local function play_drop_highlight_animation(player, position)
   local color = get_finish_animation_color()
-  local left_top = {x = position.x - 43/256, y = position.y - 43/256} -- 43/256 ~= 1/6
-  local right_bottom = {x = position.x + 43/256, y = position.y + 43/256}
+  -- 44/256 ~= 1.7 . I had wanted ~1.6 however 42 and 43 would form non squares depending on where we are in a
+  -- tile. So 44 it is.
+  local left_top = {x = position.x - 44/256, y = position.y - 44/256}
+  local right_bottom = {x = position.x + 44/256, y = position.y + 44/256}
   local id = rendering.draw_rectangle{
     surface = player.current_surface_index,
     forces = {player.force_index},
     color = color,
-    width = 3,
+    width = 2.999,
     left_top = left_top,
     right_bottom = right_bottom,
   }
@@ -1863,7 +1865,7 @@ local function play_line_to_drop_highlight_animation(player, position)
   local from, to, length = get_from_and_to_for_line_from_center(
     player,
     vec.copy(position),
-    43/256
+    44/256
   )
   if not from then return end ---@cast to -nil
 
