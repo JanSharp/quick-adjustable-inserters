@@ -92,7 +92,7 @@
   - [x] trigger switch_to_idle (even though adjusting on a nil entity already does that)
   - [ ] trigger switch_to_idle_and_back
 - [x] make all qai prefixes lowercase, outside of type names of course
-- [ ] maybe always script disable while adjusting
+- [x] maybe always script disable while adjusting
 - [x] do not use rotate locale, just make your own for not being able to adjust enemy structures
 - [ ] maybe add nothing technology effects/modifies with descriptions
 - [x] or just add technology descriptions

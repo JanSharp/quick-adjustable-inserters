@@ -910,6 +910,15 @@ local function hide_inserter_speed_text(player)
   end
 end
 
+---@param player PlayerDataQAI
+---@param inserter LuaEntity
+local function deactivate_inserter(player, inserter)
+  if inserter.active then -- If another mod already deactivated it then this mod shall not reactivate it.
+    inserter.active = false
+    player.reactivate_inserter_when_done = true
+  end
+end
+
 ---@param inserter LuaEntity
 local function reactivate_inserter(inserter)
   if inserter.valid then
@@ -1622,6 +1631,7 @@ local function ensure_is_idle_and_try_set_target_inserter(player, target_inserte
     end
     return false
   end
+  deactivate_inserter(player, target_inserter)
   return true
 end
 
@@ -2015,10 +2025,6 @@ local function try_place_held_inserter_and_adjust_it(player, position, inserter_
   if not inserter.valid then return end
   switch_to_selecting_pickup(player, inserter)
   player.pipette_when_done = true
-  if inserter.active then -- If another mod already deactivated it then this mod shall not reactivate it.
-    inserter.active = false
-    player.reactivate_inserter_when_done = true
-  end
 end
 
 ---@param entity LuaEntity
