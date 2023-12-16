@@ -668,16 +668,16 @@ local function generate_direction_arrow_cache(cache)
   }
 end
 
----Centers the collision box both horizontally and vertically, by taking the distance from the center and
+---Centers the given box both horizontally and vertically, by taking the distance from the center and
 ---making both left and right have the same - higher - distance. Same goes for top and bottom.
----@param col_box BoundingBox
-local function normalize_collision_box(col_box)
-  local x_distance = math.max(-col_box.left_top.x, col_box.right_bottom.x)
-  local y_distance = math.max(-col_box.left_top.y, col_box.right_bottom.y)
-  col_box.left_top.x = -x_distance
-  col_box.left_top.y = -y_distance
-  col_box.right_bottom.x = x_distance
-  col_box.right_bottom.y = y_distance
+---@param box BoundingBox
+local function normalize_box(box)
+  local x_distance = math.max(-box.left_top.x, box.right_bottom.x)
+  local y_distance = math.max(-box.left_top.y, box.right_bottom.y)
+  box.left_top.x = -x_distance
+  box.left_top.y = -y_distance
+  box.right_bottom.x = x_distance
+  box.right_bottom.y = y_distance
 end
 
 ---@param inserter LuaEntityPrototype
@@ -685,8 +685,19 @@ end
 ---@return InserterCacheQAI
 local function generate_cache_for_inserter(inserter, tech_level)
   local range = tech_level.range
-  local col_box = inserter.collision_box
-  normalize_collision_box(col_box)
+  local collision_box = inserter.collision_box
+  local selection_box = inserter.selection_box
+  local relevant_box = {
+    left_top = {
+      x = math.min(collision_box.left_top.x, selection_box.left_top.x),
+      y = math.min(collision_box.left_top.y, selection_box.left_top.y),
+    },
+    right_bottom = {
+      x = math.max(collision_box.right_bottom.x, selection_box.right_bottom.x),
+      y = math.max(collision_box.right_bottom.y, selection_box.right_bottom.y),
+    },
+  }
+  normalize_box(relevant_box)
 
   -- These do not match the values from the prototype, because it seems that changing the pickup and drop
   -- positions does not care about being inside of the tile width/height of the inserter itself. It even
@@ -698,34 +709,34 @@ local function generate_cache_for_inserter(inserter, tech_level)
   local offset_from_inserter
   local placeable_off_grid = inserter.flags["placeable-off-grid"] or false
   if placeable_off_grid then
-    local col_width = col_box.right_bottom.x - col_box.left_top.x
-    local col_height = col_box.right_bottom.y - col_box.left_top.y
+    local col_width = relevant_box.right_bottom.x - relevant_box.left_top.x
+    local col_height = relevant_box.right_bottom.y - relevant_box.left_top.y
     tile_width = math.ceil(col_width)
     tile_height = math.ceil(col_height)
     offset_from_inserter = {
-      x = col_box.left_top.x - ((tile_width - col_width) / 2) - range,
-      y = col_box.left_top.y - ((tile_height - col_height) / 2) - range,
+      x = relevant_box.left_top.x - ((tile_width - col_width) / 2) - range,
+      y = relevant_box.left_top.y - ((tile_height - col_height) / 2) - range,
     }
   else
     local odd_width = (inserter.tile_width % 2) == 1
     local odd_height = (inserter.tile_height % 2) == 1
     local shifted_left_top = {
-      x = col_box.left_top.x + (odd_width and 0.5 or 0),
-      y = col_box.left_top.y + (odd_height and 0.5 or 0),
+      x = relevant_box.left_top.x + (odd_width and 0.5 or 0),
+      y = relevant_box.left_top.y + (odd_height and 0.5 or 0),
     }
     local snapped_left_top = {
       x = math.floor(shifted_left_top.x),
       y = math.floor(shifted_left_top.y),
     }
     local snapped_right_bottom = {
-      x = math.ceil(col_box.right_bottom.x + (odd_width and 0.5 or 0)),
-      y = math.ceil(col_box.right_bottom.y + (odd_height and 0.5 or 0)),
+      x = math.ceil(relevant_box.right_bottom.x + (odd_width and 0.5 or 0)),
+      y = math.ceil(relevant_box.right_bottom.y + (odd_height and 0.5 or 0)),
     }
     tile_width = snapped_right_bottom.x - snapped_left_top.x
     tile_height = snapped_right_bottom.y - snapped_left_top.y
     offset_from_inserter = {
-      x = col_box.left_top.x - (shifted_left_top.x - snapped_left_top.x) - range,
-      y = col_box.left_top.y - (shifted_left_top.y - snapped_left_top.y) - range,
+      x = relevant_box.left_top.x - (shifted_left_top.x - snapped_left_top.x) - range,
+      y = relevant_box.left_top.y - (shifted_left_top.y - snapped_left_top.y) - range,
     }
   end
 

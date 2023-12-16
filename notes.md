@@ -96,6 +96,6 @@
 - [x] do not use rotate locale, just make your own for not being able to adjust enemy structures
 - [ ] maybe add nothing technology effects/modifies with descriptions
 - [x] or just add technology descriptions
-- [ ] use both the selection box and collision box to determine the size of the inserter
+- [x] use both the selection box and collision box to determine the size of the inserter
 - [ ] auto detect more range technologies, simply by going sequentially (long-inserters-1, long-inserters-2, long-inserters-3, ...)
 - [ ] map setting to "only allow mirrored". Select the pickup position, and the drop off position has to be in the tile on the opposite side, such that those 2 tiles are mirrored at the inserter's center
