@@ -92,6 +92,14 @@ local function add_if_it_does_not_exist(prototype_type, name, prototype_getter)
   return prototype
 end
 
+---A non existent setting is treated as `true`.
+---@param name string @ Name of a bool setting.
+---@return boolean
+local function check_setting(name)
+  local setting = settings.startup[name]
+  return not setting or setting.value--[[@as boolean]]
+end
+
 add_if_it_does_not_exist("technology", "near-inserters", function()
   return {
     type = "technology",
@@ -109,43 +117,47 @@ add_if_it_does_not_exist("technology", "near-inserters", function()
   }--[[@as data.TechnologyPrototype]]
 end)
 
-add_if_it_does_not_exist("technology", "long-inserters-1", function()
-  return {
-    type = "technology",
-    name = "long-inserters-1",
-    icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-1.png",
-    icon_size = 256, icon_mipmaps = 1,
-    prerequisites = {"logistics"},
-    effects = {},
-    unit = {
-      count = 20,
-      ingredients = {{"automation-science-pack", 1}},
-      time = 15,
-    },
-    order = "a-e-a",
-  }--[[@as data.TechnologyPrototype]]
-end)
-
-add_if_it_does_not_exist("technology", "long-inserters-2", function()
-  return {
-    type = "technology",
-    name = "long-inserters-2",
-    icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-2.png",
-    icon_size = 256, icon_mipmaps = 1,
-    prerequisites = {"long-inserters-1", "chemical-science-pack"},
-    effects = {},
-    unit = {
-      count = 50,
-      ingredients = {
-        {"automation-science-pack", 1},
-        {"logistic-science-pack", 1},
-        {"chemical-science-pack", 1},
+if check_setting("bobmods-inserters-long1") then
+  add_if_it_does_not_exist("technology", "long-inserters-1", function()
+    return {
+      type = "technology",
+      name = "long-inserters-1",
+      icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-1.png",
+      icon_size = 256, icon_mipmaps = 1,
+      prerequisites = {"logistics"},
+      effects = {},
+      unit = {
+        count = 20,
+        ingredients = {{"automation-science-pack", 1}},
+        time = 15,
       },
-      time = 30,
-    },
-    order = "a-e-b",
-  }--[[@as data.TechnologyPrototype]]
-end)
+      order = "a-e-a",
+    }--[[@as data.TechnologyPrototype]]
+  end)
+end
+
+if check_setting("bobmods-inserters-long1") and check_setting("bobmods-inserters-long2") then
+  add_if_it_does_not_exist("technology", "long-inserters-2", function()
+    return {
+      type = "technology",
+      name = "long-inserters-2",
+      icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-2.png",
+      icon_size = 256, icon_mipmaps = 1,
+      prerequisites = {"long-inserters-1", "chemical-science-pack"},
+      effects = {},
+      unit = {
+        count = 50,
+        ingredients = {
+          {"automation-science-pack", 1},
+          {"logistic-science-pack", 1},
+          {"chemical-science-pack", 1},
+        },
+        time = 30,
+      },
+      order = "a-e-b",
+    }--[[@as data.TechnologyPrototype]]
+  end)
+end
 
 add_if_it_does_not_exist("technology", "more-inserters-1", function()
   return {
@@ -167,27 +179,29 @@ add_if_it_does_not_exist("technology", "more-inserters-1", function()
   }--[[@as data.TechnologyPrototype]]
 end)
 
-add_if_it_does_not_exist("technology", "more-inserters-2", function()
-  return {
-    type = "technology",
-    name = "more-inserters-2",
-    icon = "__quick-adjustable-inserters__/graphics/technology/more-inserters-2.png",
-    icon_size = 256, icon_mipmaps = 1,
-    prerequisites = {"more-inserters-1", "logistics-3"},
-    effects = {},
-    unit = {
-      count = 50,
-      ingredients = {
-        {"automation-science-pack", 1},
-        {"logistic-science-pack", 1},
-        {"chemical-science-pack", 1},
-        {"production-science-pack", 1},
+if check_setting("bobmods-inserters-more2") then
+  add_if_it_does_not_exist("technology", "more-inserters-2", function()
+    return {
+      type = "technology",
+      name = "more-inserters-2",
+      icon = "__quick-adjustable-inserters__/graphics/technology/more-inserters-2.png",
+      icon_size = 256, icon_mipmaps = 1,
+      prerequisites = {"more-inserters-1", "logistics-3"},
+      effects = {},
+      unit = {
+        count = 50,
+        ingredients = {
+          {"automation-science-pack", 1},
+          {"logistic-science-pack", 1},
+          {"chemical-science-pack", 1},
+          {"production-science-pack", 1},
+        },
+        time = 30,
       },
-      time = 30,
-    },
-    order = "c-n-b",
-  }--[[@as data.TechnologyPrototype]]
-end)
+      order = "c-n-b",
+    }--[[@as data.TechnologyPrototype]]
+  end)
+end
 
 -- HACK: this is super temporary, see notes.md
 for _, inserter in pairs(data.raw["inserter"]) do

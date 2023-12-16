@@ -75,7 +75,8 @@
 - [x] change hard dependency on bobinserters to hidden optional (for mod load order)
 - [x] add own technologies with the same names and own custom icons
   - [ ] revisit icons, probably using the inserter tech icon and adding something to it in gimp
-- [ ] add startup settings just like bobinserters, even with the same name, but only if they don't exist already
+  - [ ] locale name and descriptions
+- [x] add startup settings just like bobinserters, even with the same name, but only if they don't exist already
 - [ ] add logic in data updates and final fixes to enable runtime adjustable vectors
   - [ ] remember which ones were touched in data updates and don't touch them again in final fixes
   - [ ] ignore hidden inserters
