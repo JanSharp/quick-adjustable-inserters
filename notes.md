@@ -77,9 +77,9 @@
   - [ ] revisit icons, probably using the inserter tech icon and adding something to it in gimp
   - [x] locale name and descriptions
 - [x] add startup settings just like bobinserters, even with the same name, but only if they don't exist already
-- [ ] add logic in data updates and final fixes to enable runtime adjustable vectors
-  - [ ] remember which ones were touched in data updates and don't touch them again in final fixes
-  - [ ] ignore hidden inserters
+- [x] add logic in data updates and final fixes to enable runtime adjustable vectors
+  - [x] remember which ones were touched in data updates and don't touch them again in final fixes
+  - [x] ignore hidden inserters
 - [ ] maybe add startup setting to normalize pickup vectors, snapping them to tile centers
 - [x] use "cardinal" instead of "perpendicular"
 - [ ] maybe add remote interface and api

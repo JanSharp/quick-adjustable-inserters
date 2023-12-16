@@ -2,6 +2,10 @@
 -- This file is not shipped with the final package, so pcall require it is.
 pcall(require, "__quick-adjustable-inserters__.data_for_auto_screenshots")
 
+local data_core = require("__quick-adjustable-inserters__.data_core")
+
+data_core.modify_existing_inserters()
+
 local function make_selectable(params)
   return {
     type = "simple-entity-with-owner",
@@ -211,9 +215,4 @@ if check_setting("bobmods-inserters-more2") then
       order = "c-n-b",
     }--[[@as data.TechnologyPrototype]]
   end)
-end
-
--- HACK: this is super temporary, see notes.md
-for _, inserter in pairs(data.raw["inserter"]) do
-  inserter.allow_custom_vectors = true
 end
