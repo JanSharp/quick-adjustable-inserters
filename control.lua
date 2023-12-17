@@ -2359,6 +2359,7 @@ script.on_event(ev.on_tick, function(event)
   local player = active_players[next_index]
   if player then
     update_active_player(player)
+    active_players.next_index = next_index + 1
   else
     active_players.next_index = 1
   end
