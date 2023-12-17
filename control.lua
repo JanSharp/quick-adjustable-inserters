@@ -2247,6 +2247,7 @@ local function update_active_player(player)
     switch_to_idle(player)
     return
   end
+  deactivate_inserter(player, inserter)
   local position = inserter.position
   local prev_position = player.target_inserter_position
   if inserter.direction ~= player.target_inserter_direction
