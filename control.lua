@@ -1163,8 +1163,7 @@ end
 
 ---@param player PlayerDataQAI
 local function draw_direction_arrow(player)
-  local inserter = player.target_inserter
-  local inserter_position = inserter.position
+  local inserter_position = player.target_inserter_position
   local cache = player.target_inserter_cache
   inserter_position.x = inserter_position.x + cache.offset_from_inserter.x + cache.direction_arrow_position.x
   inserter_position.y = inserter_position.y + cache.offset_from_inserter.y + cache.direction_arrow_position.y
@@ -1174,7 +1173,7 @@ local function draw_direction_arrow(player)
     forces = {player.force_index},
     color = color_step,
     vertices = player.target_inserter_cache.direction_arrow_vertices,
-    orientation = inserter.orientation,
+    orientation = player.target_inserter.orientation,
     target = inserter_position,
   }
   if do_animate then
