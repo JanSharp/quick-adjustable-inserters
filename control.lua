@@ -1382,7 +1382,7 @@ local function estimate_inserter_speed(player, selected_position)
   if player.state == "selecting-pickup" then
     inserter_throughput.set_from_based_on_position(
       def,
-      target_inserter.surface,
+      player.current_surface,
       player.target_inserter_position,
       selected_position
     )
@@ -1391,7 +1391,7 @@ local function estimate_inserter_speed(player, selected_position)
     inserter_throughput.set_from_based_on_inserter(def, target_inserter)
     inserter_throughput.set_to_based_on_position(
       def,
-      target_inserter.surface,
+      player.current_surface,
       player.target_inserter_position,
       calculate_actual_drop_position(player, selected_position)
     )
