@@ -1337,8 +1337,8 @@ local function draw_all_rendering_objects(player)
   if player.inserter_circle_id then return end
   draw_direction_arrow(player)
   draw_circle_on_inserter(player)
-  draw_grid_lines(player)
   draw_grid_background(player)
+  draw_grid_lines(player)
 end
 
 ---@param player PlayerDataQAI

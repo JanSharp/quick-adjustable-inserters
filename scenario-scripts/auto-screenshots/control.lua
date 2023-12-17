@@ -130,6 +130,7 @@ local function un_pre_multiply_colors()
   end
 end
 
+---TODO: This is very most likely redundant, see the commit in which this note got added. I've just not tested it.
 local function push_transparent_background_back()
   local bring_to_front_afterwards = {}
   for _, id in pairs(rendering.get_all_ids()) do
