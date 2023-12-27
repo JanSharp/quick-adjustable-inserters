@@ -101,3 +101,4 @@
 - [x] use both the selection box and collision box to determine the size of the inserter
 - [ ] auto detect more range technologies, simply by going sequentially (long-inserters-1, long-inserters-2, long-inserters-3, ...)
 - [ ] map setting to "only allow mirrored". Select the pickup position, and the drop off position has to be in the tile on the opposite side, such that those 2 tiles are mirrored at the inserter's center
+- [ ] improve rotation state tracking. I don't know why yet but when play testing there's several times where using place and adjust places the inserter in the wrong direction and I didn't do anything that I'd expect to actually cause that to happen, because I know it will happen sometimes no matter what. But yea, investigate this.
