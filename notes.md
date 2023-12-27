@@ -39,7 +39,10 @@
   - [x] upon leaving, restore the cursor, if possible and if it didn't change through other means in the mean time
   - [x] setting to not restore cursor when leaving. Even though I believe there's little reason to disable this, by having that setting there mentioning that you can use the key bind to place an inserter it ultimately makes that feature more discoverable. That's a good enough reason to keep the setting.
   - [ ] maybe place ghosts when the player cannot reach? That is if ghost support gets added.
-- [ ] support ghosts, if possible (I think it is)
+- [x] support ghosts, if possible (I think it is)
+  - [ ] support a ghost becoming real (reviving)
+  - [ ] support an entity becoming a ghost (dieing)
+  - [ ] if a ghost became real, do not stop adjusting because of being "out of range". Just pretend there was no range limitation until the player is done adjusting
 - [x] support inserters of any size, and off grid
 - [x] handle multiplayer
   - [x] switch to idle when leaving

@@ -2,18 +2,31 @@
 local inserter_throughput = require("__inserter-throughput-lib__.api")
 local vec = require("__inserter-throughput-lib__.vector")
 
----cSpell:ignore rects
+---cSpell:ignore rects, IDQAI
+
+---Unique table for a ghost in the world. So multiple LuaEntity instances can evaluate to the same id.
+---Specifically when they are actually a reference to the same ghost entity in the world.\
+---Must store information purely to be able to remove the id from the `global.ghosts_id` table again, because
+---the entity may be destroyed before the id gets removed.
+---@class EntityGhostIDQAI
+---@field surface_index uint32
+---@field x double
+---@field y double
+
+---`unit_number` or a unique table for ghosts which don't have a `ghost_unit_number`.
+---@alias EntityIDQAI uint32|EntityGhostIDQAI
 
 ---@class GlobalDataQAI
 ---@field players table<int, PlayerDataQAI>
 ---@field forces table<uint8, ForceDataQAI>
----@field inserters_in_use table<uint32, PlayerDataQAI> @ Indexed by inserter unit_number.
+---@field inserters_in_use table<EntityIDQAI, PlayerDataQAI>
 ---@field active_players PlayerDataQAI[]|{count: integer, next_index: integer}
 ---@field active_animations AnimationQAI[]|{count: integer}
 ---Selectable entity unit number => player data.
 ---@field selectable_entities_to_player_lut table<uint32, PlayerDataQAI>
 ---Selectable entity unit number => entity with that unit number.
 ---@field selectable_entities_by_unit_number table<uint32, LuaEntity>
+---@field ghost_ids table<uint32, table<double, table<double, EntityGhostIDQAI>>>
 global = {}
 
 ---@alias AnimationQAI
@@ -134,7 +147,7 @@ local animation_type = {
 ---@field state PlayerStateQAI
 ---@field index_in_active_players integer @ `nil` when idle.
 ---`nil` when idle. Must be stored, because we can switch to idle _after_ an entity has been invalidated.
----@field target_inserter_unit_number uint32
+---@field target_inserter_id EntityIDQAI
 ---@field target_inserter LuaEntity @ `nil` when idle.
 ---@field target_inserter_cache InserterCacheQAI @ `nil` when idle.
 ---@field target_inserter_position MapPosition @ `nil` when idle.
@@ -786,10 +799,104 @@ local function generate_cache_for_inserter(inserter, tech_level)
   return cache
 end
 
+---This is effectively adding a field to the LuaEntity class, it's just that you do `is_ghost[entity]` instead
+---of `entity.is_ghost`.
+---
+---It is also abusing the fact that the type of an entity is static, allowing this table to cache whether an
+---entity is a ghost or not, without actually storing the data in `global`. But why? In order to prematurely
+---optimize the code by reducing the amount of api calls and (interned) string creations there are, because an
+---entity gets checked for being a ghost multiple times throughout several code paths. And I mean hey, the
+---difference between `is_ghost(entity)` and `is_ghost[entity]` is pretty minor, it's just the implementation
+---that's different.
+---@type table<LuaEntity, boolean>
+local is_ghost = setmetatable({}, {
+  __mode = "k", -- Weak keys, so it doesn't keep the LuaEntity objects alive.
+  ---@param tab table<LuaEntity, boolean>
+  ---@param entity LuaEntity
+  __index = function(tab, entity)
+    local result = entity.type == "entity-ghost"
+    tab[entity] = result
+    return result
+  end,
+})
+
 ---@param entity LuaEntity
----@param name string
-local function is_entity_or_ghost(entity, name)
-  return entity.name == name or entity.type == "entity-ghost" and entity.ghost_name == name
+---@return boolean
+local function is_real_or_ghost_inserter(entity)
+  return (is_ghost[entity] and entity.ghost_type or entity.type) == "inserter"
+end
+
+---@param entity LuaEntity
+---@return string
+local function get_real_or_ghost_name(entity)
+  return is_ghost[entity] and entity.ghost_name or entity.name
+end
+
+---@param entity LuaEntity @ Must not be a ghost of a tile.
+---@return LuaEntityPrototype
+local function get_real_or_ghost_prototype(entity)
+  return is_ghost[entity] and entity.ghost_prototype--[[@as LuaEntityPrototype]] or entity.prototype
+end
+
+---@param inserter LuaEntity
+---@return EntityIDQAI?
+local function get_id(inserter)
+  if not is_ghost[inserter] then return inserter.unit_number end
+  local unit_number = inserter.ghost_unit_number
+  if unit_number then return unit_number end
+  -- The following code is just the annoying way of writing:
+  -- return global.ghost_ids[inserter.surface_index]?[inserter.position.x]?[inserter.position.y]
+  local x_lut = global.ghost_ids[inserter.surface_index]
+  if not x_lut then return end
+  local position = inserter.position
+  local y_lut = x_lut[position.x]
+  if not y_lut then return end
+  return y_lut[position.y]
+end
+
+---@generic K
+---@generic V : table
+---@param tab table<K, V>
+---@param key K
+---@return V value
+local function get_or_create_table(tab, key)
+  local value = tab[key]
+  if value then return value end
+  value = {}
+  tab[key] = value
+  return value
+end
+
+---@param inserter LuaEntity
+---@return EntityIDQAI
+local function get_or_create_id(inserter)
+  if not is_ghost[inserter] then return inserter.unit_number end
+  local unit_number = inserter.ghost_unit_number
+  if unit_number then return unit_number end
+  local surface_index = inserter.surface_index
+  local position = inserter.position
+  local x = position.x
+  local y = position.y
+  local f = get_or_create_table -- This is so dumb, but it somehow actually makes it more readable. What?
+  local id = f(f(f(global.ghost_ids, surface_index), x), y)
+  if not id.surface_index then
+    id.surface_index = surface_index
+    id.x = x
+    id.y = y
+  end
+  return id
+end
+
+---@param id EntityIDQAI
+local function remove_id(id)
+  if type(id) == "number" then return end
+  local x_lut = global.ghost_ids[id.surface_index]
+  local y_lut = x_lut[id.x]
+  y_lut[id.y] = nil
+  if next(y_lut) then return end
+  x_lut[id.x] = nil
+  -- Do not remove the table from global.ghost_ids, because its keys are just the surface index, so those will
+  -- get reused quite frequently. x and y positions will be different 99% of the time however.
 end
 
 ---@param entities uint32[]
@@ -913,6 +1020,7 @@ end
 ---@param player PlayerDataQAI
 ---@param inserter LuaEntity
 local function deactivate_inserter(player, inserter)
+  if is_ghost[inserter] then return end -- Ghosts are always inactive.
   if inserter.active then -- If another mod already deactivated it then this mod shall not reactivate it.
     inserter.active = false
     player.reactivate_inserter_when_done = true
@@ -921,6 +1029,7 @@ end
 
 ---@param inserter LuaEntity
 local function reactivate_inserter(inserter)
+  if is_ghost[inserter] then return end -- Ghosts are always inactive.
   if inserter.valid then
     inserter.active = true
   end
@@ -959,6 +1068,7 @@ local function restore_after_adjustment(player, target_inserter)
     if not player.pipette_after_place_and_adjust or not target_inserter.valid then goto leave_pipette end
     local name = player.pipette_copies_vectors and target_inserter.name
     player.player.pipette_entity(target_inserter)
+    -- TODO: should this accept it if the entity changed between being real or a ghost? both directions are possible.
     if not player.pipette_copies_vectors or not target_inserter.valid then goto leave_pipette end
     local cursor = player.player.cursor_stack
     local place_result = cursor and cursor.valid_for_read and cursor.prototype.place_result
@@ -988,9 +1098,10 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   if not keep_rendering then
     destroy_all_rendering_objects(player)
   end
-  global.inserters_in_use[player.target_inserter_unit_number] = nil
+  remove_id(player.target_inserter_id)
+  global.inserters_in_use[player.target_inserter_id] = nil
   remove_active_player(player)
-  player.target_inserter_unit_number = nil
+  player.target_inserter_id = nil
   local target_inserter = player.target_inserter
   player.target_inserter = nil
   player.target_inserter_cache = nil
@@ -1383,7 +1494,8 @@ local function estimate_inserter_speed(player, selected_position)
       def,
       player.current_surface,
       player.target_inserter_position,
-      selected_position
+      selected_position,
+      target_inserter
     )
     inserter_throughput.set_to_based_on_inserter(def, target_inserter)
   else
@@ -1392,7 +1504,8 @@ local function estimate_inserter_speed(player, selected_position)
       def,
       player.current_surface,
       player.target_inserter_position,
-      calculate_actual_drop_position(player, selected_position)
+      calculate_actual_drop_position(player, selected_position),
+      target_inserter
     )
   end
 
@@ -1401,13 +1514,13 @@ end
 
 ---@param inserter LuaEntity
 local function estimate_inserter_speed_for_inserter(inserter)
-  local prototype = inserter.prototype
+  local prototype = get_real_or_ghost_prototype(inserter)
   ---@type InserterThroughputDefinition
   local def = {
     extension_speed = prototype.inserter_extension_speed,
     rotation_speed = prototype.inserter_rotation_speed,
     chases_belt_items = prototype.inserter_chases_belt_items,
-    stack_size = inserter.inserter_target_pickup_count,
+    stack_size = inserter.inserter_target_pickup_count, -- This works on ghosts.
   }
   inserter_throughput.set_from_based_on_inserter(def, inserter)
   inserter_throughput.set_to_based_on_inserter(def, inserter)
@@ -1436,7 +1549,7 @@ function update_inserter_speed_text(player)
   end
 
   if player.show_throughput_on_inserter
-    and selected.type == "inserter"
+    and is_real_or_ghost_inserter(selected)
     and selected.force.is_friend(player.force_index)
   then
     update_inserter_speed_text_using_inserter(player, selected)
@@ -1573,7 +1686,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
   local force = global.forces[player.force_index]
   if not force then return false end
 
-  local cache = force.inserter_cache_lut[target_inserter.name]
+  local cache = force.inserter_cache_lut[get_real_or_ghost_name(target_inserter)]
   if not cache then
     return show_error(player, {"qai.cant-change-inserter-at-runtime"})
   end
@@ -1587,14 +1700,14 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
     return show_error(player, {"cant-reach"})
   end
 
-  local unit_number = target_inserter.unit_number ---@cast unit_number -nil
-  if global.inserters_in_use[unit_number] then
+  local id = get_or_create_id(target_inserter)
+  if global.inserters_in_use[id] then
     return show_error(player, {"qai.only-one-player-can-adjust"})
   end
 
-  global.inserters_in_use[unit_number] = player
+  global.inserters_in_use[id] = player
   add_active_player(player)
-  player.target_inserter_unit_number = unit_number
+  player.target_inserter_id = id
   player.target_inserter = target_inserter
   player.target_inserter_cache = cache
   player.target_inserter_position = target_inserter.position
@@ -1681,6 +1794,7 @@ local function switch_to_idle_and_back(player, do_check_reach)
   local target_inserter = player.target_inserter
   local selecting_pickup = player.state == "selecting-pickup"
   switch_to_idle(player, false, true)
+  -- TODO: should this accept it if the entity changed between being real or a ghost? both directions are possible.
   if not target_inserter.valid or player.state ~= "idle" then
     forget_about_restoring(player, target_inserter)
     return
@@ -1695,6 +1809,7 @@ end
 ---@param player PlayerDataQAI
 ---@return boolean
 local function validate_target_inserter(player)
+  -- TODO: this function and everywhere it's used should most likely accept changing from ghost to real and vice versa.
   local is_valid = player.target_inserter.valid
   if not is_valid then
     switch_to_idle(player)
@@ -2038,13 +2153,13 @@ end
 ---@type table<string, fun(player: PlayerDataQAI, selected: LuaEntity)>
 local on_adjust_handler_lut = {
   ["idle"] = function(player, selected)
-    if selected.type ~= "inserter" then return end
+    if not is_real_or_ghost_inserter(selected) then return end
     switch_to_selecting_pickup(player, selected, true)
   end,
 
   ["selecting-pickup"] = function(player, selected)
     if not validate_target_inserter(player) then return end
-    if selected.type == "inserter" then
+    if is_real_or_ghost_inserter(selected) then
       if selected == player.target_inserter then
         switch_to_selecting_drop(player, selected)
       else
@@ -2066,7 +2181,7 @@ local on_adjust_handler_lut = {
 
   ["selecting-drop"] = function(player, selected)
     if not validate_target_inserter(player) then return end
-    if selected.type == "inserter" then
+    if is_real_or_ghost_inserter(selected) then
       if selected == player.target_inserter then
         play_finish_animation(player)  -- Before switching to idle because some rendering objects get reused.
         switch_to_idle(player)
@@ -2243,6 +2358,7 @@ end
 local function update_active_player(player)
   local inserter = player.target_inserter
   if not inserter.valid then
+    -- TODO: check if it switched between being real/ghost
     switch_to_idle(player)
     return
   end
@@ -2433,10 +2549,10 @@ script.on_event(ev.on_player_pipette, function(event)
   if not inverse_direction_lut[direction] then return end
   player.last_used_direction = direction
 
-  if not player.pipette_copies_vectors or selected.type ~= "inserter" then return end
+  if not player.pipette_copies_vectors or not is_real_or_ghost_inserter(selected) then return end
   local force = global.forces[player.force_index]
   if not force then return end
-  local name = selected.name
+  local name = get_real_or_ghost_name(selected)
   local cache = force.inserter_cache_lut[name]
   if not cache then return end
   save_pipetted_vectors(player, name, selected)
@@ -2477,7 +2593,7 @@ script.on_event(ev.on_entity_settings_pasted, function(event)
   end
   local destination = event.destination
   if destination.type ~= "inserter" then return end
-  player = global.inserters_in_use[destination.unit_number]
+  player = global.inserters_in_use[get_id(destination)] ---@cast player PlayerDataQAI?
   if not player then return end
   switch_to_idle_and_back(player)
   update_inserter_speed_text(player)
@@ -2516,7 +2632,7 @@ do
       -- them. Making it update for them is not worth the performance cost or complexity.
       update_inserter_speed_text(player)
     end
-    player = global.inserters_in_use[event.entity.unit_number] ---@cast player PlayerDataQAI
+    player = global.inserters_in_use[get_id(event.entity)] ---@cast player PlayerDataQAI?
     if player then
       switch_to_idle_and_back(player, do_check_reach)
     end
@@ -2532,11 +2648,12 @@ for _, destroy_event in pairs{
 do
   ---@param event EventData.on_entity_died|EventData.on_robot_mined_entity|EventData.on_player_mined_entity|EventData.script_raised_destroy
   script.on_event(destroy_event, function(event)
-    local player = global.inserters_in_use[event.entity.unit_number]
+    local player = global.inserters_in_use[get_id(event.entity)] ---@cast player PlayerDataQAI?
     if not player then return end
     switch_to_idle(player)
   end, {
     {filter = "type", type = "inserter"},
+    {mode = "or", filter = "ghost_type", type = "inserter"},
   })
 end
 
@@ -2546,7 +2663,7 @@ script.on_event(ev.on_built_entity, function(event)
   local expected_name = player.pipetted_inserter_name
   if not expected_name then return end
   local entity = event.created_entity
-  if not is_entity_or_ghost(entity, expected_name) then return end
+  if get_real_or_ghost_name(entity) ~= expected_name then return end
   local direction = entity.direction
   if not inverse_direction_lut[direction] then return end
   local rotation = rotation_matrix_lut[direction]
@@ -2645,6 +2762,7 @@ script.on_init(function()
     active_animations = {count = 0},
     selectable_entities_to_player_lut = {},
     selectable_entities_by_unit_number = {},
+    ghost_ids = {},
   }
   for _, force in pairs(game.forces) do
     init_force(force)
