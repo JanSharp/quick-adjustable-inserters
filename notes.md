@@ -38,7 +38,8 @@
   - [x] upon entering, clear the cursor
   - [x] upon leaving, restore the cursor, if possible and if it didn't change through other means in the mean time
   - [x] setting to not restore cursor when leaving. Even though I believe there's little reason to disable this, by having that setting there mentioning that you can use the key bind to place an inserter it ultimately makes that feature more discoverable. That's a good enough reason to keep the setting.
-  - [ ] maybe place ghosts when the player cannot reach? That is if ghost support gets added.
+  - [x] maybe place ghosts when the player cannot reach? That is if ghost support gets added.
+  - [x] place ghosts if the cursor is a ghost, not an actual item
 - [x] support ghosts, if possible (I think it is)
   - [ ] support a ghost becoming real (reviving)
   - [ ] support an entity becoming a ghost (dieing)

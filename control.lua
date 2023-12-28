@@ -92,6 +92,7 @@ local animation_type = {
 ---@class InserterCacheQAI
 ---@field prototype LuaEntityPrototype
 ---@field tech_level TechnologyLevelQAI
+---@field min_extra_reach_distance number @ The minimum extra reach distance when building this entity.
 ---@field diagonal_by_default boolean
 ---@field default_drop_offset_multiplier -1|0|1 @ -1 = near, 0 = center, 1 = far. Vanilla is all far, fyi.
 ---@field min_extra_build_distance number @ The minimum extra reach distance when building this entity.
@@ -845,6 +846,16 @@ local function get_real_or_ghost_prototype(entity)
   return is_ghost[entity] and entity.ghost_prototype--[[@as LuaEntityPrototype]] or entity.prototype
 end
 
+---@param surface LuaSurface
+---@param name string
+---@param position MapPosition
+---@return LuaEntity?
+local function find_ghost_entity(surface, name, position)
+  local ghost = surface.find_entity("entity-ghost", position)
+  if not ghost then return nil end
+  return ghost.ghost_name == name and ghost or nil
+end
+
 ---@param inserter LuaEntity
 ---@return EntityIDQAI?
 local function get_id(inserter)
@@ -1061,6 +1072,26 @@ local function save_pipetted_vectors(player, inserter_name, inserter)
   player.pipetted_drop_vector = vec.transform_by_matrix(rotation, vec.sub(inserter.drop_position, position))
 end
 
+---@param player PlayerDataQAI
+---@return LuaItemPrototype?
+---@return boolean is_cursor_ghost
+local function get_cursor_item_prototype(player)
+  local actual_player = player.player
+  local cursor = actual_player.cursor_stack
+  if cursor and cursor.valid_for_read then
+    return cursor.prototype, false
+  end
+  return actual_player.cursor_ghost--[[@as LuaItemPrototype?]], true
+end
+
+---@param player PlayerDataQAI
+---@return LuaEntityPrototype?
+---@return boolean is_cursor_ghost
+local function get_cursor_item_place_result(player)
+  local item_prototype, is_cursor_ghost = get_cursor_item_prototype(player)
+  return item_prototype and item_prototype.place_result, is_cursor_ghost
+end
+
 ---Can raise an event.
 ---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
@@ -1073,12 +1104,25 @@ local function restore_after_adjustment(player, target_inserter)
   if player.pipette_when_done then
     player.pipette_when_done = nil
     if not player.pipette_after_place_and_adjust or not target_inserter.valid then goto leave_pipette end
-    local name = player.pipette_copies_vectors and target_inserter.name
-    player.player.pipette_entity(target_inserter)
+    local name = get_real_or_ghost_name(target_inserter)
+    player.player.pipette_entity(is_ghost[target_inserter] and name or target_inserter)
+    -- Manually set the cursor_ghost for 2 reasons:
+    -- 1) pipette_entity does not set a ghost cursor even though the "Pick ghost item if no items are available"
+    --    setting is enabled.
+    -- 2) the pipette_when_done feature works in cohesion with place and adjust feature. Therefore the point
+    --    is for the player to be able to place an inserter ghost, adjust it immediately, and then continue
+    --    placing ghosts. So basically this doesn't care about the setting mentioned above.
+    -- There is the issue that the game plays the error sound in the pipette_entity call when the player does
+    -- not have any items to build that inserter anymore. That is how it is.
+    local cursor = player.player.cursor_stack
+    if cursor and not cursor.valid_for_read and not player.player.cursor_ghost then
+      local items = (game.entity_prototypes[name]--[[@as LuaEntityPrototype]]).items_to_place_this
+      local item = items and items[1]
+      player.player.cursor_ghost = item and item.name
+    end
     -- TODO: should this accept it if the entity changed between being real or a ghost? both directions are possible.
     if not player.pipette_copies_vectors or not target_inserter.valid then goto leave_pipette end
-    local cursor = player.player.cursor_stack
-    local place_result = cursor and cursor.valid_for_read and cursor.prototype.place_result
+    local place_result = get_cursor_item_place_result(player)
     if place_result and place_result.name == name then
       save_pipetted_vectors(player, name--[[@as string]], target_inserter)
     end
@@ -2114,39 +2158,140 @@ local function play_finish_animation(player)
   play_line_to_pickup_highlight_animation(player)
 end
 
+---This appears to match the game's snapping logic perfectly.
+---And we must do this here in order for find_entity to actually find the inserter we just placed, because
+---find_entity goes by collision boxes and inserters do not take up entire tiles. Basically nothing does.
+---Note that if it went by position we'd also have to do this. So that detail doesn't really matter.
+---@param position MapPosition @ Gets modified.
+---@param cache InserterCacheQAI
+local function snap_build_position(position, cache)
+  if cache.placeable_off_grid then return end
+  position.x = (cache.prototype.tile_width % 2) == 0
+    and math.floor(position.x + 0.5) -- even
+    or math.floor(position.x) + 0.5 -- odd
+  position.y = (cache.prototype.tile_height % 2) == 0
+    and math.floor(position.y + 0.5) -- even
+    or math.floor(position.y) + 0.5 -- odd
+end
+
+---@param actual_player LuaPlayer
+---@param args LuaPlayer.build_from_cursor_param
+---@param cache InserterCacheQAI
+---@return LuaEntity? built_entity
+local function brute_force_it(actual_player, args, cache)
+  return actual_player.surface.create_entity{
+    name = "entity-ghost",
+    inner_name = cache.prototype.name,
+    position = args.position,
+    direction = args.direction,
+    player = actual_player,
+    force = actual_player.force,
+    raise_built = true,
+  }
+end
+
+---@param actual_player LuaPlayer
+---@param item_prototype LuaItemPrototype
+local function try_reset_cursor(actual_player, item_prototype)
+  local cursor = actual_player.cursor_stack
+  if not cursor then return end
+  if cursor.valid_for_read and cursor.name == item_prototype.name then
+    -- Best guesses to delete the previously spawned in item, could actually be deleting an item it shouldn't.
+    -- But at that point the other mod is likely doing some weird stuff.
+    if cursor.count == 1 then
+      cursor.clear()
+    else
+      cursor.count = cursor.count - 1
+    end
+  end
+  cursor = actual_player.cursor_stack
+  if cursor and not cursor.valid_for_read then
+    actual_player.cursor_ghost = item_prototype
+  end
+end
+
+---@param actual_player LuaPlayer
+---@param args LuaPlayer.build_from_cursor_param
+---@param cache InserterCacheQAI
+---@return LuaEntity? built_entity @ Guaranteed to be valid (when not `nil` of course).
+local function build_from_cursor_ghost(actual_player, args, cache)
+  local item_prototype = actual_player.cursor_ghost--[[@as LuaItemPrototype]]
+  local surface = actual_player.surface
+
+  -- Initial validation (do nothing if it is a spectator).
+  local cursor = actual_player.cursor_stack
+  if not cursor then return nil end
+
+  cursor.set_stack{name = item_prototype.name, count = 1}
+
+  -- Validation after set_stack.
+  if not surface.valid or actual_player.surface_index ~= surface.index then
+    try_reset_cursor(actual_player, item_prototype)
+    return nil
+  end
+  cursor = actual_player.cursor_stack -- Refetch just in case the controller changed multiple times in between.
+  if not cursor or not cursor.valid_for_read or cursor.name ~= item_prototype.name then
+    local built_entity = brute_force_it(actual_player, args, cache)
+    try_reset_cursor(actual_player, item_prototype)
+    return built_entity and built_entity.valid and built_entity or nil
+  end
+
+  -- Validation passed, build ghost from cursor.
+  actual_player.build_from_cursor(args)
+  local built_entity = surface.valid and find_ghost_entity(surface, cache.prototype.name, args.position) or nil
+  try_reset_cursor(actual_player, item_prototype)
+  return built_entity and built_entity.valid and built_entity or nil
+end
+
+---This logic deciding between real or ghost building does not match the game's logic. There are several
+---cases where this will choose to build a ghost sooner than the game would consider it out of range,
+---especially on diagonals. However for simplicity this is good enough, and it does take the collision box
+---of the inserter into account at least a little bit. And it never causes a "cannot reach" floating text.
 ---@param player PlayerDataQAI
 ---@param position MapPosition
 ---@param cache InserterCacheQAI
-local function try_place_held_inserter_and_adjust_it(player, position, cache)
-  ---@type LuaPlayer.can_build_from_cursor_param|LuaPlayer.build_from_cursor_param
-  local args = {
-    position = position,
-    direction = player.last_used_direction,
-  }
+---@return boolean
+local function is_within_build_range(player, position, cache)
   local actual_player = player.player
-  if not actual_player.can_build_from_cursor(args--[[@as LuaPlayer.can_build_from_cursor_param]]) then return end
-  -- This appears to match the game's snapping logic perfectly.
-  -- And we must do this here in order for find_entity to actually find the inserter we just placed, because
-  -- find_entity goes by collision boxes and inserters do not take up entire tiles. Basically nothing does.
-  -- Note that if it went by position we'd also have to do this. So that detail doesn't really matter.
-  if not cache.placeable_off_grid then
-    position.x = (cache.prototype.tile_width % 2) == 0
-      and math.floor(position.x + 0.5) -- even
-      or math.floor(position.x) + 0.5 -- odd
-    position.y = (cache.prototype.tile_height % 2) == 0
-      and math.floor(position.y + 0.5) -- even
-      or math.floor(position.y) + 0.5 -- odd
-  end
-  -- This logic deciding between real or ghost building does not match the game's logic. There are several
-  -- cases where this will choose to build a ghost sooner than the game would consider it out of range,
-  -- especially on diagonals. However for simplicity this is good enough, and it does take the collision box
-  -- of the inserter into account at least a little bit. And it never causes a "cannot reach" floating text.
   -- + 1/256 just to make sure there are no rare edge cases where it ends up being off by 1.
   local distance = vec.get_length(vec.sub(actual_player.position, position)) + 1/256
   -- And greater _equals_ for the same potential edge cases.
-  args.alt = distance >= actual_player.build_distance + cache.min_extra_build_distance
-  actual_player.build_from_cursor(args--[[@as LuaPlayer.build_from_cursor_param]])
-  local inserter = actual_player.surface.find_entity(cache.prototype.name, position)
+  return distance >= actual_player.build_distance + cache.min_extra_build_distance
+end
+
+---@param player PlayerDataQAI
+---@param position MapPosition
+---@param cache InserterCacheQAI
+---@param is_cursor_ghost boolean?
+local function try_place_held_inserter_and_adjust_it(player, position, cache, is_cursor_ghost)
+  ---@type LuaPlayer.can_build_from_cursor_param
+  local args = {
+    position = position,
+    direction = player.last_used_direction,
+    -- `alt` is evaluated later.
+  }
+  local actual_player = player.player
+  if not is_cursor_ghost and not actual_player.can_build_from_cursor(args) then return end
+
+  ---@cast args LuaPlayer.build_from_cursor_param
+  snap_build_position(position, cache)
+  local surface = actual_player.surface
+  local inserter
+  if is_cursor_ghost then
+    args.alt = true
+    inserter = build_from_cursor_ghost(actual_player, args, cache)
+  else
+    args.alt = is_within_build_range(player, position, cache)
+    actual_player.build_from_cursor(args)
+    if args.alt then
+      inserter = surface.valid and find_ghost_entity(surface, cache.prototype.name, position)
+    else
+      inserter = surface.valid and surface.find_entity(cache.prototype.name, position)
+    end
+  end
+
+  -- If the player changed surface, do not switch to selecting pickup.
+  if not surface.valid or actual_player.surface_index ~= surface.index then return end
   if not inserter then return end
   if not actual_player.clear_cursor() then return end
   -- Docs say clear_cursor raises an event in the current tick, not instantly, but a valid check does not hurt.
@@ -2518,16 +2663,13 @@ end)
 script.on_event("qai-adjust", function(event)
   local player = get_player(event)
   if not player then return end
-  local cursor = player.player.cursor_stack
-  if cursor and cursor.valid_for_read then
-    local place_result = cursor.prototype.place_result
-    if place_result and place_result.type == "inserter" then
-      local force = global.forces[player.player.force_index]
-      local cache = force and force.inserter_cache_lut[place_result.name]
-      if cache then
-        try_place_held_inserter_and_adjust_it(player, event.cursor_position, cache)
-        return
-      end
+  local place_result, is_cursor_ghost = get_cursor_item_place_result(player)
+  if place_result and place_result.type == "inserter" then
+    local force = global.forces[player.player.force_index]
+    local cache = force and force.inserter_cache_lut[place_result.name]
+    if cache then
+      try_place_held_inserter_and_adjust_it(player, event.cursor_position, cache, is_cursor_ghost)
+      return
     end
   end
 
@@ -2537,8 +2679,7 @@ end)
 script.on_event("qai-rotate", function(event)
   local player = get_player(event)
   if not player then return end
-  local cursor = player.player.cursor_stack
-  if cursor and cursor.valid_for_read then
+  if get_cursor_item_prototype(player) then
     player.last_used_direction = rotate_direction_lut[player.last_used_direction]
   end
 end)
@@ -2546,8 +2687,7 @@ end)
 script.on_event("qai-reverse-rotate", function(event)
   local player = get_player(event)
   if not player then return end
-  local cursor = player.player.cursor_stack
-  if cursor and cursor.valid_for_read then
+  if get_cursor_item_prototype(player) then
     player.last_used_direction = reverse_rotate_direction_lut[player.last_used_direction]
   end
 end)
@@ -2575,21 +2715,13 @@ end)
 script.on_event(ev.on_player_cursor_stack_changed, function(event)
   local player = get_player(event)
   if not player then return end
-  local cursor = player.player.cursor_stack
-  if not cursor then
+  local cursor_item = get_cursor_item_prototype(player)
+  if cursor_item then
     player.pipette_when_done = nil
+  end
+  if not cursor_item or cursor_item.name ~= player.pipetted_inserter_name then
     clear_pipetted_inserter_data(player)
-    return
   end
-  if cursor.valid_for_read then
-    player.pipette_when_done = nil
-    if player.pipetted_inserter_name and cursor.name ~= player.pipetted_inserter_name then
-      clear_pipetted_inserter_data(player)
-    end
-    return
-  end
-  -- Not valid for read.
-  clear_pipetted_inserter_data(player)
 end)
 
 script.on_event(ev.on_selected_entity_changed, function(event)
