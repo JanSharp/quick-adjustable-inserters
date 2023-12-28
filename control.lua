@@ -94,6 +94,7 @@ local animation_type = {
 ---@field tech_level TechnologyLevelQAI
 ---@field diagonal_by_default boolean
 ---@field default_drop_offset_multiplier -1|0|1 @ -1 = near, 0 = center, 1 = far. Vanilla is all far, fyi.
+---@field min_extra_build_distance number @ The minimum extra reach distance when building this entity.
 ---@field is_square boolean @ When false, `vertical_offset_from_inserter ~= horizontal_offset_from_inserter`.
 ---@field base_range integer
 ---@field range_gap_from_center integer
@@ -757,6 +758,12 @@ local function generate_cache_for_inserter(inserter, tech_level)
   local cache = {
     prototype = inserter,
     tech_level = tech_level,
+    min_extra_build_distance = math.min(
+      -collision_box.left_top.x,
+      -collision_box.left_top.y,
+      collision_box.right_bottom.x,
+      collision_box.right_bottom.y
+    ),
     is_square = tile_width == tile_height,
     offset_from_inserter = offset_from_inserter,
     offset_from_inserter_flipped = (nil)--[[@as any]], -- Set after the `calculate_cached_base_reach` call.
@@ -2119,7 +2126,6 @@ local function try_place_held_inserter_and_adjust_it(player, position, inserter_
   }
   local actual_player = player.player
   if not actual_player.can_build_from_cursor(args--[[@as LuaPlayer.can_build_from_cursor_param]]) then return end
-  actual_player.build_from_cursor(args--[[@as LuaPlayer.build_from_cursor_param]])
   -- This appears to match the game's snapping logic perfectly.
   -- And we must do this here in order for find_entity to actually find the inserter we just placed, because
   -- find_entity goes by collision boxes and inserters do not take up entire tiles. Basically nothing does.
@@ -2132,6 +2138,15 @@ local function try_place_held_inserter_and_adjust_it(player, position, inserter_
       and math.floor(position.y + 0.5) -- even
       or math.floor(position.y) + 0.5 -- odd
   end
+  -- This logic deciding between real or ghost building does not match the game's logic. There are several
+  -- cases where this will choose to build a ghost sooner than the game would consider it out of range,
+  -- especially on diagonals. However for simplicity this is good enough, and it does take the collision box
+  -- of the inserter into account at least a little bit. And it never causes a "cannot reach" floating text.
+  -- + 1/256 just to make sure there are no rare edge cases where it ends up being off by 1.
+  local distance = vec.get_length(vec.sub(actual_player.position, position)) + 1/256
+  -- And greater _equals_ for the same potential edge cases.
+  args.alt = distance >= actual_player.build_distance + cache.min_extra_build_distance
+  actual_player.build_from_cursor(args--[[@as LuaPlayer.build_from_cursor_param]])
   local inserter = actual_player.surface.find_entity(inserter_prototype.name, position)
   if not inserter then return end
   if not actual_player.clear_cursor() then return end
