@@ -2116,9 +2116,8 @@ end
 
 ---@param player PlayerDataQAI
 ---@param position MapPosition
----@param inserter_prototype LuaEntityPrototype
 ---@param cache InserterCacheQAI
-local function try_place_held_inserter_and_adjust_it(player, position, inserter_prototype, cache)
+local function try_place_held_inserter_and_adjust_it(player, position, cache)
   ---@type LuaPlayer.can_build_from_cursor_param|LuaPlayer.build_from_cursor_param
   local args = {
     position = position,
@@ -2131,10 +2130,10 @@ local function try_place_held_inserter_and_adjust_it(player, position, inserter_
   -- find_entity goes by collision boxes and inserters do not take up entire tiles. Basically nothing does.
   -- Note that if it went by position we'd also have to do this. So that detail doesn't really matter.
   if not cache.placeable_off_grid then
-    position.x = (inserter_prototype.tile_width % 2) == 0
+    position.x = (cache.prototype.tile_width % 2) == 0
       and math.floor(position.x + 0.5) -- even
       or math.floor(position.x) + 0.5 -- odd
-    position.y = (inserter_prototype.tile_height % 2) == 0
+    position.y = (cache.prototype.tile_height % 2) == 0
       and math.floor(position.y + 0.5) -- even
       or math.floor(position.y) + 0.5 -- odd
   end
@@ -2147,7 +2146,7 @@ local function try_place_held_inserter_and_adjust_it(player, position, inserter_
   -- And greater _equals_ for the same potential edge cases.
   args.alt = distance >= actual_player.build_distance + cache.min_extra_build_distance
   actual_player.build_from_cursor(args--[[@as LuaPlayer.build_from_cursor_param]])
-  local inserter = actual_player.surface.find_entity(inserter_prototype.name, position)
+  local inserter = actual_player.surface.find_entity(cache.prototype.name, position)
   if not inserter then return end
   if not actual_player.clear_cursor() then return end
   -- Docs say clear_cursor raises an event in the current tick, not instantly, but a valid check does not hurt.
@@ -2526,7 +2525,7 @@ script.on_event("qai-adjust", function(event)
       local force = global.forces[player.player.force_index]
       local cache = force and force.inserter_cache_lut[place_result.name]
       if cache then
-        try_place_held_inserter_and_adjust_it(player, event.cursor_position, place_result, cache)
+        try_place_held_inserter_and_adjust_it(player, event.cursor_position, cache)
         return
       end
     end
