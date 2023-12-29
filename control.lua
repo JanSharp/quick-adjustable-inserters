@@ -1798,6 +1798,8 @@ local function ensure_is_idle_and_try_set_target_inserter(player, target_inserte
   return true
 end
 
+---Similar to switch_to_idle, this function can raise an event, so make sure to expect the world and the mod
+---to be in any state after calling it.
 ---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
 ---@param do_check_reach boolean?
@@ -1818,6 +1820,8 @@ local function should_use_auto_drop_offset(player)
   return not player.target_inserter_cache.tech_level.drop_offset
 end
 
+---Similar to switch_to_idle, this function can raise an event, so make sure to expect the world and the mod
+---to be in any state after calling it.
 ---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
 ---@param do_check_reach boolean?
@@ -2297,7 +2301,9 @@ local function try_place_held_inserter_and_adjust_it(player, position, cache, is
   -- Docs say clear_cursor raises an event in the current tick, not instantly, but a valid check does not hurt.
   if not inserter.valid then return end
   switch_to_selecting_pickup(player, inserter)
-  player.pipette_when_done = true
+  if player.state == "selecting-pickup" then
+    player.pipette_when_done = true
+  end
 end
 
 ---@param entity LuaEntity
