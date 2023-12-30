@@ -856,12 +856,19 @@ local function find_ghost_entity(surface, name, position)
   return ghost.ghost_name == name and ghost or nil
 end
 
----@param inserter LuaEntity
+---@param surface LuaSurface
+---@param name string
+---@param position MapPosition
+---@return LuaEntity?
+local function find_real_or_ghost_entity(surface, name, position)
+  local entity = surface.find_entity(name, position)
+  if entity then return entity end
+  return find_ghost_entity(surface, name, position)
+end
+
+---@param inserter LuaEntity @ Can actually be a real or a ghost entity, but it always uses `global.ghost_ids`.
 ---@return EntityIDQAI?
-local function get_id(inserter)
-  if not is_ghost[inserter] then return inserter.unit_number end
-  local unit_number = inserter.ghost_unit_number
-  if unit_number then return unit_number end
+local function get_ghost_id(inserter)
   -- The following code is just the annoying way of writing:
   -- return global.ghost_ids[inserter.surface_index]?[inserter.position.x]?[inserter.position.y]
   local x_lut = global.ghost_ids[inserter.surface_index]
@@ -870,6 +877,13 @@ local function get_id(inserter)
   local y_lut = x_lut[position.x]
   if not y_lut then return end
   return y_lut[position.y]
+end
+
+---@param inserter LuaEntity
+---@return EntityIDQAI?
+local function get_id(inserter)
+  if not is_ghost[inserter] then return inserter.unit_number end
+  return inserter.ghost_unit_number or get_ghost_id(inserter)
 end
 
 ---@generic K
@@ -1094,8 +1108,10 @@ end
 
 ---Can raise an event.
 ---@param player PlayerDataQAI
----@param target_inserter LuaEntity
-local function restore_after_adjustment(player, target_inserter)
+---@param target_inserter LuaEntity @ Can be invalid.
+---@param surface LuaSurface @ Can be invalid.
+---@param inserter_position MapPosition
+local function restore_after_adjustment(player, target_inserter, surface, inserter_position)
   if player.reactivate_inserter_when_done then
     player.reactivate_inserter_when_done = nil
     reactivate_inserter(target_inserter)
@@ -1120,8 +1136,13 @@ local function restore_after_adjustment(player, target_inserter)
       local item = items and items[1]
       player.player.cursor_ghost = item and item.name
     end
-    -- TODO: should this accept it if the entity changed between being real or a ghost? both directions are possible.
-    if not player.pipette_copies_vectors or not target_inserter.valid then goto leave_pipette end
+
+    if not surface.valid then goto leave_pipette end
+    ---@diagnostic disable-next-line: cast-local-type
+    target_inserter = target_inserter.valid
+      and target_inserter
+      or find_real_or_ghost_entity(surface, name, inserter_position)
+    if not player.pipette_copies_vectors or not target_inserter then goto leave_pipette end
     local place_result = get_cursor_item_place_result(player)
     if place_result and place_result.name == name then
       save_pipetted_vectors(player, name--[[@as string]], target_inserter)
@@ -1140,6 +1161,10 @@ local update_inserter_speed_text
 ---@param do_not_restore boolean? @ When true, do not script enable the inserter and do not pipette it.
 local function switch_to_idle(player, keep_rendering, do_not_restore)
   if player.state == "idle" then return end
+  local target_inserter = player.target_inserter
+  local surface = player.current_surface
+  local position = player.target_inserter_position
+
   player.current_surface_index = nil
   player.current_surface = nil
   destroy_entities(player.used_squares)
@@ -1153,7 +1178,6 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   global.inserters_in_use[player.target_inserter_id] = nil
   remove_active_player(player)
   player.target_inserter_id = nil
-  local target_inserter = player.target_inserter
   player.target_inserter = nil
   player.target_inserter_cache = nil
   player.target_inserter_position = nil
@@ -1169,7 +1193,7 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   update_inserter_speed_text(player)
 
   if not do_not_restore then
-    restore_after_adjustment(player, target_inserter)
+    restore_after_adjustment(player, target_inserter, surface, position)
   end
 end
 
@@ -1779,6 +1803,8 @@ end
 ---@return boolean success
 local function ensure_is_idle_and_try_set_target_inserter(player, target_inserter, do_check_reach)
   local prev_target_inserter = player.target_inserter
+  local prev_surface = player.current_surface
+  local prev_position = player.target_inserter_position
   if player.state ~= "idle" then
     local is_same_inserter = prev_target_inserter == target_inserter
     if not is_same_inserter then
@@ -1790,7 +1816,7 @@ local function ensure_is_idle_and_try_set_target_inserter(player, target_inserte
   if not try_set_target_inserter(player, target_inserter, do_check_reach) then
     destroy_all_rendering_objects(player)
     if prev_target_inserter then
-      restore_after_adjustment(player, prev_target_inserter)
+      restore_after_adjustment(player, prev_target_inserter, prev_surface, prev_position)
     end
     return false
   end
@@ -1844,16 +1870,25 @@ end
 
 ---@param player PlayerDataQAI
 ---@param do_check_reach boolean?
-local function switch_to_idle_and_back(player, do_check_reach)
+---@param new_target_inserter LuaEntity?
+local function switch_to_idle_and_back(player, do_check_reach, new_target_inserter)
   if player.state == "idle" then return end
-  local target_inserter = player.target_inserter
+  local target_inserter = new_target_inserter or player.target_inserter
+  local surface = player.current_surface
+  local cache = player.target_inserter_cache
+  local position = player.target_inserter_position
   local selecting_pickup = player.state == "selecting-pickup"
+
   switch_to_idle(player, false, true)
-  -- TODO: should this accept it if the entity changed between being real or a ghost? both directions are possible.
-  if not target_inserter.valid or player.state ~= "idle" then
+  if player.state ~= "idle" then
     forget_about_restoring(player, target_inserter)
     return
   end
+  ---@diagnostic disable-next-line: cast-local-type
+  target_inserter = target_inserter.valid and target_inserter
+    or surface.valid and find_real_or_ghost_entity(surface, cache.prototype.name, position)
+  if not target_inserter then return end
+
   if selecting_pickup then
     switch_to_selecting_pickup(player, target_inserter, do_check_reach)
   else
@@ -1864,12 +1899,27 @@ end
 ---@param player PlayerDataQAI
 ---@return boolean
 local function validate_target_inserter(player)
-  -- TODO: this function and everywhere it's used should most likely accept changing from ghost to real and vice versa.
-  local is_valid = player.target_inserter.valid
-  if not is_valid then
+  local inserter = player.target_inserter
+  if inserter.valid then return true end
+  ---@diagnostic disable-next-line: cast-local-type
+  inserter = player.current_surface.valid and find_real_or_ghost_entity(
+    player.current_surface,
+    player.target_inserter_cache.prototype.name,
+    player.target_inserter_position
+  )
+  if not inserter then
     switch_to_idle(player)
+    return false
   end
-  return is_valid
+  local expected_state = player.state
+  switch_to_idle_and_back(player, false, inserter)
+  if player.state ~= expected_state or player.target_inserter ~= inserter then return false end
+  if not inserter.valid then
+    -- A switch_to_idle_and_back attempt was made, the inserter is once again invalid, so now just give up.
+    switch_to_idle(player)
+    return false
+  end
+  return true
 end
 
 ---@param player PlayerDataQAI
@@ -2521,12 +2571,8 @@ end
 
 ---@param player PlayerDataQAI
 local function update_active_player(player)
+  if not validate_target_inserter(player) then return end
   local inserter = player.target_inserter
-  if not inserter.valid then
-    -- TODO: check if it switched between being real/ghost
-    switch_to_idle(player)
-    return
-  end
   deactivate_inserter(player, inserter)
   local position = inserter.position
   local prev_position = player.target_inserter_position
@@ -2792,13 +2838,12 @@ do
 end
 
 for _, destroy_event in pairs{
-  ev.on_entity_died,
   ev.on_robot_mined_entity,
   ev.on_player_mined_entity,
   ev.script_raised_destroy,
 }
 do
-  ---@param event EventData.on_entity_died|EventData.on_robot_mined_entity|EventData.on_player_mined_entity|EventData.script_raised_destroy
+  ---@param event EventData.on_robot_mined_entity|EventData.on_player_mined_entity|EventData.script_raised_destroy
   script.on_event(destroy_event, function(event)
     local player = global.inserters_in_use[get_id(event.entity)] ---@cast player PlayerDataQAI?
     if not player then return end
@@ -2809,12 +2854,40 @@ do
   })
 end
 
+script.on_event(ev.on_post_entity_died, function(event)
+  local ghost = event.ghost
+  if not ghost then return end
+  local player = global.inserters_in_use[event.unit_number]
+  if not player then return end
+  switch_to_idle_and_back(player, false, ghost)
+end, {{filter = "type", type = "inserter"}})
+
+---@param entity LuaEntity
+---@return boolean
+local function potential_revive(entity)
+  local player = global.inserters_in_use[entity.unit_number]
+    or global.inserters_in_use[get_ghost_id(entity)]
+  ---@cast player PlayerDataQAI?
+  if not player then return false end
+  switch_to_idle_and_back(player, false, entity)
+  return true
+end
+
+script.on_event(ev.script_raised_revive, function(event)
+  potential_revive(event.entity)
+end, {{filter = "type", type = "inserter"}})
+
+script.on_event(ev.on_robot_built_entity, function(event)
+  potential_revive(event.created_entity)
+end, {{filter = "type", type = "inserter"}})
+
 script.on_event(ev.on_built_entity, function(event)
+  local entity = event.created_entity
+  if not is_ghost[entity] and potential_revive(event.created_entity) then return end
   local player = get_player(event)
   if not player then return end
   local expected_name = player.pipetted_inserter_name
   if not expected_name then return end
-  local entity = event.created_entity
   if get_real_or_ghost_name(entity) ~= expected_name then return end
   local direction = entity.direction
   if not inverse_direction_lut[direction] then return end
