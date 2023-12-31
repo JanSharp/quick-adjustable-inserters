@@ -251,18 +251,35 @@ local reverse_rotation_matrix_lut = {
   [defines.direction.west] = vec.rotation_matrix_by_orientation(-0.75),
 }
 
+---The created iterator allows removal of the current key while iterating. Not the next key though, that one
+---must continue to exist.
+---@generic K, V
+---@param tab table<K, V>
+---@return fun(): K, V
+local function safer_pairs(tab)
+  local next = next
+  local next_k, next_v = next(tab)
+  return function()
+    local k, v = next_k, next_v
+    next_k, next_v = next(tab, k)
+    return k, v
+  end
+end
+
 local remove_player
+
+---@param player PlayerDataQAI?
+---@return PlayerDataQAI?
+local function validate_player(player)
+  if not player then return end
+  if player.player.valid then return player end
+  remove_player(player)
+end
 
 ---@param player_index uint32
 ---@return PlayerDataQAI?
 local function get_player_raw(player_index)
-  local player = global.players[player_index]
-  if not player then return end
-  if not player.player.valid then
-    remove_player(player)
-    return
-  end
-  return player
+  return validate_player(global.players[player_index])
 end
 
 ---@param event EventData|{player_index: uint32}
@@ -1648,11 +1665,16 @@ local function update_inserter_speed_text_using_inserter(player, inserter)
     y = (selection_box.left_top.y + selection_box.right_bottom.y) / 2 - 0.31,
   }
   set_inserter_speed_text(player, position, string.format("%.3f/s", items_per_second))
-  return
 end
+
+local validate_target_inserter
 
 ---@param player PlayerDataQAI
 function update_inserter_speed_text(player)
+  -- There are a few cases where this function gets called where the target inserter is already guaranteed to
+  -- be valid, however a lot of the time that is not the case. So just always validate.
+  validate_target_inserter(player)
+
   local selected = player.player.selected
   if not selected then
     hide_inserter_speed_text(player)
@@ -1812,7 +1834,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
   end
 
   local id = get_or_create_id(target_inserter)
-  if global.inserters_in_use[id] then
+  if validate_player(global.inserters_in_use[id]) then
     return show_error(player, {"qai.only-one-player-can-adjust"})
   end
 
@@ -1933,8 +1955,9 @@ local function switch_to_idle_and_back(player, do_check_reach, new_target_insert
 end
 
 ---@param player PlayerDataQAI
----@return boolean
-local function validate_target_inserter(player)
+---@return boolean @ `true` if the player results in a non idle state with a valid inserter.
+function validate_target_inserter(player)
+  if player.state == "idle" then return false end
   local inserter = player.target_inserter
   if inserter.valid then return true end
   ---@diagnostic disable-next-line: cast-local-type
@@ -2614,6 +2637,7 @@ end
 
 ---@param player PlayerDataQAI
 local function update_active_player(player)
+  if not validate_player(player) then return end
   if not validate_target_inserter(player) then return end
   local inserter = player.target_inserter
   deactivate_inserter(player, inserter)
@@ -2834,7 +2858,7 @@ script.on_event(ev.on_entity_settings_pasted, function(event)
   end
   local destination = event.destination
   if destination.type ~= "inserter" then return end
-  player = global.inserters_in_use[get_id(destination)] ---@cast player PlayerDataQAI?
+  player = validate_player(global.inserters_in_use[get_id(destination)])
   if not player then return end
   switch_to_idle_and_back(player)
   update_inserter_speed_text(player)
@@ -2873,7 +2897,7 @@ do
       -- them. Making it update for them is not worth the performance cost or complexity.
       update_inserter_speed_text(player)
     end
-    player = global.inserters_in_use[get_id(event.entity)] ---@cast player PlayerDataQAI?
+    player = validate_player(global.inserters_in_use[get_id(event.entity)])
     if player then
       switch_to_idle_and_back(player, do_check_reach)
     end
@@ -2888,7 +2912,7 @@ for _, destroy_event in pairs{
 do
   ---@param event EventData.on_robot_mined_entity|EventData.on_player_mined_entity|EventData.script_raised_destroy
   script.on_event(destroy_event, function(event)
-    local player = global.inserters_in_use[get_id(event.entity)] ---@cast player PlayerDataQAI?
+    local player = validate_player(global.inserters_in_use[get_id(event.entity)])
     if not player then return end
     switch_to_idle(player)
   end, {
@@ -2900,7 +2924,7 @@ end
 script.on_event(ev.on_post_entity_died, function(event)
   local ghost = event.ghost
   if not ghost then return end
-  local player = global.inserters_in_use[event.unit_number]
+  local player = validate_player(global.inserters_in_use[event.unit_number])
   if not player then return end
   switch_to_idle_and_back(player, false, ghost)
 end, {{filter = "type", type = "inserter"}})
@@ -2908,9 +2932,9 @@ end, {{filter = "type", type = "inserter"}})
 ---@param entity LuaEntity
 ---@return boolean
 local function potential_revive(entity)
-  local player = global.inserters_in_use[entity.unit_number]
-    or global.inserters_in_use[get_ghost_id(entity)]
-  ---@cast player PlayerDataQAI?
+  local player = validate_player(
+    global.inserters_in_use[entity.unit_number] or global.inserters_in_use[get_ghost_id(entity)]
+  )
   if not player then return false end
   switch_to_idle_and_back(player, false, entity)
   return true
@@ -2959,7 +2983,7 @@ end)
 ---@param force LuaForce
 local function recheck_players_in_force(force)
   for _, player in pairs(force.players) do
-    local player_data = global.players[player.index]
+    local player_data = get_player_raw(player.index)
     if player_data then
       switch_to_idle_and_back(player_data)
     end
@@ -2985,9 +3009,11 @@ script.on_configuration_changed(function(event)
   if mod_changes and not mod_changes.old_version then return end
 
   -- Do this before updating forces, because updating forces potentially involves changing player states.
-  for _, player in pairs(global.players) do
-    player.pipette_when_done = nil
-    clear_pipetted_inserter_data(player)
+  for _, player in safer_pairs(global.players) do
+    if validate_player(player)then
+      player.pipette_when_done = nil
+      clear_pipetted_inserter_data(player)
+    end
   end
 
   for _, force in pairs(global.forces) do
@@ -2996,7 +3022,7 @@ script.on_configuration_changed(function(event)
 end)
 
 script.on_event(ev.on_force_created, function(event)
-  init_force(event.force)
+  init_force(event.force) -- This can unfortunately cause a little lag spike.
 end)
 
 script.on_event(ev.on_forces_merged, function(event)
