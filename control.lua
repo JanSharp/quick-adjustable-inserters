@@ -251,10 +251,24 @@ local reverse_rotation_matrix_lut = {
   [defines.direction.west] = vec.rotation_matrix_by_orientation(-0.75),
 }
 
----@param event EventData|{player_index: uint}
+local remove_player
+
+---@param player_index uint32
+---@return PlayerDataQAI?
+local function get_player_raw(player_index)
+  local player = global.players[player_index]
+  if not player then return end
+  if not player.player.valid then
+    remove_player(player)
+    return
+  end
+  return player
+end
+
+---@param event EventData|{player_index: uint32}
 ---@return PlayerDataQAI?
 local function get_player(event)
-  return global.players[event.player_index]
+  return get_player_raw(event.player_index)
 end
 
 ---@param animation AnimationQAI
@@ -1050,6 +1064,14 @@ local function hide_inserter_speed_text(player)
 end
 
 ---@param player PlayerDataQAI
+local function destroy_inserter_speed_text(player)
+  if player.inserter_speed_text_id then
+    rendering.destroy(player.inserter_speed_text_id)
+    player.inserter_speed_text_id = nil
+  end
+end
+
+---@param player PlayerDataQAI
 ---@param inserter LuaEntity
 local function deactivate_inserter(player, inserter)
   if is_ghost[inserter] then return end -- Ghosts are always inactive.
@@ -1153,6 +1175,13 @@ end
 
 local update_inserter_speed_text
 
+---@param player PlayerDataQAI
+---@param target_inserter LuaEntity
+local function extra_clean_up_for_removed_player(player, target_inserter)
+  destroy_inserter_speed_text(player)
+  forget_about_restoring(player, target_inserter)
+end
+
 ---This function can raise an event, so make sure to expect the world to be in any state after calling it.
 ---This includes the state of this mod. Calling switch_to_idle does not mean that the player's state will
 ---actually be idle afterwards.
@@ -1185,9 +1214,16 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   player.target_inserter_force_index = nil
   player.should_flip = nil
   player.state = "idle"
-  local selected = player.player.selected
+
+  local actual_player = player.player
+  if not actual_player.valid then -- Only happens when coming from `remove_player()`.
+    extra_clean_up_for_removed_player(player, target_inserter)
+    return
+  end
+
+  local selected = actual_player.selected
   if selected and entity_name_lut[selected.name] then
-    player.player.selected = nil
+    actual_player.selected = nil
   end
 
   update_inserter_speed_text(player)
@@ -2556,14 +2592,21 @@ local function init_player(player)
     pipette_after_place_and_adjust = player_settings["qai-pipette-after-place-and-adjust"].value--[[@as boolean]],
     pipette_copies_vectors = player_settings["qai-pipette-copies-vectors"].value--[[@as boolean]],
   }
-  global.players[player.index] = player_data
+  global.players[player_data.player_index] = player_data
   return player_data
 end
 
+---@param player PlayerDataQAI
+function remove_player(player)
+  switch_to_idle(player)
+  global.players[player.player_index] = nil
+end
+
+---Can be called if the given `player_index` actually no longer exists at this point in time.
 ---@param player_index integer
 ---@return PlayerDataQAI?
 local function get_or_init_player(player_index)
-  local player_data = global.players[player_index]
+  local player_data = get_player_raw(player_index)
   if player_data then return player_data end
   local player = game.get_player(player_index)
   return player and init_player(player) or nil
@@ -2972,9 +3015,12 @@ script.on_event(ev.on_player_created, function(event)
 end)
 
 script.on_event(ev.on_player_removed, function(event)
-  local player = get_player(event) ---@cast player -nil
-  switch_to_idle(player)
-  global.players[event.player_index] = nil
+  -- It might legitimately already have been removed through another mod raising an event which causes this
+  -- mod to call get_player, which checks player validity and then removes the player. Said other mod would
+  -- have to do so in its on_player_removed handler and come before this mod in mod load order.
+  local player = global.players[event.player_index]
+  if not player then return end
+  remove_player(player)
 end)
 
 script.on_init(function()
