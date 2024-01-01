@@ -288,6 +288,37 @@ local function get_player(event)
   return get_player_raw(event.player_index)
 end
 
+local init_force
+
+---@param force ForceDataQAI
+local function remove_force(force)
+  global.forces[force.force_index] = nil
+end
+
+---@param force ForceDataQAI?
+---@return ForceDataQAI?
+local function validate_force(force)
+  if not force then return end
+  if force.force.valid then return force end
+  remove_force(force)
+end
+
+---@param force_index uint32
+---@return ForceDataQAI?
+local function get_force(force_index)
+  return validate_force(global.forces[force_index])
+end
+
+---Can be called even if the given `force_index` actually does not exist at this point in time.
+---@param force_index uint32
+---@return ForceDataQAI?
+local function get_or_init_force(force_index)
+  local force_data = get_force(force_index)
+  if force_data then return force_data end
+  local force = game.forces[force_index]
+  return force and init_force(force) or nil
+end
+
 ---@param animation AnimationQAI
 local function add_animation(animation)
   local active_animations = global.active_animations
@@ -1816,7 +1847,7 @@ end
 ---@param do_check_reach boolean?
 ---@return boolean
 local function try_set_target_inserter(player, target_inserter, do_check_reach)
-  local force = global.forces[player.force_index]
+  local force = get_or_init_force(player.force_index)
   if not force then return false end
 
   local cache = force.inserter_cache_lut[get_real_or_ghost_name(target_inserter)]
@@ -2527,7 +2558,7 @@ end
 
 ---@param force LuaForce
 ---@return ForceDataQAI
-local function init_force(force)
+function init_force(force)
   local force_index = force.index
   ---@type ForceDataQAI
   local force_data = {
@@ -2784,7 +2815,7 @@ script.on_event("qai-adjust", function(event)
   if not player then return end
   local place_result, is_cursor_ghost = get_cursor_item_place_result(player)
   if place_result and place_result.type == "inserter" then
-    local force = global.forces[player.player.force_index]
+    local force = get_or_init_force(player.player.force_index)
     local cache = force and force.inserter_cache_lut[place_result.name]
     if cache then
       try_place_held_inserter_and_adjust_it(player, event.cursor_position, cache, is_cursor_ghost)
@@ -2823,7 +2854,7 @@ script.on_event(ev.on_player_pipette, function(event)
   player.last_used_direction = direction
 
   if not player.pipette_copies_vectors or not is_real_or_ghost_inserter(selected) then return end
-  local force = global.forces[player.force_index]
+  local force = get_or_init_force(player.force_index)
   if not force then return end
   local name = get_real_or_ghost_name(selected)
   local cache = force.inserter_cache_lut[name]
@@ -2969,13 +3000,13 @@ end)
 script.on_event({ev.on_research_finished, ev.on_research_reversed}, function(event)
   local research = event.research
   if not techs_we_care_about[research.name] then return end
-  local force = global.forces[research.force.index]
+  local force = get_force(research.force.index)
   if not force then return end
   update_tech_level_for_force(force)
 end)
 
 script.on_event(ev.on_force_reset, function(event)
-  local force = global.forces[event.force.index]
+  local force = get_force(event.force.index)
   if not force then return end
   update_tech_level_for_force(force)
 end)
@@ -3016,8 +3047,10 @@ script.on_configuration_changed(function(event)
     end
   end
 
-  for _, force in pairs(global.forces) do
-    update_tech_level_for_force(force)
+  for _, force in safer_pairs(global.forces) do
+    if validate_force(force) then
+      update_tech_level_for_force(force)
+    end
   end
 end)
 
