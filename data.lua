@@ -50,7 +50,7 @@ data:extend{
     type = "custom-input",
     name = "qai-adjust",
     action = "lua",
-    key_sequence = "CONTROL + SHIFT + R",
+    key_sequence = "SHIFT + F",
   },
   {
     type = "custom-input",

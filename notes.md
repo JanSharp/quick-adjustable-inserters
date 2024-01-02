@@ -62,7 +62,9 @@
 - [x] add locale for invisible entities
 - [x] change all rendering to target a position, not the entity. That way being tick paused in the editor and having mods do weird stuff without raising an event doesn't make this mod look weird
 - [x] add locale for the key bind/control
-- [ ] change default key sequence because it conflicts with bobinserters
+- [x] change default key sequence because it conflicts with bobinserters
+  - [x] SHIFT + F conflicts with several search mods, however looking through all the key sequences I'd like to use, they all have conflicts so this is most likely one of the lesser evils
+  - [ ] play test with it a bit
 - [x] maybe make direction arrow a little transparent
 - [x] change visualization when pickup has been selected
   - [x] draw square around it instead of a highlight box
