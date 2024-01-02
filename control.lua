@@ -1701,15 +1701,21 @@ local function estimate_inserter_speed_for_inserter(inserter)
   return inserter_throughput.estimate_inserter_speed(def), inserter_throughput.is_estimate(def)
 end
 
+---@param inserter LuaEntity
+local function get_inserter_speed_position_next_to_inserter(inserter)
+  local prototype = get_real_or_ghost_prototype(inserter)
+  local box = prototype.selection_box
+  local offset = math.max(-box.left_top.x, -box.left_top.y, box.right_bottom.x, box.right_bottom.y)
+  local position = inserter.position
+  position.x = position.x + offset + 0.15
+  return position
+end
+
 ---@param player PlayerDataQAI
 ---@param inserter LuaEntity
 local function update_inserter_speed_text_using_inserter(player, inserter)
   local items_per_second, is_estimate = estimate_inserter_speed_for_inserter(inserter)
-  local selection_box = inserter.selection_box
-  local position = {
-    x = selection_box.right_bottom.x + 0.15,
-    y = (selection_box.left_top.y + selection_box.right_bottom.y) / 2,
-  }
+  local position = get_inserter_speed_position_next_to_inserter(inserter)
   set_inserter_speed_text(player, position, items_per_second, is_estimate)
 end
 
