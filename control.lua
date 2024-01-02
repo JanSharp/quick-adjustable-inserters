@@ -1614,10 +1614,15 @@ local function draw_all_rendering_objects(player)
   draw_grid_lines(player)
 end
 
+local function format_inserter_speed(items_per_second, is_estimate)
+  return string.format((is_estimate and "~ " or "").."%.3f/s", items_per_second)
+end
+
 ---@param player PlayerDataQAI
 ---@param position MapPosition
----@param text string
-local function set_inserter_speed_text(player, position, text)
+---@param items_per_second number
+---@param is_estimate boolean
+local function set_inserter_speed_text(player, position, items_per_second, is_estimate)
   local id = player.inserter_speed_text_id
   if not id or not rendering.is_valid(id) then
     player.inserter_speed_text_id = rendering.draw_text{
@@ -1626,11 +1631,11 @@ local function set_inserter_speed_text(player, position, text)
       players = {player.player_index},
       color = {1, 1, 1},
       target = position,
-      text = text,
+      text = format_inserter_speed(items_per_second, is_estimate),
     }
     return
   end
-  rendering.set_text(id, text)
+  rendering.set_text(id, format_inserter_speed(items_per_second, is_estimate))
   rendering.set_target(id, position)
   rendering.set_visible(id, true)
   rendering.bring_to_front(id)
@@ -1641,6 +1646,7 @@ local calculate_actual_drop_position
 ---@param player PlayerDataQAI
 ---@param selected_position MapPosition @ Position of the selected square or ninth.
 ---@return number items_per_second
+---@return boolean is_estimate
 local function estimate_inserter_speed(player, selected_position)
   local cache = player.target_inserter_cache
   local target_inserter = player.target_inserter
@@ -1672,10 +1678,12 @@ local function estimate_inserter_speed(player, selected_position)
     )
   end
 
-  return inserter_throughput.estimate_inserter_speed(def)
+  return inserter_throughput.estimate_inserter_speed(def), inserter_throughput.is_estimate(def)
 end
 
 ---@param inserter LuaEntity
+---@return number items_per_second
+---@return boolean is_estimate
 local function estimate_inserter_speed_for_inserter(inserter)
   local prototype = get_real_or_ghost_prototype(inserter)
   ---@type InserterThroughputDefinition
@@ -1687,19 +1695,19 @@ local function estimate_inserter_speed_for_inserter(inserter)
   }
   inserter_throughput.set_from_based_on_inserter(def, inserter)
   inserter_throughput.set_to_based_on_inserter(def, inserter)
-  return inserter_throughput.estimate_inserter_speed(def)
+  return inserter_throughput.estimate_inserter_speed(def), inserter_throughput.is_estimate(def)
 end
 
 ---@param player PlayerDataQAI
 ---@param inserter LuaEntity
 local function update_inserter_speed_text_using_inserter(player, inserter)
-  local items_per_second = estimate_inserter_speed_for_inserter(inserter)
+  local items_per_second, is_estimate = estimate_inserter_speed_for_inserter(inserter)
   local selection_box = inserter.selection_box
   local position = {
     x = selection_box.right_bottom.x + 0.15,
     y = (selection_box.left_top.y + selection_box.right_bottom.y) / 2 - 0.31,
   }
-  set_inserter_speed_text(player, position, string.format("%.3f/s", items_per_second))
+  set_inserter_speed_text(player, position, items_per_second, is_estimate)
 end
 
 local validate_target_inserter
@@ -1741,10 +1749,10 @@ function update_inserter_speed_text(player)
   end
 
   local position = selected.position
-  local items_per_second = estimate_inserter_speed(player, position)
+  local items_per_second, is_estimate = estimate_inserter_speed(player, position)
   position.x = position.x + (name == ninth_entity_name and 0.35 or 0.6)
   position.y = position.y - 0.31
-  set_inserter_speed_text(player, position, string.format("%.3f/s", items_per_second))
+  set_inserter_speed_text(player, position, items_per_second, is_estimate)
 end
 
 ---@param player PlayerDataQAI
