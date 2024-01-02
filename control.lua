@@ -1632,6 +1632,9 @@ local function set_inserter_speed_text(player, position, items_per_second, is_es
       color = {1, 1, 1},
       target = position,
       text = format_inserter_speed(items_per_second, is_estimate),
+      scale = 1.5,
+      scale_with_zoom = true,
+      vertical_alignment = "middle",
     }
     return
   end
@@ -1705,7 +1708,7 @@ local function update_inserter_speed_text_using_inserter(player, inserter)
   local selection_box = inserter.selection_box
   local position = {
     x = selection_box.right_bottom.x + 0.15,
-    y = (selection_box.left_top.y + selection_box.right_bottom.y) / 2 - 0.31,
+    y = (selection_box.left_top.y + selection_box.right_bottom.y) / 2,
   }
   set_inserter_speed_text(player, position, items_per_second, is_estimate)
 end
@@ -1751,7 +1754,6 @@ function update_inserter_speed_text(player)
   local position = selected.position
   local items_per_second, is_estimate = estimate_inserter_speed(player, position)
   position.x = position.x + (name == ninth_entity_name and 0.35 or 0.6)
-  position.y = position.y - 0.31
   set_inserter_speed_text(player, position, items_per_second, is_estimate)
 end
 
