@@ -173,6 +173,9 @@ local animation_type = {
 ---Can be `nil` even when not idle. Can even be `nil` when `pickup_highlight_id` is not `nil`.
 ---@field line_to_pickup_highlight_id uint64?
 ---@field default_drop_highlight LuaEntity? @ Can be `nil` even when not idle.
+---`nil` when idle. Ghosts don't need reach checks, and when going from ghost to real, it still shouldn't do
+---reach checks, because that'd be annoying. Imagine bots kicking you out of adjustment.
+---@field no_reach_checks boolean?
 ---@field inserter_speed_text_id uint64? @ Only `nil` initially, once it exists, it's never destroyed (by this mod).
 ---@field show_throughput_on_drop boolean
 ---@field show_throughput_on_pickup boolean
@@ -1261,6 +1264,7 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   player.target_inserter_direction = nil
   player.target_inserter_force_index = nil
   player.should_flip = nil
+  player.no_reach_checks = nil
   player.state = "idle"
 
   local actual_player = player.player
@@ -1845,8 +1849,9 @@ end
 ---should not care about being out of reach. Going out of reach while adjusting an inserter is handled in the
 ---player position changed event, which is raised for each tile the player moves.
 ---@param do_check_reach boolean?
+---@param carry_over_no_reach_checks boolean?
 ---@return boolean
-local function try_set_target_inserter(player, target_inserter, do_check_reach)
+local function try_set_target_inserter(player, target_inserter, do_check_reach, carry_over_no_reach_checks)
   local force = get_or_init_force(player.force_index)
   if not force then return false end
 
@@ -1860,7 +1865,10 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
     return show_error(player, {"qai.cant-adjust-enemy-inserters"})
   end
 
-  if do_check_reach and not player.player.can_reach_entity(target_inserter) then
+  if do_check_reach
+    and not carry_over_no_reach_checks
+    and not player.player.can_reach_entity(target_inserter)
+  then
     return show_error(player, {"cant-reach"})
   end
 
@@ -1883,6 +1891,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach)
     and is_east_or_west_lut[target_inserter.direction]
   player.current_surface_index = target_inserter.surface_index
   player.current_surface = target_inserter.surface
+  player.no_reach_checks = carry_over_no_reach_checks or is_ghost[target_inserter]
   return true
 end
 
@@ -1894,6 +1903,7 @@ local function ensure_is_idle_and_try_set_target_inserter(player, target_inserte
   local prev_target_inserter = player.target_inserter
   local prev_surface = player.current_surface
   local prev_position = player.target_inserter_position
+  local carry_over_no_reach_checks = player.no_reach_checks and prev_target_inserter == target_inserter
   if player.state ~= "idle" then
     local is_same_inserter = prev_target_inserter == target_inserter
     if not is_same_inserter then
@@ -1902,7 +1912,7 @@ local function ensure_is_idle_and_try_set_target_inserter(player, target_inserte
     switch_to_idle(player, is_same_inserter, true)
     if not target_inserter.valid or player.state ~= "idle" then return false end
   end
-  if not try_set_target_inserter(player, target_inserter, do_check_reach) then
+  if not try_set_target_inserter(player, target_inserter, do_check_reach, carry_over_no_reach_checks) then
     destroy_all_rendering_objects(player)
     if prev_target_inserter then
       restore_after_adjustment(player, prev_target_inserter, prev_surface, prev_position)
@@ -1959,14 +1969,19 @@ end
 
 ---@param player PlayerDataQAI
 ---@param do_check_reach boolean?
----@param new_target_inserter LuaEntity?
+---@param new_target_inserter LuaEntity? @ Use this when an inserter changed to/from being real or ghost.
 local function switch_to_idle_and_back(player, do_check_reach, new_target_inserter)
   if player.state == "idle" then return end
+  if new_target_inserter and do_check_reach then
+    error("When an inserter gets revived or dies while being adjusted, do not do reach checks.")
+  end
   local target_inserter = new_target_inserter or player.target_inserter
   local surface = player.current_surface
   local cache = player.target_inserter_cache
   local position = player.target_inserter_position
-  local selecting_pickup = player.state == "selecting-pickup"
+  local original_player_state = player.state
+  local carry_over_no_reach_checks = player.no_reach_checks
+  do_check_reach = do_check_reach and not carry_over_no_reach_checks
 
   switch_to_idle(player, false, true)
   if player.state ~= "idle" then
@@ -1978,10 +1993,20 @@ local function switch_to_idle_and_back(player, do_check_reach, new_target_insert
     or surface.valid and find_real_or_ghost_entity(surface, cache.prototype.name, position)
   if not target_inserter then return end
 
-  if selecting_pickup then
+  if original_player_state == "selecting-pickup" then
     switch_to_selecting_pickup(player, target_inserter, do_check_reach)
   else
     switch_to_selecting_drop(player, target_inserter, do_check_reach)
+  end
+
+  -- Carry it over for things like tech level changes, etc. Set it when `new_target_inserter` is non `nil`
+  -- because if a robot, another player or a script revived the inserter, moving around should not cause you
+  -- to get switched to idle. Especially relevant for the place and adjust feature.
+  if (carry_over_no_reach_checks or new_target_inserter)
+    and player.state == original_player_state
+    and player.target_inserter == target_inserter
+  then
+    player.no_reach_checks = true
   end
 end
 
@@ -2908,7 +2933,9 @@ script.on_event(ev.on_player_changed_position, function(event)
   if not player then return end
   if player.state ~= "idle" then
     local inserter = player.target_inserter
-    if not inserter.valid or not player.player.can_reach_entity(inserter) then
+    if not inserter.valid
+      or (not player.no_reach_checks and not player.player.can_reach_entity(inserter))
+    then
       switch_to_idle(player)
     end
   end

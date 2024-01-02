@@ -43,7 +43,7 @@
 - [x] support ghosts, if possible (I think it is)
   - [x] support a ghost becoming real (reviving)
   - [x] support an entity becoming a ghost (dieing)
-  - [ ] if a ghost became real, do not stop adjusting because of being "out of range". Just pretend there was no range limitation until the player is done adjusting
+  - [x] if a ghost became real, do not stop adjusting because of being "out of range". Just pretend there was no range limitation until the player is done adjusting
 - [x] support inserters of any size, and off grid
 - [x] handle multiplayer
   - [x] switch to idle when leaving
