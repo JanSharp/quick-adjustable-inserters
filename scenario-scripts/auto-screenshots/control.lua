@@ -130,22 +130,6 @@ local function un_pre_multiply_colors()
   end
 end
 
----TODO: This is very most likely redundant, see the commit in which this note got added. I've just not tested it.
-local function push_transparent_background_back()
-  local bring_to_front_afterwards = {}
-  for _, id in pairs(rendering.get_all_ids()) do
-    local obj_type = rendering.get_type(id)
-    if obj_type == "line" then
-      rendering.bring_to_front(id)
-    elseif rendering.get_color(id).a == 1 then
-      bring_to_front_afterwards[#bring_to_front_afterwards+1] = id
-    end
-  end
-  for _, id in pairs(bring_to_front_afterwards) do
-    rendering.bring_to_front(id)
-  end
-end
-
 local function make_lines_thicker()
   for _, id in pairs(rendering.get_all_ids()) do
     local obj_type = rendering.get_type(id)
@@ -179,15 +163,20 @@ end
 ---@param surface LuaSurface
 ---@param range integer
 ---@param name string
-local function take_screenshot(surface, range, name)
+---@param resolution integer? @ Default: 256
+---@param pixels_per_tile number? @ Default: evaluated based on range and resolution
+---@param anti_alias boolean?
+local function take_screenshot(surface, range, name, resolution, pixels_per_tile, anti_alias)
+  resolution = resolution or 256
+  pixels_per_tile = pixels_per_tile or (resolution / (get_actual_range(range) * 2 + 1 + 1))
   game.take_screenshot{
     surface = surface,
     position = get_inserter_position(range),
     daytime = 0,
     path = "qai/"..name,
-    -- anti_alias = true,
-    resolution = {256, 256},
-    zoom = 8 / (get_actual_range(range) * 2 + 1 + 1),
+    anti_alias = anti_alias,
+    resolution = {resolution, resolution},
+    zoom = pixels_per_tile / 32,
     force_render = true,
   }
 end
@@ -244,7 +233,9 @@ delayed_actions["thumbnail"] = function()
   game.tick_paused = false
   adjust_at(global.surface, global.player, 3, {x = 2, y = -2})
   delete_unwanted_rendering_objects()
-  take_screenshot(global.surface, 3, "thumbnail.png")
+  make_lines_thicker()
+  take_screenshot(global.surface, 3, "thumbnail.png", 144, 19, true)
+  -- NOTE: The current thumbnail has been edited in gimp afterwards to clean up some of the green lines.
   run_delayed_action("unpause")
 end
 wait_ticks(1)
@@ -278,7 +269,6 @@ local function add_actions_for_tech_icon_screenshot(name, pickup_tile, drop_tile
     turn_green_into_yellow()
     un_pre_multiply_colors()
     make_background_more_opaque()
-    push_transparent_background_back()
     take_screenshot(global.surface, 2, name..".png")
     run_delayed_action("unpause")
   end
