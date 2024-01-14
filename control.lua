@@ -1517,7 +1517,6 @@ local function set_direction(player, new_direction)
   inserter.pickup_position = pickup_position
   inserter.drop_position = drop_position
   player.target_inserter_direction = actual_direction
-  player.last_used_direction = actual_direction
 end
 
 ---@param player PlayerDataQAI
@@ -1901,7 +1900,6 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach, 
   player.target_inserter_position = target_inserter.position
   local direction = target_inserter.direction
   player.target_inserter_direction = direction
-  player.last_used_direction = direction
   player.target_inserter_force_index = target_inserter.force_index
   player.should_flip = not player.target_inserter_cache.is_square
     and is_east_or_west_lut[target_inserter.direction]
