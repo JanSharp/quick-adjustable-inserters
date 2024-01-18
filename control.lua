@@ -1721,6 +1721,16 @@ end
 local validate_target_inserter
 
 ---@param player PlayerDataQAI
+---@param position MapPosition @ Gets modified.
+local function snap_position_to_tile_center_relative_to_inserter(player, position)
+  if player.state == "idle" then
+    error("Attempt to snap_position_to_tile_center_relative_to_inserter when player state is idle.")
+  end
+  local left_top = vec.add(vec.copy(player.target_inserter_position), get_offset_from_inserter(player))
+  vec.add_scalar(vec.sub(position, vec.mod_scalar(vec.sub(vec.copy(position), left_top), 1)), 0.5)
+end
+
+---@param player PlayerDataQAI
 function update_inserter_speed_text(player)
   -- There are a few cases where this function gets called where the target inserter is already guaranteed to
   -- be valid, however a lot of the time that is not the case. So just always validate.
@@ -1758,7 +1768,10 @@ function update_inserter_speed_text(player)
 
   local position = selected.position
   local items_per_second, is_estimate = estimate_inserter_speed(player, position)
-  position.x = position.x + (name == ninth_entity_name and 0.35 or 0.6)
+  if name == ninth_entity_name then
+    snap_position_to_tile_center_relative_to_inserter(player, position)
+  end
+  position.x = position.x + 0.6
   set_inserter_speed_text(player, position, items_per_second, is_estimate)
 end
 
