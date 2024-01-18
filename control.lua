@@ -1179,6 +1179,8 @@ local function get_cursor_item_place_result(player)
   return item_prototype and item_prototype.place_result, is_cursor_ghost
 end
 
+local validate_cursor_stack_associated_data
+
 ---Can raise an event.
 ---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity @ Can be invalid.
@@ -1190,6 +1192,7 @@ local function restore_after_adjustment(player, target_inserter, surface, insert
     reactivate_inserter(target_inserter)
   end
 
+  validate_cursor_stack_associated_data(player)
   if player.pipette_when_done then
     player.pipette_when_done = nil
     if not player.pipette_after_place_and_adjust or not target_inserter.valid then goto leave_pipette end
@@ -2400,6 +2403,7 @@ local function try_reset_cursor(actual_player, item_prototype)
       cursor.count = cursor.count - 1
     end
   end
+  -- clear() or `count=` most likely do not raise any events instantly so these rechecks are likely pointless.
   cursor = actual_player.cursor_stack
   if cursor and not cursor.valid_for_read then
     actual_player.cursor_ghost = item_prototype
@@ -2420,12 +2424,15 @@ local function build_from_cursor_ghost(actual_player, args, cache)
 
   cursor.set_stack{name = item_prototype.name, count = 1}
 
-  -- Validation after set_stack.
-  if not surface.valid or actual_player.surface_index ~= surface.index then
-    try_reset_cursor(actual_player, item_prototype)
-    return nil
+  do -- set_stack most likely does not raise any event instantly, so the next code block is likely pointless.
+    if not surface.valid or actual_player.surface_index ~= surface.index then
+      try_reset_cursor(actual_player, item_prototype)
+      return nil
+    end
+    cursor = actual_player.cursor_stack -- Refetch just in case the controller changed multiple times in between.
   end
-  cursor = actual_player.cursor_stack -- Refetch just in case the controller changed multiple times in between.
+
+  -- This entire block is likely just as pointless.
   if not cursor or not cursor.valid_for_read or cursor.name ~= item_prototype.name then
     local built_entity = brute_force_it(actual_player, args, cache)
     try_reset_cursor(actual_player, item_prototype)
@@ -2436,6 +2443,7 @@ local function build_from_cursor_ghost(actual_player, args, cache)
   actual_player.build_from_cursor(args)
   local built_entity = surface.valid and find_ghost_entity(surface, cache.prototype.name, args.position) or nil
   try_reset_cursor(actual_player, item_prototype)
+  -- The built_entity valid check here is likely also pointless.
   return built_entity and built_entity.valid and built_entity or nil
 end
 
@@ -2639,6 +2647,19 @@ local function clear_pipetted_inserter_data(player)
   player.pipetted_inserter_name = nil
   player.pipetted_pickup_vector = nil
   player.pipetted_drop_vector = nil
+end
+
+---Since on_player_cursor_stack_changed gets raised at the end of the tick, make sure to validate associated
+---data every time any of said data gets used, since the cursor could have changed already in this tick.
+---@param player PlayerDataQAI
+function validate_cursor_stack_associated_data(player)
+  local cursor_item = get_cursor_item_prototype(player)
+  if cursor_item then
+    player.pipette_when_done = nil
+  end
+  if not cursor_item or cursor_item.name ~= player.pipetted_inserter_name then
+    clear_pipetted_inserter_data(player)
+  end
 end
 
 ---@type table<string, fun(player: PlayerDataQAI)>
@@ -2917,13 +2938,7 @@ end)
 script.on_event(ev.on_player_cursor_stack_changed, function(event)
   local player = get_player(event)
   if not player then return end
-  local cursor_item = get_cursor_item_prototype(player)
-  if cursor_item then
-    player.pipette_when_done = nil
-  end
-  if not cursor_item or cursor_item.name ~= player.pipetted_inserter_name then
-    clear_pipetted_inserter_data(player)
-  end
+  validate_cursor_stack_associated_data(player)
 end)
 
 script.on_event(ev.on_selected_entity_changed, function(event)
@@ -3038,6 +3053,7 @@ script.on_event(ev.on_built_entity, function(event)
   if not is_ghost[entity] and potential_revive(event.created_entity) then return end
   local player = get_player(event)
   if not player then return end
+  validate_cursor_stack_associated_data(player)
   local expected_name = player.pipetted_inserter_name
   if not expected_name then return end
   if get_real_or_ghost_name(entity) ~= expected_name then return end

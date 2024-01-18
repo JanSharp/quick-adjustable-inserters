@@ -112,4 +112,4 @@
 - [ ] improve rotation state tracking. I don't know why yet but when play testing there's several times where using place and adjust places the inserter in the wrong direction and I didn't do anything that I'd expect to actually cause that to happen, because I know it will happen sometimes no matter what. But yea, investigate this.
 - [x] make sure every event checks valid. Like the selected changed event doesn't.
 - [x] LuaForce valid checking
-- [ ] on cursor stack changed is raised at the end of the tick, so everything using that data needs to have validation itself
+- [x] on cursor stack changed is raised at the end of the tick, so everything using that data needs to have validation itself
