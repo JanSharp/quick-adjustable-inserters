@@ -75,7 +75,7 @@
 - [x] test if creating and deleting entities is faster than teleporting and changing force
   - [x] yes it is. With pooling hitting the key bind 3 times on an inserter takes 2.57 ms, without pooling it takes 1.7 ms
 - [x] thumbnail
-- [ ] readme/description
+- [x] readme/description
 - [ ] tips and tricks simulations
 - [x] don't restore when rotating and similar
 - [x] ~~try using render_player_index for selectable entities. See if the selection box shows up for other players as well~~ Tried it, they are still selectable for other players, so this is not an option
@@ -112,3 +112,4 @@
 - [ ] improve rotation state tracking. I don't know why yet but when play testing there's several times where using place and adjust places the inserter in the wrong direction and I didn't do anything that I'd expect to actually cause that to happen, because I know it will happen sometimes no matter what. But yea, investigate this.
 - [x] make sure every event checks valid. Like the selected changed event doesn't.
 - [x] LuaForce valid checking
+- [ ] on cursor stack changed is raised at the end of the tick, so everything using that data needs to have validation itself
