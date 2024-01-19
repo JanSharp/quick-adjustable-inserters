@@ -47,7 +47,7 @@ local animation_type = {
 ---@field type AnimationTypeQAI
 ---@field id uint64
 ---@field remaining_updates integer @ Stays alive when going to 0, finishes the next update.
----@field destroy_on_finish boolean
+---@field destroy_on_finish boolean?
 
 ---@class AnimatedCircleQAI : AnimationBaseQAI
 ---@field color Color @ Matches the current value. Must have fields r, g, b and a.
@@ -169,7 +169,8 @@ local animation_type = {
 ---`nil` when idle. Can be `nil` when destroying all rendering objects due to being part of an animation.
 ---@field inserter_circle_id uint64
 ---@field direction_arrow_id uint64 @ `nil` when idle.
----@field pickup_highlight_id uint64? @ Can be `nil` even when not idle.
+---@field pickup_highlight_id uint64? @ `nil` when idle.
+---@field drop_highlight_id uint64? @ `nil` when idle.
 ---Can be `nil` even when not idle. Can even be `nil` when `pickup_highlight_id` is not `nil`.
 ---@field line_to_pickup_highlight_id uint64?
 ---@field default_drop_highlight LuaEntity? @ Can be `nil` even when not idle.
@@ -1021,6 +1022,82 @@ local function destroy_default_drop_highlight(player)
   end
 end
 
+---@param current_color Color @ Gets modified.
+---@param final_color Color
+---@param frames integer
+---@param start_on_first_frame boolean? @ When true `init` will have `step` added to it once already.
+---@return Color init @ Same table as `current_color`.
+---@return Color step @ New table.
+---@return integer remaining_updates
+local function get_color_init_and_step(current_color, final_color, frames, start_on_first_frame)
+  local step_r = (final_color.r - current_color.r) / frames
+  local step_g = (final_color.g - current_color.g) / frames
+  local step_b = (final_color.b - current_color.b) / frames
+  local step_a = (final_color.a - current_color.a) / frames
+  -- Truncate precision which could be lost throughout the [-1,1] range. This means so long as the value
+  -- remains within the [-1,1] range it can be modified without any precision lost. It can be multiplied,
+  -- added, subtracted, it doesn't matter, so long as the result is is also within [-1,1].
+  -- And so long as all input values are properly truncated. And there's more technicalities.
+  step_r = step_r - (step_r % (1 / 2^53))
+  step_g = step_g - (step_g % (1 / 2^53))
+  step_b = step_b - (step_b % (1 / 2^53))
+  step_a = step_a - (step_a % (1 / 2^53))
+  local step = {
+    r = step_r,
+    g = step_g,
+    b = step_b,
+    a = step_a,
+  }
+  -- Change init color such that adding step to it `frames` times will result in the exact `final_color`.
+  local remaining_updates = start_on_first_frame and (frames - 1) or frames
+  current_color.r = final_color.r - step_r * remaining_updates
+  current_color.g = final_color.g - step_g * remaining_updates
+  current_color.b = final_color.b - step_b * remaining_updates
+  current_color.a = final_color.a - step_a * remaining_updates
+  return current_color, step, remaining_updates
+end
+
+---@param id uint64
+---@param final_color Color
+---@param frames integer
+---@param destroy_on_finish boolean?
+local function animate_fade_to_color(id, final_color, frames, destroy_on_finish)
+  local current_color = rendering.get_color(id) ---@cast current_color -nil
+  -- `start_on_first_frame` set to true to have the same animation length as newly created objects.
+  -- Basically all animations start on the first frame in this mod, not the initial color/value.
+  local color_init, color_step, remaining_updates
+    = get_color_init_and_step(current_color, final_color, frames, true)
+  add_animated_color{
+    id = id,
+    destroy_on_finish = destroy_on_finish,
+    color = color_init,
+    color_step = color_step,
+    remaining_updates = remaining_updates,
+  }
+end
+
+---@return boolean do_animate
+local function should_animate()
+  return not game.tick_paused
+end
+
+---@param id uint64
+---@param frames integer
+local function fade_out(id, frames)
+  animate_fade_to_color(id, {r = 0, g = 0, b = 0, a = 0}, frames, true)
+end
+
+---Destroys if `should_animate()` is `false`.
+---@param id uint64
+---@param frames integer
+local function fade_out_or_destroy(id, frames)
+  if should_animate() then
+    fade_out(id, frames)
+  else
+    rendering.destroy(id)
+  end
+end
+
 ---@param ids uint64[]
 local function animate_lines_disappearing(ids)
   local opacity = 1 / grid_fade_out_frames
@@ -1037,6 +1114,7 @@ local function animate_lines_disappearing(ids)
   end
 end
 
+---Can only animate the color white.
 ---@param id uint64
 ---@param current_opacity number
 local function animate_id_disappearing(id, current_opacity)
@@ -1051,6 +1129,7 @@ local function animate_id_disappearing(id, current_opacity)
   }
 end
 
+---Can only animate the color white.
 ---@param ids uint64[]
 local function destroy_and_clear_rendering_ids(ids)
   local destroy = rendering.destroy
@@ -1065,24 +1144,28 @@ local function destroy_all_rendering_objects(player)
   -- For simplicity in other parts of the code, accept this function getting called no matter what.
   if not player.background_polygon_id then return end
   local destroy = rendering.destroy
-  local do_animate = not game.tick_paused
-  if do_animate then
+  if should_animate() then
     animate_lines_disappearing(player.line_ids)
     animate_id_disappearing(player.background_polygon_id, grid_background_opacity)
     animate_id_disappearing(player.direction_arrow_id, direction_arrow_opacity)
     if player.inserter_circle_id then animate_id_disappearing(player.inserter_circle_id, 1) end
+    if player.pickup_highlight_id then fade_out(player.pickup_highlight_id, grid_fade_out_frames) end
+    if player.drop_highlight_id then animate_id_disappearing(player.drop_highlight_id, 1) end
+    if player.line_to_pickup_highlight_id then fade_out(player.line_to_pickup_highlight_id, grid_fade_out_frames) end
   else
     destroy_and_clear_rendering_ids(player.line_ids)
     destroy(player.background_polygon_id)
     destroy(player.direction_arrow_id)
     if player.inserter_circle_id then destroy(player.inserter_circle_id) end
+    if player.pickup_highlight_id then destroy(player.pickup_highlight_id) end
+    if player.drop_highlight_id then destroy(player.drop_highlight_id) end
+    if player.line_to_pickup_highlight_id then destroy(player.line_to_pickup_highlight_id) end
   end
-  if player.pickup_highlight_id then destroy(player.pickup_highlight_id) end
-  if player.line_to_pickup_highlight_id then destroy(player.line_to_pickup_highlight_id) end
   player.background_polygon_id = nil
   player.inserter_circle_id = nil
   player.direction_arrow_id = nil
   player.pickup_highlight_id = nil
+  player.drop_highlight_id = nil
   player.line_to_pickup_highlight_id = nil
 end
 
@@ -1404,7 +1487,7 @@ end
 ---@return number opacity
 ---@return Color color_step
 local function get_color_for_potential_animation(full_opacity)
-  local do_animate = not game.tick_paused
+  local do_animate = should_animate()
   local opacity = do_animate and (full_opacity / grid_fade_in_frames) or full_opacity
   return do_animate, opacity, {r = opacity, g = opacity, b = opacity, a = opacity}
 end
@@ -1778,6 +1861,15 @@ function update_inserter_speed_text(player)
   set_inserter_speed_text(player, position, items_per_second, is_estimate)
 end
 
+---@param color Color @ Assumes `r`, `g` and `b` to be the color at full opacity. Current `a` is ignored.
+---@param opacity number
+local function pre_multiply_and_set_alpha(color, opacity)
+  color.r = color.r * opacity
+  color.g = color.g * opacity
+  color.b = color.b * opacity
+  color.a = opacity
+end
+
 ---@param player PlayerDataQAI
 ---@return MapPosition left_top
 ---@return MapPosition right_bottom
@@ -1787,24 +1879,85 @@ local function get_pickup_box(player)
     {x = pickup_pos.x + 0.5, y = pickup_pos.y + 0.5}
 end
 
+---@param id uint64
+---@param left_top MapPosition
+---@param right_bottom MapPosition
+---@return boolean
+local function rectangle_positions_equal(id, left_top, right_bottom)
+  return vec.vec_equals(left_top, rendering.get_left_top(id).position)
+    and vec.vec_equals(right_bottom, rendering.get_right_bottom(id).position)
+end
+
 ---@param player PlayerDataQAI
-local function draw_pickup_highlight(player)
+---@param final_opacity number
+---@param color Color @ `r`, `b` and `b` must be provided. `a` will be set to `final_opacity`.
+---@return boolean
+local function try_reuse_existing_pickup_highlight(player, final_opacity, color)
+  local id = player.pickup_highlight_id
+  if not id or not rendering.is_valid(id) then return false end
+
   local left_top, right_bottom = get_pickup_box(player)
-  local do_animate, opacity, color_step = get_color_for_potential_animation(1)
-  color_step.r = 0
-  color_step.b = 0
+  if not rectangle_positions_equal(id, left_top, right_bottom) then
+    -- Not checking surface or force, because those will trigger switch_to_idle_and_back anyway.
+    fade_out_or_destroy(id, grid_fade_in_frames)
+    return false
+  end
+
+  if not should_animate() then
+    rendering.set_color(id, color)
+    return true
+  end
+
+  pre_multiply_and_set_alpha(color, final_opacity)
+  animate_fade_to_color(id, color, grid_fade_in_frames)
+  return true
+end
+
+---@param player PlayerDataQAI
+---@param width number
+---@param left_top MapPosition
+---@param right_bottom MapPosition
+---@param final_opacity number
+---@param color Color @ `r`, `b` and `b` must be provided. `a` will be set to `final_opacity`.
+---@return uint64 id
+local function draw_pickup_or_drop_highlight(player, width, left_top, right_bottom, final_opacity, color)
+  local do_animate, opacity, color_step = get_color_for_potential_animation(final_opacity)
+  color_step.r = color_step.r * color.r
+  color_step.g = color_step.g * color.g
+  color_step.b = color_step.b * color.b
   local id = rendering.draw_rectangle{
     surface = player.current_surface_index,
     forces = {player.force_index},
     color = color_step,
-    width = 2.999,
+    width = width,
     left_top = left_top,
     right_bottom = right_bottom,
   }
-  player.pickup_highlight_id = id
   if do_animate then
-    add_non_white_grid_fade_in_animation(id, opacity, color_step, {r = 0, g = 1, b = 0, a = 1})
+    color.a = final_opacity
+    add_non_white_grid_fade_in_animation(id, opacity, color_step, color)
   end
+  return id
+end
+
+---@param player PlayerDataQAI
+---@param final_opacity number
+---@param color Color @ `r`, `b` and `b` must be provided. `a` will be set to `final_opacity`.
+local function draw_pickup_highlight_internal(player, final_opacity, color)
+  if try_reuse_existing_pickup_highlight(player, final_opacity, color) then return end
+  local left_top, right_bottom = get_pickup_box(player)
+  player.pickup_highlight_id
+    = draw_pickup_or_drop_highlight(player, 2.999, left_top, right_bottom, final_opacity, color)
+end
+
+---@param player PlayerDataQAI
+local function draw_green_pickup_highlight(player)
+  draw_pickup_highlight_internal(player, 1, {r = 0, g = 1, b = 0})
+end
+
+---@param player PlayerDataQAI
+local function draw_white_pickup_highlight(player)
+  draw_pickup_highlight_internal(player, 1, {r = 1, g = 1, b = 1})
 end
 
 ---@param player PlayerDataQAI
@@ -1953,6 +2106,8 @@ local function ensure_is_idle_and_try_set_target_inserter(player, target_inserte
   return true
 end
 
+local draw_white_drop_highlight
+
 ---Similar to switch_to_idle, this function can raise an event, so make sure to expect the world and the mod
 ---to be in any state after calling it.
 ---@param player PlayerDataQAI
@@ -1965,6 +2120,8 @@ local function switch_to_selecting_pickup(player, target_inserter, do_check_reac
   place_squares(player)
   place_rects(player)
   draw_all_rendering_objects(player)
+  draw_white_pickup_highlight(player)
+  draw_white_drop_highlight(player)
   player.state = "selecting-pickup"
   update_inserter_speed_text(player)
 end
@@ -1991,7 +2148,8 @@ local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
   end
   place_rects(player)
   draw_all_rendering_objects(player)
-  draw_pickup_highlight(player)
+  draw_green_pickup_highlight(player)
+  draw_white_drop_highlight(player)
   draw_line_to_pickup_highlight(player)
   player.state = "selecting-drop"
   update_inserter_speed_text(player)
@@ -2200,14 +2358,51 @@ local function get_finish_animation_color_step()
   return {r = 0, g = -1 / finish_animation_frames, b = 0, a = -1 / finish_animation_frames}
 end
 
----@param player PlayerDataQAI
 ---@param position MapPosition
-local function play_drop_highlight_animation(player, position)
-  local color = get_finish_animation_color()
+---@return MapPosition left_top
+---@return MapPosition right_bottom
+local function get_drop_box(position)
   -- 44/256 ~= 1.7 . I had wanted ~1.6 however 42 and 43 would form non squares depending on where we are in a
   -- tile. So 44 it is.
   local left_top = {x = position.x - 44/256, y = position.y - 44/256}
   local right_bottom = {x = position.x + 44/256, y = position.y + 44/256}
+  return left_top, right_bottom
+end
+
+---@param player PlayerDataQAI
+---@param visual_drop_position MapPosition
+---@return boolean
+local function try_reuse_existing_drop_highlight(player, visual_drop_position)
+  local id = player.drop_highlight_id
+  if not id or not rendering.is_valid(id) then return false end
+  local left_top, right_bottom = get_drop_box(visual_drop_position)
+  if not rectangle_positions_equal(id, left_top, right_bottom) then
+    fade_out_or_destroy(id, grid_fade_in_frames)
+    return false
+  end
+  -- The color is the same, so nothing to do.
+  return true
+end
+
+---@param player PlayerDataQAI
+function draw_white_drop_highlight(player)
+  local position = calculate_visualized_drop_position(player, player.target_inserter.drop_position)
+  if try_reuse_existing_drop_highlight(player, position) then return end
+  local left_top, right_bottom = get_drop_box(position)
+  player.drop_highlight_id
+    = draw_pickup_or_drop_highlight(player, 1, left_top, right_bottom, 1, {r = 1, g = 1, b = 1})
+end
+
+---@param player PlayerDataQAI
+---@param position MapPosition
+local function play_drop_highlight_animation(player, position)
+  if player.drop_highlight_id then
+    rendering.destroy(player.drop_highlight_id)
+    player.drop_highlight_id = nil
+  end
+
+  local color = get_finish_animation_color()
+  local left_top, right_bottom = get_drop_box(position)
   local id = rendering.draw_rectangle{
     surface = player.current_surface_index,
     forces = {player.force_index},
@@ -2348,7 +2543,7 @@ end
 
 ---@param player PlayerDataQAI
 local function play_finish_animation(player)
-  if game.tick_paused then return end
+  if not should_animate() then return end
   local drop_position = calculate_visualized_drop_position(player, player.target_inserter.drop_position)
   play_drop_highlight_animation(player, drop_position)
   play_line_to_drop_highlight_animation(player, drop_position)

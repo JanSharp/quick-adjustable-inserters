@@ -113,3 +113,6 @@
 - [x] make sure every event checks valid. Like the selected changed event doesn't.
 - [x] LuaForce valid checking
 - [x] on cursor stack changed is raised at the end of the tick, so everything using that data needs to have validation itself
+- [ ] maybe check pickup and drop positions in update_active_player to catch other mods modifying them while an inserter is being adjusted
+- [ ] why is it that selected is being set to nil when switching to idle again? wasn't that because of teleporting or something? (in other words outdated?)
+- [ ] in whenever a state switch happens with keep_rendering true, the following code is not actually cleaning up rendering objects properly, because any other state switch could have happened in between, leaving the old rendering objects floating forever
