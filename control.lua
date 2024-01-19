@@ -1057,6 +1057,32 @@ local function get_color_init_and_step(current_color, final_color, frames, start
   return current_color, step, remaining_updates
 end
 
+---@param current_position MapPosition @ Gets modified.
+---@param final_position MapPosition
+---@param frames integer
+---@param start_on_first_frame boolean? @ When true `init` will have `step` added to it once already.
+---@return MapPosition init @ Same table as `current_position`.
+---@return MapPosition update @ New table.
+---@return integer remaining_updates
+local function get_position_init_and_step(current_position, final_position, frames, start_on_first_frame)
+  local step_x = (final_position.x - current_position.x) / frames
+  local step_y = (final_position.y - current_position.y) / frames
+  -- Same truncate logic as in get_color_init_and_step, but this time with less precision because the number
+  -- range is [-1000000,1000000]. While stepping through these positions the intermediate values may not be
+  -- accurate map positions, however the last position will always be perfectly equal to final_position.
+  step_x = step_x - (step_x % (1 / 2^34))
+  step_y = step_y - (step_y % (1 / 2^34))
+  local step = {
+    x = step_x,
+    y = step_y,
+  }
+  -- Change init position such that adding step to it `frames` times will result in the exact `final_position`.
+  local remaining_updates = start_on_first_frame and (frames - 1) or frames
+  current_position.x = final_position.x - step_x * remaining_updates
+  current_position.y = final_position.y - step_y * remaining_updates
+  return current_position, step, remaining_updates
+end
+
 ---@param id uint64
 ---@param final_color Color
 ---@param frames integer
