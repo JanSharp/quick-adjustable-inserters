@@ -1651,13 +1651,13 @@ local function draw_grid_lines(player)
     to = to,
   }
 
-  for _, line in pairs(get_lines(player)) do
+  for i, line in pairs(get_lines(player)) do
     from.x = left + line.from.x
     from.y = top + line.from.y
     to.x = left + line.to.x
     to.y = top + line.to.y
     local id = rendering.draw_line(line_param)
-    player.line_ids[#player.line_ids+1] = id
+    player.line_ids[i] = id
     if do_animate then
       add_grid_fade_in_animation(id, opacity, color_step)
     end
