@@ -147,6 +147,11 @@ local animation_type = {
 ---@field force_index uint8
 ---@field last_used_direction defines.direction @ Direction of last adjusted inserter or pipetted entity.
 ---@field state PlayerStateQAI
+---Always `nil` when not idle. Set to `true` when `keep_rendering` was set for `switch_to_idle`, because then
+---the rendering objects are still alive even though the state is idle. This can then be used to ensure these
+---objects get destroyed if another state switch happens before these objects were able to be reused. Which
+---can only happen when mods do things in a raised event during our `switch_to_idle`.
+---@field rendering_is_floating_while_idle boolean?
 ---@field index_in_active_players integer @ `nil` when idle.
 ---`nil` when idle. Must be stored, because we can switch to idle _after_ an entity has been invalidated.
 ---@field target_inserter_id EntityIDQAI
@@ -1139,10 +1144,9 @@ local function destroy_and_clear_rendering_ids(ids)
   end
 end
 
+---Must only be called if the rendering objects actually exist.
 ---@param player PlayerDataQAI
 local function destroy_all_rendering_objects(player)
-  -- For simplicity in other parts of the code, accept this function getting called no matter what.
-  if not player.background_polygon_id then return end
   local destroy = rendering.destroy
   if should_animate() then
     animate_lines_disappearing(player.line_ids)
@@ -1167,6 +1171,18 @@ local function destroy_all_rendering_objects(player)
   player.pickup_highlight_id = nil
   player.drop_highlight_id = nil
   player.line_to_pickup_highlight_id = nil
+end
+
+---@param player PlayerDataQAI
+local function destroy_all_rendering_objects_if_kept_rendering(player)
+  if not player.rendering_is_floating_while_idle then return end
+  player.rendering_is_floating_while_idle = nil
+  destroy_all_rendering_objects(player)
+end
+
+---@param player PlayerDataQAI
+local function confirm_rendering_was_kept_successfully(player)
+  player.rendering_is_floating_while_idle = nil
 end
 
 ---@param player PlayerDataQAI
@@ -1337,6 +1353,7 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   destroy_entities(player.used_ninths)
   destroy_entities(player.used_rects)
   destroy_default_drop_highlight(player)
+  player.rendering_is_floating_while_idle = keep_rendering
   if not keep_rendering then
     destroy_all_rendering_objects(player)
   end
@@ -2078,6 +2095,9 @@ end
 ---@param do_check_reach boolean?
 ---@return boolean success
 local function ensure_is_idle_and_try_set_target_inserter(player, target_inserter, do_check_reach)
+  -- If we are in here because of a raised event during another switch_to_idle call, we must first clean up
+  -- the rendering objects for that were potentially kept alive in that call.
+  destroy_all_rendering_objects_if_kept_rendering(player)
   local prev_target_inserter = player.target_inserter
   local prev_surface = player.current_surface
   local prev_position = player.target_inserter_position
@@ -2091,12 +2111,13 @@ local function ensure_is_idle_and_try_set_target_inserter(player, target_inserte
     if not target_inserter.valid or player.state ~= "idle" then return false end
   end
   if not try_set_target_inserter(player, target_inserter, do_check_reach, carry_over_no_reach_checks) then
-    destroy_all_rendering_objects(player)
+    destroy_all_rendering_objects_if_kept_rendering(player)
     if prev_target_inserter then
       restore_after_adjustment(player, prev_target_inserter, prev_surface, prev_position)
     end
     return false
   end
+  confirm_rendering_was_kept_successfully(player)
   deactivate_inserter(player, target_inserter)
   return true
 end
