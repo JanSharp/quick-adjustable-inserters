@@ -158,6 +158,10 @@ local animation_type = {
 ---@field target_inserter LuaEntity @ `nil` when idle.
 ---@field target_inserter_cache InserterCacheQAI @ `nil` when idle.
 ---@field target_inserter_position MapPosition @ `nil` when idle.
+---`nil` when idle. Used purely to detect changes. All other logic re-fetches the pickup position.
+---@field target_inserter_pickup_position MapPosition
+---`nil` when idle. Used purely to detect changes. All other logic re-fetches the drop position.
+---@field target_inserter_drop_position MapPosition
 ---@field target_inserter_direction defines.direction @ `nil` when idle.
 ---@field target_inserter_force_index uint32 @ `nil` when idle.
 ---`nil` when idle.\
@@ -1364,6 +1368,8 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   player.target_inserter = nil
   player.target_inserter_cache = nil
   player.target_inserter_position = nil
+  player.target_inserter_pickup_position = nil
+  player.target_inserter_drop_position = nil
   player.target_inserter_direction = nil
   player.target_inserter_force_index = nil
   player.should_flip = nil
@@ -2079,6 +2085,8 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach, 
   player.target_inserter = target_inserter
   player.target_inserter_cache = cache
   player.target_inserter_position = target_inserter.position
+  player.target_inserter_pickup_position = target_inserter.pickup_position
+  player.target_inserter_drop_position = target_inserter.drop_position
   local direction = target_inserter.direction
   player.target_inserter_direction = direction
   player.target_inserter_force_index = target_inserter.force_index
@@ -2956,14 +2964,17 @@ local function update_active_player(player)
   if not validate_target_inserter(player) then return end
   local inserter = player.target_inserter
   deactivate_inserter(player, inserter)
-  local position = inserter.position
-  local prev_position = player.target_inserter_position
   if inserter.direction ~= player.target_inserter_direction
     or inserter.force_index ~= player.target_inserter_force_index
-    or position.x ~= prev_position.x
-    or position.y ~= prev_position.y
+    or not vec.vec_equals(inserter.position, player.target_inserter_position)
   then
     switch_to_idle_and_back(player, true)
+    update_inserter_speed_text(player)
+  end
+  if not vec.vec_equals(inserter.pickup_position, player.target_inserter_pickup_position)
+    or not vec.vec_equals(inserter.drop_position, player.target_inserter_drop_position)
+  then
+    switch_to_idle_and_back(player) -- Don't do reach checks.
     update_inserter_speed_text(player)
   end
 end
