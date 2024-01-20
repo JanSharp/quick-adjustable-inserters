@@ -1359,11 +1359,6 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
     return
   end
 
-  local selected = actual_player.selected
-  if selected and entity_name_lut[selected.name] then
-    actual_player.selected = nil
-  end
-
   update_inserter_speed_text(player)
 
   if not do_not_restore then
