@@ -15,7 +15,8 @@
       "data_for_auto_screenshots.lua",
       "notes.md",
       "scenario-scripts/**/*",
-      "scenarios/**/*"
+      "scenarios/**/*",
+      "**/*.xcf"
     ]
   }
 }

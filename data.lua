@@ -163,14 +163,28 @@ then
   end)
 end
 
+local fast_inserter_icon = mods["base"]
+  and "__base__/graphics/technology/fast-inserter.png" -- Reuse existing, no need to duplicate it in VRAM.
+  or "__quick-adjustable-inserters__/graphics/technology/fast-inserter.png"
+
 add_if_it_does_not_exist("technology", "more-inserters-1", function()
   return {
     type = "technology",
     name = "more-inserters-1",
     localised_name = {"technology-name.qai-more-inserters-1"},
     localised_description = {"technology-description.qai-more-inserters-1"},
-    icon = "__quick-adjustable-inserters__/graphics/technology/more-inserters-1.png",
-    icon_size = 256, icon_mipmaps = 1,
+    icons = {
+      {
+        icon = fast_inserter_icon,
+        icon_size = 256, icon_mipmaps = 4,
+      },
+      {
+        icon = "__quick-adjustable-inserters__/graphics/technology/constant-more-inserters-1.png",
+        icon_size = 128,
+        icon_mipmaps = 3,
+        shift = {100, 100},
+      }
+    },
     prerequisites = {"logistics-2"},
     effects = {},
     unit = {
@@ -192,8 +206,18 @@ if data_core.check_setting("bobmods-inserters-more2", true) then
       name = "more-inserters-2",
       localised_name = {"technology-name.qai-more-inserters-2"},
       localised_description = {"technology-description.qai-more-inserters-2"},
-      icon = "__quick-adjustable-inserters__/graphics/technology/more-inserters-2.png",
-      icon_size = 256, icon_mipmaps = 1,
+      icons = {
+        {
+          icon = fast_inserter_icon,
+          icon_size = 256, icon_mipmaps = 4,
+        },
+        {
+          icon = "__quick-adjustable-inserters__/graphics/technology/constant-more-inserters-2.png",
+          icon_size = 128,
+          icon_mipmaps = 3,
+          shift = {100, 100},
+        }
+      },
       prerequisites = {"more-inserters-1", "logistics-3"},
       effects = {},
       unit = {

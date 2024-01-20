@@ -84,7 +84,7 @@
 - [ ] look into smart inserters and see how hard compatibility with that mod would be
 - [x] change hard dependency on bobinserters to hidden optional (for mod load order)
 - [x] add own technologies with the same names and own custom icons
-  - [ ] revisit icons, probably using the inserter tech icon and adding something to it in gimp
+  - [x] revisit icons, probably using the inserter tech icon and adding something to it in gimp
   - [x] locale name and descriptions
 - [x] add startup settings just like bobinserters, even with the same name, but only if they don't exist already
 - [x] add logic in data updates and final fixes to enable runtime adjustable vectors
