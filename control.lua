@@ -1427,6 +1427,18 @@ local function get_grid_center(player)
 end
 
 ---@param player PlayerDataQAI
+---@return MapPosition
+local function get_current_grid_center_position(player)
+  return vec.add(
+    vec.add(
+      vec.copy(player.target_inserter_position),
+      get_offset_from_inserter(player)
+    ),
+    get_grid_center(player)
+  )
+end
+
+---@param player PlayerDataQAI
 ---@return MapPosition[]
 local function get_tiles(player)
   local cache = player.target_inserter_cache
@@ -1661,9 +1673,6 @@ end
 ---@param player PlayerDataQAI
 local function draw_circle_on_inserter(player)
   local cache = player.target_inserter_cache
-  local inserter_position = player.target_inserter_position
-  local offset_from_inserter = get_offset_from_inserter(player)
-  local grid_center = get_grid_center(player)
   local do_animate, opacity, color_step = get_color_for_potential_animation(1)
   player.inserter_circle_id = rendering.draw_circle{
     surface = player.current_surface_index,
@@ -1671,10 +1680,7 @@ local function draw_circle_on_inserter(player)
     color = color_step,
     radius = cache.radius_for_circle_on_inserter,
     width = 2,
-    target = {
-      x = inserter_position.x + offset_from_inserter.x + grid_center.x,
-      y = inserter_position.y + offset_from_inserter.y + grid_center.y,
-    },
+    target = get_current_grid_center_position(player),
   }
   if do_animate then
     add_grid_fade_in_animation(player.inserter_circle_id, opacity, color_step)
@@ -2028,13 +2034,7 @@ end
 ---@return MapPosition? to
 ---@return number length
 local function get_from_and_to_for_line_from_center(player, square_position, square_radius)
-  local grid_center_position = vec.add(
-    vec.add(
-      vec.copy(player.target_inserter_position),
-      get_offset_from_inserter(player)
-    ),
-    get_grid_center(player)
-  )
+  local grid_center_position = get_current_grid_center_position(player)
   local pickup_vector = vec.sub(square_position, grid_center_position)
   local distance_from_pickup = (3/32) + vec.get_length(vec.div_scalar(
     vec.copy(pickup_vector),
