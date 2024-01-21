@@ -118,6 +118,8 @@ local animation_type = {
 ---@field tiles_background_vertices_flipped ScriptRenderVertexTarget[]
 ---@field lines LineDefinitionQAI[]
 ---@field lines_flipped LineDefinitionQAI[]
+---@field direction_arrows_indicator_lines LineDefinitionQAI[]
+---@field direction_arrows_indicator_lines_flipped LineDefinitionQAI[]
 ---@field direction_arrows DirectionArrowDefinitionQAI[] @ 4 when square, otherwise 2 (north and south).
 ---@field direction_arrow_position MapPosition
 ---@field direction_arrow_vertices ScriptRenderVertexTarget[]
@@ -174,6 +176,7 @@ local animation_type = {
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
 ---@field line_ids uint64[]
+---@field direction_arrows_indicator_line_ids uint64[]
 ---@field background_polygon_id uint64 @ `nil` when idle.
 ---`nil` when idle. Can be `nil` when destroying all rendering objects due to being part of an animation.
 ---@field inserter_circle_id uint64
@@ -588,23 +591,13 @@ local function generate_tiles_background_cache(cache)
   end
 end
 
----@param cache InserterCacheQAI
-local function generate_lines_cache(cache)
+---@param lines LineDefinitionQAI[]
+---@param lines_flipped LineDefinitionQAI[]
+---@return fun(line: LineDefinitionQAI)
+local function line_adder_factory(lines, lines_flipped)
   local count = 0
-  local lines = cache.lines
-  local lines_flipped = cache.lines_flipped
-  ---How many lines within a tile can be drawn?
-  local resolution = 2
-  local line_part_length = 1 / resolution
-  ---Extra tiles needed to be able to draw lines indicating the selection boxes for direction arrows.
-  ---Because points must be >= 0. So this is the arrow height when north and south, otherwise it is the width.
-  local extra_tiles = 2
   ---@param line LineDefinitionQAI
-  local function add(line)
-    line.from.y = line.from.y / resolution - extra_tiles
-    line.from.x = line.from.x / resolution - extra_tiles
-    line.to.y = line.to.y / resolution - extra_tiles
-    line.to.x = line.to.x / resolution - extra_tiles
+  return function(line)
     count = count + 1
     lines[count] = line
     lines_flipped[count] = {
@@ -618,18 +611,15 @@ local function generate_lines_cache(cache)
       },
     }
   end
+end
 
-  ---Get a point that is actually relative to the top left corner of the grid.
-  ---@param x integer
-  ---@param y integer
-  ---@return integer point
-  local function get_shifted_point(x, y)
-    return get_point((x + extra_tiles) * resolution, (y + extra_tiles) * resolution)
-  end
+---@param cache InserterCacheQAI
+local function generate_lines_cache(cache)
+  local add = line_adder_factory(cache.lines, cache.lines_flipped)
 
   -- The final lines are represented as points in these grids.
-  -- shifted 0, 0 in horizontal_grid is the line going from the top left corner 1 tile to the right.
-  -- shifted 0, 0 in vertical_grid is the line going from the top left corner 1 tile downwards.
+  -- 0, 0 in horizontal_grid is the line going from the top left corner 1 tile to the right.
+  -- 0, 0 in vertical_grid is the line going from the top left corner 1 tile downwards.
   ---@type table<uint32, true>
   local horizontal_grid = {}
   ---@type table<uint32, true>
@@ -637,40 +627,10 @@ local function generate_lines_cache(cache)
 
   -- Define grid lines.
   for _, tile in pairs(cache.tiles) do
-    for i = 0, 1 - line_part_length, line_part_length do
-      horizontal_grid[get_shifted_point(tile.x + i, tile.y)] = true
-      horizontal_grid[get_shifted_point(tile.x + i, tile.y + 1)] = true
-      vertical_grid[get_shifted_point(tile.x, tile.y + i)] = true
-      vertical_grid[get_shifted_point(tile.x + 1, tile.y + i)] = true
-    end
-  end
-
-  -- Define direction arrow highlight lines.
-  local max_range = cache.tech_level.range + cache.range_gap_from_center
-  local grid_width = max_range * 2 + cache.tile_width
-  local grid_height = max_range * 2 + cache.tile_height
-  local arrow_width = 3 -- For north and south, otherwise it would be height.
-  local from_top = max_range - (arrow_width - cache.tile_height) / 2
-  local from_left = max_range - (arrow_width - cache.tile_width) / 2
-  for i = 0, 1 do
-    local x = i * (grid_width + extra_tiles * 2 - line_part_length) - extra_tiles
-    local y = i * (grid_height + extra_tiles * 2 - line_part_length) - extra_tiles
-    if cache.is_square then
-      horizontal_grid[get_shifted_point(x, from_top)] = true
-      horizontal_grid[get_shifted_point(x, from_top + arrow_width)] = true
-    end
-    vertical_grid[get_shifted_point(from_left, y)] = true
-    vertical_grid[get_shifted_point(from_left + arrow_width, y)] = true
-  end
-  for i = 0, 1 do
-    local x = i * (grid_width + extra_tiles * 2) - extra_tiles
-    local y = i * (grid_height + extra_tiles * 2) - extra_tiles
-    for j = 0, arrow_width - line_part_length, arrow_width - line_part_length do
-      if cache.is_square then
-        vertical_grid[get_shifted_point(x, from_top + j)] = true
-      end
-      horizontal_grid[get_shifted_point(from_left + j, y)] = true
-    end
+    horizontal_grid[get_point(tile.x, tile.y)] = true
+    horizontal_grid[get_point(tile.x, tile.y + 1)] = true
+    vertical_grid[get_point(tile.x, tile.y)] = true
+    vertical_grid[get_point(tile.x + 1, tile.y)] = true
   end
 
   -- Combine horizontal lines.
@@ -711,6 +671,55 @@ local function generate_lines_cache(cache)
       from = {x = x, y = from_y},
       to = {x = x, y = to_y + 1},
     }
+  end
+end
+
+---@param cache InserterCacheQAI
+local function generate_direction_arrows_indicator_lines_cache(cache)
+  local add = line_adder_factory(
+    cache.direction_arrows_indicator_lines,
+    cache.direction_arrows_indicator_lines_flipped
+  )
+
+  local line_length = 0.5
+  local arrow_width = 3 -- For north and south, otherwise it would be height.
+  local arrow_height = 2 -- For north and south, otherwise it would be width.
+  local max_range = cache.tech_level.range + cache.range_gap_from_center
+  local grid_width = max_range * 2 + cache.tile_width
+  local grid_height = max_range * 2 + cache.tile_height
+  local from_top = max_range - (arrow_width - cache.tile_height) / 2
+  local from_left = max_range - (arrow_width - cache.tile_width) / 2
+  for i = 0, 1 do -- Add the lines "facing inwards".
+    local x = i * (grid_width + arrow_height * 2 - line_length) - arrow_height
+    local y = i * (grid_height + arrow_height * 2 - line_length) - arrow_height
+    for j = 0, arrow_width, arrow_width do
+      if cache.is_square then
+        add{
+          from = {x = x, y = from_top + j},
+          to = {x = x + line_length, y = from_top + j},
+        }
+      end
+      add{
+        from = {x = from_left + j, y = y},
+        to = {x = from_left + j, y = y + line_length},
+      }
+    end
+  end
+  for i = 0, 1 do -- Add the lines "going along the outside".
+    local x = i * (grid_width + arrow_height * 2) - arrow_height
+    local y = i * (grid_height + arrow_height * 2) - arrow_height
+    for j = 0, arrow_width - line_length, arrow_width - line_length do
+      if cache.is_square then
+        add{
+          from = {x = x, y = from_top + j},
+          to = {x = x, y = from_top + j + line_length},
+        }
+      end
+      add{
+        from = {x = from_left + j, y = y},
+        to = {x = from_left + j + line_length, y = y},
+      }
+    end
   end
 end
 
@@ -858,6 +867,8 @@ local function generate_cache_for_inserter(inserter, tech_level)
     tiles_background_vertices_flipped = {},
     lines = {},
     lines_flipped = {},
+    direction_arrows_indicator_lines = {},
+    direction_arrows_indicator_lines_flipped = {},
     direction_arrows = {},
     direction_arrow_vertices = {},
     extension_speed = inserter.inserter_extension_speed,
@@ -883,6 +894,7 @@ local function generate_cache_for_inserter(inserter, tech_level)
   generate_tiles_cache(cache)
   generate_tiles_background_cache(cache)
   generate_lines_cache(cache)
+  generate_direction_arrows_indicator_lines_cache(cache)
   generate_direction_arrow_cache(cache)
   return cache
 end
@@ -1159,6 +1171,7 @@ local function destroy_all_rendering_objects(player)
   local destroy = rendering.destroy
   if should_animate() then
     animate_lines_disappearing(player.line_ids)
+    animate_lines_disappearing(player.direction_arrows_indicator_line_ids)
     animate_id_disappearing(player.background_polygon_id, grid_background_opacity)
     animate_id_disappearing(player.direction_arrow_id, direction_arrow_opacity)
     if player.inserter_circle_id then animate_id_disappearing(player.inserter_circle_id, 1) end
@@ -1167,6 +1180,7 @@ local function destroy_all_rendering_objects(player)
     if player.line_to_pickup_highlight_id then fade_out(player.line_to_pickup_highlight_id, grid_fade_out_frames) end
   else
     destroy_and_clear_rendering_ids(player.line_ids)
+    destroy_and_clear_rendering_ids(player.direction_arrows_indicator_line_ids)
     destroy(player.background_polygon_id)
     destroy(player.direction_arrow_id)
     if player.inserter_circle_id then destroy(player.inserter_circle_id) end
@@ -1431,6 +1445,15 @@ local function get_lines(player)
 end
 
 ---@param player PlayerDataQAI
+---@return LineDefinitionQAI[]
+local function get_direction_arrows_indicator_lines(player)
+  local cache = player.target_inserter_cache
+  return player.should_flip
+    and cache.direction_arrows_indicator_lines_flipped
+    or cache.direction_arrows_indicator_lines
+end
+
+---@param player PlayerDataQAI
 ---@return ScriptRenderVertexTarget[]
 local function get_tiles_background_vertices(player)
   local cache = player.target_inserter_cache
@@ -1659,7 +1682,9 @@ local function draw_circle_on_inserter(player)
 end
 
 ---@param player PlayerDataQAI
-local function draw_grid_lines(player)
+---@param line_ids int64[]
+---@param lines LineDefinitionQAI[]
+local function draw_lines_internal(player, line_ids, lines)
   local inserter_position = player.target_inserter_position
   local offset_from_inserter = get_offset_from_inserter(player)
   local left = inserter_position.x + offset_from_inserter.x
@@ -1677,17 +1702,31 @@ local function draw_grid_lines(player)
     to = to,
   }
 
-  for i, line in pairs(get_lines(player)) do
+  for i, line in pairs(lines) do
     from.x = left + line.from.x
     from.y = top + line.from.y
     to.x = left + line.to.x
     to.y = top + line.to.y
     local id = rendering.draw_line(line_param)
-    player.line_ids[i] = id
+    line_ids[i] = id
     if do_animate then
       add_grid_fade_in_animation(id, opacity, color_step)
     end
   end
+end
+
+---@param player PlayerDataQAI
+local function draw_grid_lines(player)
+  draw_lines_internal(player, player.line_ids, get_lines(player))
+end
+
+---@param player PlayerDataQAI
+local function draw_direction_arrows_indicator_lines(player)
+  draw_lines_internal(
+    player,
+    player.direction_arrows_indicator_line_ids,
+    get_direction_arrows_indicator_lines(player)
+  )
 end
 
 ---@param player PlayerDataQAI
@@ -1715,6 +1754,7 @@ local function draw_all_rendering_objects(player)
   -- When rendering objects were kept alive when switching to idle previously, don't create another set.
   if player.inserter_circle_id then return end
   draw_direction_arrow(player)
+  draw_direction_arrows_indicator_lines(player)
   draw_circle_on_inserter(player)
   draw_grid_background(player)
   draw_grid_lines(player)
@@ -2940,6 +2980,7 @@ local function init_player(player)
     used_ninths = {},
     used_rects = {},
     line_ids = {},
+    direction_arrows_indicator_line_ids = {},
     show_throughput_on_inserter = player_settings["qai-show-throughput-on-inserter"].value--[[@as boolean]],
     show_throughput_on_pickup = player_settings["qai-show-throughput-on-pickup"].value--[[@as boolean]],
     show_throughput_on_drop = player_settings["qai-show-throughput-on-drop"].value--[[@as boolean]],
