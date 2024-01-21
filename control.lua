@@ -219,12 +219,16 @@ local entity_name_lut = {
 }
 
 local techs_we_care_about = {
-  ["long-inserters-1"] = true,
-  ["long-inserters-2"] = true,
   ["near-inserters"] = true,
   ["more-inserters-1"] = true,
   ["more-inserters-2"] = true,
 }
+
+---@param name string
+local function do_we_care_about_this_technology(name)
+  return techs_we_care_about[name]
+    or string.find(name, "^long%-inserters%-([1-9]%d*)$") -- Does not accept leading zeros.
+end
 
 ---Can also be used to check if a given direction is a supported direction by this mod.
 local inverse_direction_lut = {
@@ -2820,14 +2824,20 @@ end
 local function update_tech_level_for_force(force)
   local tech_level = force.tech_level
   local techs = force.force.technologies
-  local long_inserters_1 = techs["long-inserters-1"]
-  local long_inserters_2 = techs["long-inserters-2"]
   local near_inserters = techs["near-inserters"]
   local more_inserters_1 = techs["more-inserters-1"]
   local more_inserters_2 = techs["more-inserters-2"]
-  tech_level.range = long_inserters_2 and long_inserters_2.researched and 3
-    or long_inserters_1 and long_inserters_1.researched and 2
-    or 1
+  local range = 1
+  for level = 1, 1/0 do -- No artificial limit, the practical limit will be hit pretty quickly anyway.
+    local tech = techs[string.format("long-inserters-%d", level)]
+    if not tech then break end -- Gaps in technologies are not accepted.
+    if tech.researched then
+      range = level + 1 -- "long-inserters-1" equates to having 2 range.
+    end
+    -- Continue even if a technology isn't researched to find the highest technology which has been researched.
+    -- The highest technology is unknown, so it's just a loop from the bottom up.
+  end
+  tech_level.range = range
   tech_level.drop_offset = near_inserters and near_inserters.researched or false
   tech_level.cardinal = true
   tech_level.all_tiles = more_inserters_2 and more_inserters_2.researched or false
@@ -3291,7 +3301,7 @@ end)
 
 script.on_event({ev.on_research_finished, ev.on_research_reversed}, function(event)
   local research = event.research
-  if not techs_we_care_about[research.name] then return end
+  if not do_we_care_about_this_technology(research.name) then return end
   local force = get_force(research.force.index)
   if not force then return end
   update_tech_level_for_force(force)
