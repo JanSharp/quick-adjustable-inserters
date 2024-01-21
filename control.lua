@@ -118,7 +118,7 @@ local animation_type = {
 ---@field tiles_background_vertices_flipped ScriptRenderVertexTarget[]
 ---@field lines LineDefinitionQAI[]
 ---@field lines_flipped LineDefinitionQAI[]
----@field direction_arrows DirectionArrowDefinitionQAI[] @ Always 4.
+---@field direction_arrows DirectionArrowDefinitionQAI[] @ 4 when square, otherwise 2 (north and south).
 ---@field direction_arrow_position MapPosition
 ---@field direction_arrow_vertices ScriptRenderVertexTarget[]
 ---@field extension_speed number
@@ -734,20 +734,21 @@ local function generate_direction_arrow_cache(cache)
         y = max_range * 2 + tile_height + 1,
       },
     },
-    {
+    -- Only define west and east for square grids. Otherwise north and south are flipped diagonally when needed.
+    cache.is_square and {
       direction = defines.direction.west,
       position = {
         x = -1,
         y = max_range + tile_height / 2,
       },
-    },
-    {
+    } or nil,
+    cache.is_square and {
       direction = defines.direction.east,
       position = {
         x = max_range * 2 + tile_width + 1,
         y = max_range + tile_height / 2,
       },
-    },
+    } or nil,
   }
   cache.direction_arrow_position = {
     x = max_range + tile_width / 2,
@@ -1591,7 +1592,6 @@ local function place_rects(player)
   }
   local create_entity = player.current_surface.create_entity
   for _, dir_arrow in pairs(cache.direction_arrows) do
-    if not cache.is_square and is_east_or_west_lut[dir_arrow.direction] then goto continue end
     position.x = offset_from_inserter.x + dir_arrow.position.x
     position.y = offset_from_inserter.y + dir_arrow.position.y
     flip(player, position)
@@ -1606,7 +1606,6 @@ local function place_rects(player)
     player.used_rects[#player.used_rects+1] = unit_number
     selectable_entities_to_player_lut[unit_number] = player
     selectable_entities_by_unit_number[unit_number] = entity
-    ::continue::
   end
 end
 
