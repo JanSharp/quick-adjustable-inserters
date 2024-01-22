@@ -215,12 +215,6 @@ local grid_fade_out_frames = 12
 local grid_background_opacity = 0.2
 local direction_arrow_opacity = 0.6
 
-local entity_name_lut = {
-  [square_entity_name] = true,
-  [ninth_entity_name] = true,
-  [rect_entity_name] = true,
-}
-
 local techs_we_care_about = {
   ["near-inserters"] = true,
   ["more-inserters-1"] = true,
