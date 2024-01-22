@@ -66,7 +66,7 @@
 - [x] add locale for the key bind/control
 - [x] change default key sequence because it conflicts with bobinserters
   - [x] SHIFT + F conflicts with several search mods, however looking through all the key sequences I'd like to use, they all have conflicts so this is most likely one of the lesser evils
-  - [ ] play test with it a bit
+  - [x] play test with it a bit
 - [x] maybe make direction arrow a little transparent
 - [x] change visualization when pickup has been selected
   - [x] draw square around it instead of a highlight box
@@ -76,12 +76,12 @@
   - [x] yes it is. With pooling hitting the key bind 3 times on an inserter takes 2.57 ms, without pooling it takes 1.7 ms
 - [x] thumbnail
 - [x] readme/description
-- [ ] tips and tricks simulations
+- [ ] maybe add tips and tricks simulations. It kind feels unnecessary, basically everything is either self explanatory or explained in tooltips.
 - [x] don't restore when rotating and similar
 - [x] ~~try using render_player_index for selectable entities. See if the selection box shows up for other players as well~~ Tried it, they are still selectable for other players, so this is not an option
-- [ ] look into renai transportation and see if it needs special support just for fun
+- [x] ~~look into renai transportation and see if it needs special support just for fun~~ scope creep, and I sense that performance would be horrific with a large grid
 - [ ] wait, but why do we not get a selection changed event with selected being nil when we move the cursor off of a selectable entity from this mod and pressing the adjust key bind in the same tick, causing it to delete the previously selected entity?
-- [ ] look into smart inserters and see how hard compatibility with that mod would be
+- [ ] maybe look into smart inserters and see how hard compatibility with that mod would be. For things like tech unlocks maybe
 - [x] change hard dependency on bobinserters to hidden optional (for mod load order)
 - [x] add own technologies with the same names and own custom icons
   - [x] revisit icons, probably using the inserter tech icon and adding something to it in gimp
@@ -95,10 +95,11 @@
 - [x] maybe add startup setting to normalize pickup vectors, snapping them to tile centers
 - [x] use "cardinal" instead of "perpendicular"
 - [ ] maybe add remote interface and api
-  - [ ] api file which checks for the existence remote interfaces containing a certain name, and calls all of them (that is to support for example smart inserters implementing the same interface, and being enabled at the same time)
-    - [ ] put the MIT license directly in the api file so others can copy it into their code. This allows for mods to implement the interface and replace quick adjustable inserters entirely without other mods using the api to have to change anything. It would "just work"
-  - [ ] change which technologies unlock what
-  - [ ] add more or less range
+  - [x] ~~api file which checks for the existence remote interfaces containing a certain name, and calls all of them (that is to support for example smart inserters implementing the same interface, and being enabled at the same time)~~ if tech unlocks and range cannot be modified through the remote interface then all the interface is really doing is things specific to this mod. So there's no reason to pretend like it's some standard other mods could follow. Because it isn't.
+    - [x] ~~put the MIT license directly in the api file so others can copy it into their code. This allows for mods to implement the interface and replace quick adjustable inserters entirely without other mods using the api to have to change anything. It would "just work"~~
+  - [ ] api file which is just a wrapper around the remote.call calls, because I like that
+  - [x] ~~change which technologies unlock what~~ Thought about it, it'd be stupidly complicated to actually handle properly. No thank you.
+  - [x] ~~add more or less range~~ Possible through auto detected technologies now. You can't skip levels but meh, it's better than nothing. Doing it through the remote has similar issues as the above
   - [ ] trigger build & adjust
   - [x] trigger adjust key bind on a given entity
   - [x] trigger switch_to_idle (even though adjusting on a nil entity already does that)
@@ -106,7 +107,7 @@
 - [x] make all qai prefixes lowercase, outside of type names of course
 - [x] maybe always script disable while adjusting
 - [x] do not use rotate locale, just make your own for not being able to adjust enemy structures
-- [ ] maybe add nothing technology effects/modifies with descriptions
+- [x] ~~maybe add nothing technology effects/modifies with descriptions~~ the tech descriptions are enough
 - [x] or just add technology descriptions
 - [x] use both the selection box and collision box to determine the size of the inserter
 - [x] auto detect more range technologies, simply by going sequentially (long-inserters-1, long-inserters-2, long-inserters-3, ...)
