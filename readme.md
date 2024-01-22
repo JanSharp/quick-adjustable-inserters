@@ -16,6 +16,10 @@ While having an inserter in hand/cursor, place it and instantly adjust it by pre
 
 **Known Issue:** Sometimes the inserter will be placed facing the wrong way. The mod tries its best to get it right, but there are cases that simply cannot be handled. Pipette an existing inserter and it will face the right way the next time you place an inserter again.
 
+## Mirrored Inserters only
+
+There is a map setting (off by default) to restrict how inserters can be adjusted. WHen enabled the pickup and drop positions (tiles) must be exactly mirrored/opposite of each other in relation to the center of the inserter. Basically if you like a bit of adjustment, but being able to make inserters pickup and drop on 2 adjacent tiles is too over powered, this setting might just be for you.
+
 ## Pipette copies Vectors
 
 This is an opt in feature (a mod settings) to make smart pipette (`Q`) remember the pickup and drop vectors of the inserter that got picked, and applies these vectors to newly placed inserters. This stays in effect so long as the inserter is in hand/cursor.
@@ -38,6 +42,20 @@ It is using the [Inserter Throughput Library](https://mods.factorio.com/mod/inse
 
 This mod supports ghosts. Quite a bit went into it, but for you it's just that simple. It supports adjusting ghost inserters and throughput estimation works with ghosts as well.
 
+## Balancing
+
+As a modded player there's some degree of balancing that you put upon yourself, to make the game and features fit for you. Many people consider adjusting inserters to be very over powered or they simplify the challenge of arranging setups properly too much. These are very valid concerns.
+
+But what if you just wanted to be able to do some of the following?
+
+- only change the drop position ever so slightly within a tile (aka changing the drop offset, aka near/far inserters)
+- only change the range of inserters between 1 and 2, or maybe 3, keeping the drop offset unchanged and having inserters always swing 180 degrees
+- change inserters between cardinal directions and diagonal
+
+Well with the settings this mod provides all of those restrictions are possible to be enforced. Simply by disabling some of the technologies through startup settings, as well as through the map setting to only allow mirrored inserters (180 degree swings).
+
+The default settings are the least restrictive and therefore most powerful.
+
 ## Compatibility
 
 This mod handles all kinds of weird inserters. Not to say all of them, but a lot. Like diagonal inserters, off center, off grid or non square inserters. It can also co-exist with other inserter adjustment mods.
@@ -54,6 +72,10 @@ There are settings ...
 - to show the default drop offset within tiles
 - for place and adjust to also pipette the inserter once done, to continue placing more inserters
 - for pipette to copy vectors, see section a little bit higher up
+
+A map setting ...
+
+- to only allow mirrored inserters. The pickup and drop positions/tiles must be at the opposite sides of the inserter, see section higher up
 
 As well as some startup settings ...
 

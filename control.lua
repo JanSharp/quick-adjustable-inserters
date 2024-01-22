@@ -26,7 +26,10 @@ local vec = require("__inserter-throughput-lib__.vector")
 ---@field selectable_entities_to_player_lut table<uint32, PlayerDataQAI>
 ---Selectable entity unit number => entity with that unit number.
 ---@field selectable_entities_by_unit_number table<uint32, LuaEntity>
+---Selectable square unit number => inserter. Only used with only_allow_mirrored.
+---@field selectable_dummy_redirects table<uint32, LuaEntity>
 ---@field ghost_ids table<uint32, table<double, table<double, EntityGhostIDQAI>>>
+---@field only_allow_mirrored boolean
 global = {}
 
 ---@alias AnimationQAI
@@ -172,12 +175,15 @@ local animation_type = {
 ---@field should_flip boolean
 ---@field current_surface_index uint @ `nil` when idle.
 ---@field current_surface LuaSurface @ `nil` when idle.
+---@field dummy_pickup_square LuaEntity? @ Can be `nil` even when not idle. Only used with only_allow_mirrored.
+---@field dummy_pickup_square_unit_number uint32? @ Can be `nil` even when not idle.
 ---@field used_squares uint[]
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
----@field line_ids uint64[]
+---@field line_ids uint64[] @ When `only_allow_mirrored` this will contain a rectangle while selecting drop.
 ---@field direction_arrows_indicator_line_ids uint64[]
----@field background_polygon_id uint64 @ `nil` when idle.
+---`nil` when idle. When `only_allow_mirrored` this will be a rectangle while selecting drop.
+---@field background_polygon_id uint64
 ---`nil` when idle. Can be `nil` when destroying all rendering objects due to being part of an animation.
 ---@field inserter_circle_id uint64
 ---@field direction_arrow_id uint64 @ `nil` when idle.
@@ -186,6 +192,7 @@ local animation_type = {
 ---Can be `nil` even when not idle. Can even be `nil` when `pickup_highlight_id` is not `nil`.
 ---@field line_to_pickup_highlight_id uint64?
 ---@field default_drop_highlight LuaEntity? @ Can be `nil` even when not idle.
+---@field mirrored_highlight LuaEntity? @ Can be `nil` even when not idle. Only used with only_allow_mirrored.
 ---`nil` when idle. Ghosts don't need reach checks, and when going from ghost to real, it still shouldn't do
 ---reach checks, because that'd be annoying. Imagine bots kicking you out of adjustment.
 ---@field no_reach_checks boolean?
@@ -1035,13 +1042,41 @@ local function destroy_entities(entities)
   end
 end
 
+---Can most likely raise events (instantly) through destroy trigger effects.\
+---If that is true then the mod will very, very most likely break when that happens, specifically because this
+---gets called in switch_to_idle and there is no validation after the call. But then again, who is going to
+---add destroy trigger effects to highlight entities? If anyone does that, I'm fine with this mod breaking.
+---And if someone adds a destroy trigger effect to the internal entities of this mod then... I mean that
+---speaks for itself.
+---@param entity LuaEntity? @ Potentially `nil` or invalid entity.
+local function destroy_entity_safe(entity)
+  if entity and entity.valid then
+    entity.destroy()
+  end
+end
+
+---@param player PlayerDataQAI
+local function destroy_dummy_pickup_square(player)
+  local entity = player.dummy_pickup_square
+  if not entity then return end
+  global.selectable_dummy_redirects[player.dummy_pickup_square_unit_number] = nil
+  player.dummy_pickup_square = nil
+  player.dummy_pickup_square_unit_number = nil
+  destroy_entity_safe(entity)
+end
+
 ---@param player PlayerDataQAI
 local function destroy_default_drop_highlight(player)
   local entity = player.default_drop_highlight
   player.default_drop_highlight = nil
-  if entity and entity.valid then
-    entity.destroy()
-  end
+  destroy_entity_safe(entity)
+end
+
+---@param player PlayerDataQAI
+local function destroy_mirrored_highlight(player)
+  local entity = player.mirrored_highlight
+  player.mirrored_highlight = nil
+  destroy_entity_safe(entity)
 end
 
 ---@param current_color Color @ Gets modified.
@@ -1161,35 +1196,50 @@ local function destroy_and_clear_rendering_ids(ids)
   end
 end
 
----Must only be called if the rendering objects actually exist.
+---Must only be called when the rendering objects actually exist.
 ---@param player PlayerDataQAI
-local function destroy_all_rendering_objects(player)
-  local destroy = rendering.destroy
+local function destroy_grid_lines_and_background(player)
   if should_animate() then
     animate_lines_disappearing(player.line_ids)
-    animate_lines_disappearing(player.direction_arrows_indicator_line_ids)
     animate_id_disappearing(player.background_polygon_id, grid_background_opacity)
+  else
+    destroy_and_clear_rendering_ids(player.line_ids)
+    rendering.destroy(player.background_polygon_id)
+  end
+  player.background_polygon_id = nil
+end
+
+---Must only be called when the rendering objects actually exist.
+---@param player PlayerDataQAI
+local function destroy_everything_but_grid_lines_and_background(player)
+  local destroy = rendering.destroy
+  if should_animate() then
+    animate_lines_disappearing(player.direction_arrows_indicator_line_ids)
     animate_id_disappearing(player.direction_arrow_id, direction_arrow_opacity)
     if player.inserter_circle_id then animate_id_disappearing(player.inserter_circle_id, 1) end
     if player.pickup_highlight_id then fade_out(player.pickup_highlight_id, grid_fade_out_frames) end
     if player.drop_highlight_id then animate_id_disappearing(player.drop_highlight_id, 1) end
     if player.line_to_pickup_highlight_id then fade_out(player.line_to_pickup_highlight_id, grid_fade_out_frames) end
   else
-    destroy_and_clear_rendering_ids(player.line_ids)
     destroy_and_clear_rendering_ids(player.direction_arrows_indicator_line_ids)
-    destroy(player.background_polygon_id)
     destroy(player.direction_arrow_id)
     if player.inserter_circle_id then destroy(player.inserter_circle_id) end
     if player.pickup_highlight_id then destroy(player.pickup_highlight_id) end
     if player.drop_highlight_id then destroy(player.drop_highlight_id) end
     if player.line_to_pickup_highlight_id then destroy(player.line_to_pickup_highlight_id) end
   end
-  player.background_polygon_id = nil
   player.inserter_circle_id = nil
   player.direction_arrow_id = nil
   player.pickup_highlight_id = nil
   player.drop_highlight_id = nil
   player.line_to_pickup_highlight_id = nil
+end
+
+---Must only be called when the rendering objects actually exist.
+---@param player PlayerDataQAI
+local function destroy_all_rendering_objects(player)
+  destroy_grid_lines_and_background(player)
+  destroy_everything_but_grid_lines_and_background(player)
 end
 
 ---@param player PlayerDataQAI
@@ -1371,10 +1421,15 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   destroy_entities(player.used_squares)
   destroy_entities(player.used_ninths)
   destroy_entities(player.used_rects)
+  destroy_dummy_pickup_square(player)
   destroy_default_drop_highlight(player)
+  destroy_mirrored_highlight(player)
   player.rendering_is_floating_while_idle = keep_rendering
+  if not keep_rendering or global.only_allow_mirrored then
+    destroy_grid_lines_and_background(player)
+  end
   if not keep_rendering then
-    destroy_all_rendering_objects(player)
+    destroy_everything_but_grid_lines_and_background(player)
   end
   remove_id(player.target_inserter_id)
   global.inserters_in_use[player.target_inserter_id] = nil
@@ -1471,7 +1526,23 @@ local function get_tiles_background_vertices(player)
 end
 
 ---@param player PlayerDataQAI
-local function place_squares(player)
+local function place_dummy_square_at_pickup(player)
+  local entity = player.current_surface.create_entity{
+    name = square_entity_name,
+    force = player.force_index,
+    position = player.target_inserter.pickup_position,
+  }
+  if not entity then
+    error("Creating an internal entity required by Quick Adjustable Inserters failed.")
+  end
+  player.dummy_pickup_square = entity
+  player.dummy_pickup_square_unit_number = entity.unit_number
+  global.selectable_dummy_redirects[player.dummy_pickup_square_unit_number] = player.target_inserter
+end
+
+---@param player PlayerDataQAI
+---@param specific_tiles MapPosition[]? @ Relative to grid left top.
+local function place_squares(player, specific_tiles)
   local left_top = get_current_grid_left_top(player)
   local left, top = left_top.x, left_top.y -- Micro optimization.
   local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
@@ -1484,7 +1555,7 @@ local function place_squares(player)
     position = position,
   }
   local create_entity = player.current_surface.create_entity
-  for i, tile in pairs(get_tiles(player)) do
+  for i, tile in pairs(specific_tiles or get_tiles(player)) do
     position.x = left + tile.x + 0.5
     position.y = top + tile.y + 0.5
     local entity = create_entity(arg)
@@ -1499,7 +1570,8 @@ local function place_squares(player)
 end
 
 ---@param player PlayerDataQAI
-local function place_ninths(player)
+---@param specific_tiles MapPosition? @ Relative to grid left top.
+local function place_ninths(player, specific_tiles)
   local left_top = get_current_grid_left_top(player)
   local left, top = left_top.x, left_top.y -- Micro optimization.
   local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
@@ -1513,7 +1585,7 @@ local function place_ninths(player)
   }
   local create_entity = player.current_surface.create_entity
   local count = 0
-  for _, tile in pairs(get_tiles(player)) do
+  for _, tile in pairs(specific_tiles or get_tiles(player)) do
     for inner_x = 0, 2 do
       for inner_y = 0, 2 do
         position.x = left + tile.x + inner_x / 3 + 1 / 6
@@ -1741,14 +1813,67 @@ local function draw_grid_background(player)
 end
 
 ---@param player PlayerDataQAI
-local function draw_all_rendering_objects(player)
-  -- When rendering objects were kept alive when switching to idle previously, don't create another set.
-  if player.inserter_circle_id then return end
+---@param single_tile MapPosition @ Relative to grid left top.
+local function draw_single_tile_grid(player, single_tile)
+  single_tile = vec.add(vec.copy(single_tile), get_current_grid_left_top(player))
+  ---@type LuaRendering.draw_rectangle_param
+  local arg = {
+    surface = player.current_surface_index,
+    forces = {player.force_index},
+    left_top = single_tile,
+    right_bottom = vec.add_scalar(vec.copy(single_tile), 1),
+  }
+
+  local do_animate, opacity, color_step = get_color_for_potential_animation(grid_background_opacity)
+  arg.color = color_step
+  arg.filled = true
+  player.background_polygon_id = rendering.draw_rectangle(arg)
+  if do_animate then
+    add_grid_fade_in_animation(player.background_polygon_id, opacity, color_step)
+  end
+
+  arg.filled = nil
+  do_animate, opacity, color_step = get_color_for_potential_animation(1)
+  arg.color = color_step
+  arg.width = 1
+  player.line_ids[1] = rendering.draw_rectangle(arg)
+  if do_animate then
+    add_grid_fade_in_animation(player.line_ids[1], opacity, color_step)
+  end
+end
+
+---When rendering objects were kept alive when switching to idle previously, don't create another set.
+---@param player PlayerDataQAI
+---@return boolean
+local function did_keep_rendering(player)
+  return player.inserter_circle_id--[[@as boolean]]
+end
+
+---@param player PlayerDataQAI
+---@param single_tile MapPosition?
+local function draw_grid_lines_and_background(player, single_tile)
+  if single_tile then
+    -- Do not check keep_rendering. This only happens with only_allow_mirrored where the grid is not kept.
+    draw_single_tile_grid(player, single_tile)
+    return
+  end
+  if did_keep_rendering(player) then return end
+  draw_grid_background(player)
+  draw_grid_lines(player)
+end
+
+---@param player PlayerDataQAI
+local function draw_grid_everything_but_lines_and_background(player)
+  if did_keep_rendering(player) then return end
   draw_direction_arrow(player)
   draw_direction_arrows_indicator_lines(player)
   draw_circle_on_inserter(player)
-  draw_grid_background(player)
-  draw_grid_lines(player)
+end
+
+---@param player PlayerDataQAI
+local function draw_all_rendering_objects(player)
+  draw_grid_lines_and_background(player)
+  draw_grid_everything_but_lines_and_background(player)
 end
 
 local function format_inserter_speed(items_per_second, is_estimate)
@@ -1781,6 +1906,14 @@ local function set_inserter_speed_text(player, position, items_per_second, is_es
   rendering.bring_to_front(id)
 end
 
+---@param player PlayerDataQAI
+---@param position MapPosition @ Gets modified.
+local function mirror_position(player, position)
+  local grid_center_position = get_current_grid_center_position(player)
+  vec.add(vec.mul_scalar(vec.sub(position, grid_center_position), -1), grid_center_position)
+end
+
+local should_skip_selecting_drop
 local calculate_actual_drop_position
 
 ---@param player PlayerDataQAI
@@ -1806,7 +1939,20 @@ local function estimate_inserter_speed(player, selected_position)
       selected_position,
       target_inserter
     )
-    inserter_throughput.set_to_based_on_inserter(def, target_inserter)
+    if not should_skip_selecting_drop(player) then
+      inserter_throughput.set_to_based_on_inserter(def, target_inserter)
+    else -- Only ever used if only_allow_mirrored is true.
+      local drop_position = vec.copy(selected_position)
+      mirror_position(player, drop_position)
+      inserter_throughput.set_to_based_on_position(
+        def,
+        player.current_surface,
+        player.target_inserter_position,
+        -- Will use auto drop offset because of should_skip_selecting_drop is only true if auto offset is true.
+        calculate_actual_drop_position(player, drop_position),
+        target_inserter
+      )
+    end
   else
     inserter_throughput.set_from_based_on_inserter(def, target_inserter)
     inserter_throughput.set_to_based_on_position(
@@ -1850,9 +1996,9 @@ end
 
 ---@param player PlayerDataQAI
 ---@param inserter LuaEntity
-local function update_inserter_speed_text_using_inserter(player, inserter)
+---@param position MapPosition
+local function update_inserter_speed_text_using_inserter(player, inserter, position)
   local items_per_second, is_estimate = estimate_inserter_speed_for_inserter(inserter)
-  local position = get_inserter_speed_position_next_to_inserter(inserter)
   set_inserter_speed_text(player, position, items_per_second, is_estimate)
 end
 
@@ -1861,11 +2007,41 @@ local validate_target_inserter
 ---@param player PlayerDataQAI
 ---@param position MapPosition @ Gets modified.
 local function snap_position_to_tile_center_relative_to_inserter(player, position)
-  if player.state == "idle" then
+  -- Not checking state == "idle" because it is valid to use this
+  -- function in the process of switching to selecting pickup or drop.
+  if not player.target_inserter_position then
     error("Attempt to snap_position_to_tile_center_relative_to_inserter when player state is idle.")
   end
   local left_top = get_current_grid_left_top(player)
   vec.add_scalar(vec.sub(position, vec.mod_scalar(vec.sub(vec.copy(position), left_top), 1)), 0.5)
+end
+
+---If the selected entity is a dummy entity for the pickup position when using only_allow_mirrored then this
+---function will pretend as though the selected entity is the inserter itself.
+---@param selected LuaEntity?
+---@return LuaEntity? selected
+local function get_redirected_selected_entity(selected)
+  if not selected then return end
+  if selected.name == square_entity_name then
+    local inserter = global.selectable_dummy_redirects[selected.unit_number]
+    if inserter then
+      -- It is a dummy entity, so it should never be return itself. If the redirection target inserter is
+      -- invalid then just return `nil`, not `selected`.
+      return inserter.valid and inserter or nil
+    end
+  end
+  return selected
+end
+
+---@param player PlayerDataQAI
+---@param selectable LuaEntity
+local function get_inserter_speed_position_next_to_selectable(player, selectable)
+  local position = selectable.position
+  if selectable.name == ninth_entity_name then
+    snap_position_to_tile_center_relative_to_inserter(player, position)
+  end
+  position.x = position.x + 0.6
+  return position
 end
 
 ---@param player PlayerDataQAI
@@ -1874,22 +2050,30 @@ function update_inserter_speed_text(player)
   -- be valid, however a lot of the time that is not the case. So just always validate.
   validate_target_inserter(player)
 
-  local selected = player.player.selected
+  local actual_selected = player.player.selected
+  local selected = get_redirected_selected_entity(actual_selected)
   if not selected then
     hide_inserter_speed_text(player)
     return
   end
+  ---@cast actual_selected -nil
 
   if player.show_throughput_on_inserter
     and is_real_or_ghost_inserter(selected)
     and selected.force.is_friend(player.force_index)
   then
-    update_inserter_speed_text_using_inserter(player, selected)
+    local position = is_real_or_ghost_inserter(actual_selected)
+      and get_inserter_speed_position_next_to_inserter(actual_selected)
+      or get_inserter_speed_position_next_to_selectable(player, actual_selected) -- Just for only_allow_mirrored.
+    update_inserter_speed_text_using_inserter(player, selected, position)
     return
   end
 
   if player.state == "idle"
-    or player.state == "selecting-pickup" and not player.show_throughput_on_pickup
+    or (player.state == "selecting-pickup"
+      and not player.show_throughput_on_pickup
+      and not (should_skip_selecting_drop(player) and player.show_throughput_on_drop)
+    )
     or player.state == "selecting-drop" and not player.show_throughput_on_drop
   then
     hide_inserter_speed_text(player)
@@ -2179,6 +2363,14 @@ local function switch_to_selecting_pickup(player, target_inserter, do_check_reac
 end
 
 ---@param player PlayerDataQAI
+---@return MapPosition
+local function get_single_drop_tile(player)
+  local position = player.target_inserter.drop_position
+  snap_position_to_tile_center_relative_to_inserter(player, position)
+  return vec.sub(vec.sub_scalar(position, 0.5), get_current_grid_left_top(player))
+end
+
+---@param player PlayerDataQAI
 ---@return boolean
 local function should_use_auto_drop_offset(player)
   return not player.target_inserter_cache.tech_level.drop_offset
@@ -2193,13 +2385,19 @@ local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
   if player.state == "selecting-drop" and player.target_inserter == target_inserter then return end
   if not ensure_is_idle_and_try_set_target_inserter(player, target_inserter, do_check_reach) then return end
 
+  local single_drop_tile = global.only_allow_mirrored and get_single_drop_tile(player) or nil
   if should_use_auto_drop_offset(player) then
-    place_squares(player)
+    place_squares(player, single_drop_tile and {single_drop_tile} or nil)
   else
-    place_ninths(player)
+    place_ninths(player, single_drop_tile and {single_drop_tile} or nil)
+  end
+  if global.only_allow_mirrored then
+    place_dummy_square_at_pickup(player)
   end
   place_rects(player)
-  draw_all_rendering_objects(player)
+
+  draw_grid_lines_and_background(player, single_drop_tile)
+  draw_grid_everything_but_lines_and_background(player)
   draw_green_pickup_highlight(player)
   draw_white_drop_highlight(player)
   draw_line_to_pickup_highlight(player)
@@ -2334,14 +2532,17 @@ end
 
 ---@param player PlayerDataQAI
 ---@param position MapPosition
+---@param auto_determine_drop_offset_no_matter_what boolean?
 ---@return MapPosition
-function calculate_actual_drop_position(player, position)
+function calculate_actual_drop_position(player, position, auto_determine_drop_offset_no_matter_what)
+  local auto_drop_offset = auto_determine_drop_offset_no_matter_what or should_use_auto_drop_offset(player)
   -- 51 / 256 = 0.19921875. Vanilla inserter drop positions are offset by 0.2 away from the center, however
   -- it ultimately gets rounded to 51 / 256, because of map positions. In other words, this matches vanilla.
-  return snap_drop_position(player, position, 51/256, should_use_auto_drop_offset(player))
+  return snap_drop_position(player, position, 51/256, auto_drop_offset)
 end
 
 local update_default_drop_highlight
+local update_mirrored_highlight
 do
   local left_top = {x = 0, y = 0}
   local right_bottom = {x = 0, y = 0}
@@ -2354,44 +2555,100 @@ do
       left_top = left_top,
       right_bottom = right_bottom,
     },
-    box_type = "electricity",
+    box_type = nil, -- Set in the actual function.
   }
 
   ---@param player PlayerDataQAI
-  function update_default_drop_highlight(player)
-    if not player.highlight_default_drop_offset then return end
-    if player.state ~= "selecting-drop" then return end
-
+  ---@return LuaEntity?
+  local function get_and_validate_selected(player)
     local selected = player.player.selected
-    if not selected
-      or (selected.name ~= ninth_entity_name and selected.name ~= square_entity_name)
-      or global.selectable_entities_to_player_lut[selected.unit_number] ~= player
+    if selected
+      and (selected.name == ninth_entity_name or selected.name == square_entity_name)
+      and global.selectable_entities_to_player_lut[selected.unit_number] == player
     then
-      destroy_default_drop_highlight(player)
-      return
+      return selected
     end
+  end
 
-    local position = calculate_visualized_default_drop_position(player, selected.position)
-    local existing_highlight = player.default_drop_highlight
+  ---@param player PlayerDataQAI
+  ---@param position MapPosition
+  ---@param existing_highlight LuaEntity?
+  ---@param size number
+  ---@param box_type CursorBoxRenderType
+  ---@return LuaEntity? highlight
+  local function place_highlight(player, position, existing_highlight, size, box_type)
     if existing_highlight and existing_highlight.valid then -- Guaranteed to be on the surface of the inserter.
       local existing_position = existing_highlight.position
       if existing_position.x == position.x and existing_position.y == position.y then
-        return
+        return existing_highlight
       end
     end
 
     -- "highlight-box"es cannot be teleported, so they have to be destroyed and recreated.
-    destroy_default_drop_highlight(player)
-
+    destroy_entity_safe(existing_highlight)
     if not player.current_surface.valid then return end
 
     create_entity_arg.render_player_index = player.player_index
-    left_top.x = position.x - 3/32
-    left_top.y = position.y - 3/32
-    right_bottom.x = position.x + 3/32
-    right_bottom.y = position.y + 3/32
-    player.default_drop_highlight = player.current_surface.create_entity(create_entity_arg)
+    create_entity_arg.box_type = box_type
+    local radius = size / 2
+    left_top.x = position.x - radius
+    left_top.y = position.y - radius
+    right_bottom.x = position.x + radius
+    right_bottom.y = position.y + radius
+    return player.current_surface.create_entity(create_entity_arg)
   end
+
+  ---@param player PlayerDataQAI
+  function update_default_drop_highlight(player)
+    if not player.highlight_default_drop_offset then return end
+    if player.state ~= "selecting-drop"
+      and not (player.state == "selecting-pickup" and should_skip_selecting_drop(player))
+    then
+      return
+    end
+
+    local selected = get_and_validate_selected(player)
+    if not selected then
+      destroy_default_drop_highlight(player)
+      return
+    end
+
+    local position = selected.position
+    if player.state == "selecting-pickup" then -- only_allow_mirrored is true.
+      mirror_position(player, position)
+    end
+    position = calculate_visualized_default_drop_position(player, position)
+
+    player.default_drop_highlight
+      = place_highlight(player, position, player.default_drop_highlight, 6/32, "electricity")
+  end
+
+  ---@param player PlayerDataQAI
+  function update_mirrored_highlight(player)
+    if not global.only_allow_mirrored then return end
+    if player.state ~= "selecting-pickup" then return end
+
+    local selected = get_and_validate_selected(player)
+    if not selected then
+      destroy_mirrored_highlight(player)
+      return
+    end
+
+    local position = selected.position
+    mirror_position(player, position)
+    -- No snapping required, the pickup position (the square entity position) is already centered.
+
+    player.mirrored_highlight = place_highlight(player, position, player.mirrored_highlight, 1, "entity")
+  end
+end
+
+---@param player PlayerDataQAI
+---@param position MapPosition @ Gets modified if `only_allow_mirrored` is true.
+local function set_pickup_position(player, position)
+  player.target_inserter.pickup_position = position
+  if not global.only_allow_mirrored then return end
+  mirror_position(player, position)
+  player.target_inserter.drop_position = calculate_actual_drop_position(player, position, true)
 end
 
 ---@param player PlayerDataQAI
@@ -2564,8 +2821,6 @@ end
 
 ---@param player PlayerDataQAI
 local function play_line_to_pickup_highlight_animation(player)
-  if not player.line_to_pickup_highlight_id then return end
-  if not rendering.is_valid(player.line_to_pickup_highlight_id) then return end
   local from, to, length = get_from_and_to_for_line_from_center(
     player,
     player.target_inserter.pickup_position,
@@ -2573,14 +2828,28 @@ local function play_line_to_pickup_highlight_animation(player)
   )
   -- The pickup position might have changed since the last time we checked.
   if not from then ---@cast to -nil
-    rendering.destroy(player.line_to_pickup_highlight_id)
+    -- Instantly destroy here, otherwise it would play a fade out animation.
+    if player.line_to_pickup_highlight_id then rendering.destroy(player.line_to_pickup_highlight_id) end
     player.line_to_pickup_highlight_id = nil
     return
   end
 
+  local id = player.line_to_pickup_highlight_id
+  player.line_to_pickup_highlight_id = nil -- Destroying will be handled by the animation.
+  if not id or not rendering.is_valid(id) then
+    id = rendering.draw_line{
+      surface = player.current_surface_index,
+      forces = {player.force_index},
+      color = get_finish_animation_color(),
+      width = 2,
+      from = from,
+      to = to,
+    }
+  end
+
   local frames, step_vector = get_frames_and_step_vector_for_line_to_highlight(from, to, length)
   add_animated_line{
-    id = player.line_to_pickup_highlight_id,
+    id = id,
     remaining_updates = frames - 1,
     destroy_on_finish = true,
     color = get_finish_animation_color(),
@@ -2590,7 +2859,6 @@ local function play_line_to_pickup_highlight_animation(player)
     from_step = step_vector,
     to_step = vec.mul_scalar(vec.copy(step_vector), -1),
   }
-  player.line_to_pickup_highlight_id = nil -- Destroying is now handled by the animation.
 end
 
 ---@param player PlayerDataQAI
@@ -2762,6 +3030,23 @@ local function is_selectable_for_player(entity, selectable_name, player)
     and global.selectable_entities_to_player_lut[entity.unit_number] == player
 end
 
+---@param player PlayerDataQAI
+---@return boolean
+function should_skip_selecting_drop(player)
+  return global.only_allow_mirrored and should_use_auto_drop_offset(player)
+end
+
+---Only use this function when the current state is "selecting-pickup".
+---@param player PlayerDataQAI
+local function advance_to_selecting_drop(player)
+  if should_skip_selecting_drop(player) then
+    play_finish_animation(player) -- Before switching to idle because some rendering objects get reused.
+    switch_to_idle(player)
+    return
+  end
+  switch_to_selecting_drop(player, player.target_inserter)
+end
+
 ---@type table<string, fun(player: PlayerDataQAI, selected: LuaEntity)>
 local on_adjust_handler_lut = {
   ["idle"] = function(player, selected)
@@ -2773,15 +3058,15 @@ local on_adjust_handler_lut = {
     if not validate_target_inserter(player) then return end
     if is_real_or_ghost_inserter(selected) then
       if selected == player.target_inserter then
-        switch_to_selecting_drop(player, selected)
+        advance_to_selecting_drop(player)
       else
         switch_to_selecting_pickup(player, selected, true)
       end
       return
     end
     if is_selectable_for_player(selected, square_entity_name, player) then
-      player.target_inserter.pickup_position = selected.position
-      switch_to_selecting_drop(player, player.target_inserter)
+      set_pickup_position(player, selected.position)
+      advance_to_selecting_drop(player)
       return
     end
     if is_selectable_for_player(selected, rect_entity_name, player) then
@@ -2795,7 +3080,7 @@ local on_adjust_handler_lut = {
     if not validate_target_inserter(player) then return end
     if is_real_or_ghost_inserter(selected) then
       if selected == player.target_inserter then
-        play_finish_animation(player)  -- Before switching to idle because some rendering objects get reused.
+        play_finish_animation(player) -- Before switching to idle because some rendering objects get reused.
         switch_to_idle(player)
       else
         switch_to_selecting_pickup(player, selected, true)
@@ -2949,6 +3234,15 @@ local update_setting_lut = {
     end
   end,
 }
+
+local function update_only_allow_mirrored_setting()
+  global.only_allow_mirrored = settings.global["qai-mirrored-inserters-only"].value--[[@as boolean]]
+  for _, player in safer_pairs(global.players) do
+    if validate_player(player) then
+      switch_to_idle_and_back(player)
+    end
+  end
+end
 
 ---@param player LuaPlayer
 ---@return PlayerDataQAI
@@ -3153,7 +3447,7 @@ script.on_event("qai-adjust", function(event)
     end
   end
 
-  adjust(player, player.player.selected)
+  adjust(player, get_redirected_selected_entity(player.player.selected))
 end)
 
 script.on_event("qai-rotate", function(event)
@@ -3202,6 +3496,7 @@ script.on_event(ev.on_selected_entity_changed, function(event)
   local player = get_player(event)
   if not player then return end
   update_default_drop_highlight(player)
+  update_mirrored_highlight(player)
   update_inserter_speed_text(player)
 end)
 
@@ -3220,6 +3515,11 @@ script.on_event(ev.on_entity_settings_pasted, function(event)
 end)
 
 script.on_event(ev.on_runtime_mod_setting_changed, function(event)
+  if event.setting == "qai-mirrored-inserters-only" then
+    update_only_allow_mirrored_setting()
+    return
+  end
+  -- Per player settings.
   local update_setting = update_setting_lut[event.setting]
   if not update_setting then return end
   local player = get_player(event)
@@ -3419,7 +3719,9 @@ script.on_init(function()
     active_animations = {count = 0},
     selectable_entities_to_player_lut = {},
     selectable_entities_by_unit_number = {},
+    selectable_dummy_redirects = {},
     ghost_ids = {},
+    only_allow_mirrored = settings.global["qai-mirrored-inserters-only"].value--[[@as boolean]],
   }
   for _, force in pairs(game.forces) do
     init_force(force)

@@ -87,6 +87,8 @@
   - [x] revisit icons, probably using the inserter tech icon and adding something to it in gimp
   - [x] locale name and descriptions
 - [x] add startup settings just like bobinserters, even with the same name, but only if they don't exist already
+- [ ] add startup setting to disable more-inserters-1
+- [ ] add startup setting to disable near-inserters
 - [x] add logic in data updates and final fixes to enable runtime adjustable vectors
   - [x] remember which ones were touched in data updates and don't touch them again in final fixes
   - [x] ignore hidden inserters
@@ -109,7 +111,7 @@
 - [x] use both the selection box and collision box to determine the size of the inserter
 - [x] auto detect more range technologies, simply by going sequentially (long-inserters-1, long-inserters-2, long-inserters-3, ...)
   - [ ] mention that in the readme along side the remote interface
-- [ ] map setting to "only allow mirrored". Select the pickup position, and the drop off position has to be in the tile on the opposite side, such that those 2 tiles are mirrored at the inserter's center
+- [x] map setting to "only allow mirrored". Select the pickup position, and the drop off position has to be in the tile on the opposite side, such that those 2 tiles are mirrored at the inserter's center
 - [ ] improve rotation state tracking. I don't know why yet but when play testing there's several times where using place and adjust places the inserter in the wrong direction and I didn't do anything that I'd expect to actually cause that to happen, because I know it will happen sometimes no matter what. But yea, investigate this.
 - [x] make sure every event checks valid. Like the selected changed event doesn't.
 - [x] LuaForce valid checking
@@ -117,3 +119,4 @@
 - [x] maybe check pickup and drop positions in update_active_player to catch other mods modifying them while an inserter is being adjusted
 - [x] why is it that selected is being set to nil when switching to idle again? wasn't that because of teleporting or something? (in other words outdated?) - yes it was used to get a selected entity changed event when teleportation was used, since an entity would get teleported away and back in the same tick, so selection didn't change.
 - [x] in whenever a state switch happens with keep_rendering true, the following code is not actually cleaning up rendering objects properly, because any other state switch could have happened in between, leaving the old rendering objects floating forever
+- [ ] add key sequence to rect tooltip

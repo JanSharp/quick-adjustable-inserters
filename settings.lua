@@ -49,6 +49,13 @@ data:extend({
     setting_type = "startup",
     default_value = true,
   },
+  {
+    type = "bool-setting",
+    name = "qai-mirrored-inserters-only",
+    order = "a",
+    setting_type = "runtime-global",
+    default_value = false,
+  }
 })
 
 ---@generic T
