@@ -2981,6 +2981,7 @@ end
 ---@param position MapPosition
 ---@param cache InserterCacheQAI
 ---@param is_cursor_ghost boolean?
+---@return LuaEntity? inserter @ The placed inserter if successful.
 local function try_place_held_inserter_and_adjust_it(player, position, cache, is_cursor_ghost)
   ---@type LuaPlayer.can_build_from_cursor_param
   local args = {
@@ -3015,8 +3016,9 @@ local function try_place_held_inserter_and_adjust_it(player, position, cache, is
   -- Docs say clear_cursor raises an event in the current tick, not instantly, but a valid check does not hurt.
   if not inserter.valid then return end
   switch_to_selecting_pickup(player, inserter)
-  if player.state == "selecting-pickup" then
+  if player.state == "selecting-pickup" and player.target_inserter == inserter then
     player.pipette_when_done = true
+    return inserter.valid and inserter or nil
   end
 end
 
@@ -3731,17 +3733,51 @@ script.on_init(function()
 end)
 
 remote.add_interface("qai", {
+  ---The mod and the entire world could be in any state after this call.
   ---@param player_index integer
   switch_to_idle = function(player_index)
     local player = get_or_init_player(player_index)
     if not player then return end
     switch_to_idle(player)
   end,
+  ---Effectively refreshes the current state using all new values. The mod already catches most things through
+  ---events, and things it cannot catch through events it gradually checks in an on_tick handler, but this can
+  ---instantly notify the mod about changes that require a state refresh.
+  ---
+  ---The mod and the entire world could be in any state after this call.
+  ---@param player_index integer
+  ---@param do_check_reach boolean? @ Default: `false`.
+  switch_to_idle_and_back = function(player_index, do_check_reach)
+    local player = get_or_init_player(player_index)
+    if not player then return end
+    switch_to_idle_and_back(player, do_check_reach)
+  end,
+  ---The mod and the entire world could be in any state after this call.
   ---@param player_index integer
   ---@param selected_entity LuaEntity?
   adjust = function(player_index, selected_entity)
     local player = get_or_init_player(player_index)
     if not player then return end
     adjust(player, selected_entity)
+  end,
+  ---Tries to use the inserter in the `player.cursor_stack` to place and adjust it at a given position.\
+  ---Finishing adjusting will restore the cursor, unless the cursor changed in the meantime.
+  ---
+  ---The mod and the entire world could be in any state after this call. Including the cursor, even when
+  ---successful.
+  ---@param player_index integer
+  ---@param position MapPosition
+  ---@return LuaEntity? inserter @ The placed inserter if successful. Never invalid.
+  try_place_and_adjust = function(player_index, position)
+    local player = get_or_init_player(player_index)
+    if not player then return end
+    local place_result, is_cursor_ghost = get_cursor_item_place_result(player)
+    if place_result and place_result.type == "inserter" then
+      local force = get_or_init_force(player.player.force_index)
+      local cache = force and force.inserter_cache_lut[place_result.name]
+      if cache then
+        return try_place_held_inserter_and_adjust_it(player, position, cache, is_cursor_ghost)
+      end
+    end
   end,
 })

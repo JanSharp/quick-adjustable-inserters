@@ -94,16 +94,16 @@
   - [x] ignore hidden inserters
 - [x] maybe add startup setting to normalize pickup vectors, snapping them to tile centers
 - [x] use "cardinal" instead of "perpendicular"
-- [ ] maybe add remote interface and api
+- [x] maybe add remote interface and api
   - [x] ~~api file which checks for the existence remote interfaces containing a certain name, and calls all of them (that is to support for example smart inserters implementing the same interface, and being enabled at the same time)~~ if tech unlocks and range cannot be modified through the remote interface then all the interface is really doing is things specific to this mod. So there's no reason to pretend like it's some standard other mods could follow. Because it isn't.
     - [x] ~~put the MIT license directly in the api file so others can copy it into their code. This allows for mods to implement the interface and replace quick adjustable inserters entirely without other mods using the api to have to change anything. It would "just work"~~
-  - [ ] api file which is just a wrapper around the remote.call calls, because I like that
+  - [x] ~~api file which is just a wrapper around the remote.call calls, because I like that~~ No, stop being weird. Let people use remote.call like everybody else would, because that's normal.
   - [x] ~~change which technologies unlock what~~ Thought about it, it'd be stupidly complicated to actually handle properly. No thank you.
   - [x] ~~add more or less range~~ Possible through auto detected technologies now. You can't skip levels but meh, it's better than nothing. Doing it through the remote has similar issues as the above
-  - [ ] trigger build & adjust
+  - [x] trigger build & adjust
   - [x] trigger adjust key bind on a given entity
   - [x] trigger switch_to_idle (even though adjusting on a nil entity already does that)
-  - [ ] trigger switch_to_idle_and_back
+  - [x] trigger switch_to_idle_and_back
 - [x] make all qai prefixes lowercase, outside of type names of course
 - [x] maybe always script disable while adjusting
 - [x] do not use rotate locale, just make your own for not being able to adjust enemy structures
