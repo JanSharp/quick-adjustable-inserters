@@ -227,22 +227,24 @@ local function do_we_care_about_this_technology(name)
     or string.find(name, "^long%-inserters%-([1-9]%d*)$") -- Does not accept leading zeros.
 end
 
+local dirs = {}
+
 ---Can also be used to check if a given direction is a supported direction by this mod.
-local inverse_direction_lut = {
+dirs.inverse_direction_lut = {
   [defines.direction.north] = defines.direction.south,
   [defines.direction.east] = defines.direction.west,
   [defines.direction.south] = defines.direction.north,
   [defines.direction.west] = defines.direction.east,
 }
 
-local rotate_direction_lut = {
+dirs.rotate_direction_lut = {
   [defines.direction.north] = defines.direction.east,
   [defines.direction.east] = defines.direction.south,
   [defines.direction.south] = defines.direction.west,
   [defines.direction.west] = defines.direction.north,
 }
 
-local reverse_rotate_direction_lut = {
+dirs.reverse_rotate_direction_lut = {
   [defines.direction.north] = defines.direction.west,
   [defines.direction.east] = defines.direction.north,
   [defines.direction.south] = defines.direction.east,
@@ -250,7 +252,7 @@ local reverse_rotate_direction_lut = {
 }
 
 ---Rotate something that's facing north to a given direction.
-local rotation_matrix_lut = {
+dirs.rotation_matrix_lut = {
   [defines.direction.north] = vec.new_identity_matrix(),
   [defines.direction.east] = vec.rotation_matrix_by_orientation(0.25),
   [defines.direction.south] = vec.rotation_matrix_by_orientation(0.5),
@@ -258,7 +260,7 @@ local rotation_matrix_lut = {
 }
 
 ---Rotate something that's facing a given direction to the north.
-local reverse_rotation_matrix_lut = {
+dirs.reverse_rotation_matrix_lut = {
   [defines.direction.north] = vec.new_identity_matrix(),
   [defines.direction.east] = vec.rotation_matrix_by_orientation(-0.25),
   [defines.direction.south] = vec.rotation_matrix_by_orientation(-0.5),
@@ -1268,7 +1270,7 @@ end
 ---@param inserter_name string
 ---@param inserter LuaEntity
 local function save_pipetted_vectors(player, inserter_name, inserter)
-  local rotation = reverse_rotation_matrix_lut[inserter.direction]
+  local rotation = dirs.reverse_rotation_matrix_lut[inserter.direction]
   local position = inserter.position
   player.pipetted_inserter_name = inserter_name
   player.pipetted_pickup_vector = vec.transform_by_matrix(rotation, vec.sub(inserter.pickup_position, position))
@@ -1644,7 +1646,7 @@ local function set_direction(player, new_direction)
   local drop_position = inserter.drop_position
   -- However, the actual internal direction of inserters appears to be the direction they are picking up from.
   -- This confuses me, so I'm pretending it's the other way around and only flipping it when writing/reading.
-  local actual_direction = inverse_direction_lut[new_direction]
+  local actual_direction = dirs.inverse_direction_lut[new_direction]
   inserter.direction = actual_direction
   inserter.pickup_position = pickup_position
   inserter.drop_position = drop_position
@@ -3158,7 +3160,7 @@ script.on_event("qai-rotate", function(event)
   local player = get_player(event)
   if not player then return end
   if get_cursor_item_prototype(player) then
-    player.last_used_direction = rotate_direction_lut[player.last_used_direction]
+    player.last_used_direction = dirs.rotate_direction_lut[player.last_used_direction]
   end
 end)
 
@@ -3166,7 +3168,7 @@ script.on_event("qai-reverse-rotate", function(event)
   local player = get_player(event)
   if not player then return end
   if get_cursor_item_prototype(player) then
-    player.last_used_direction = reverse_rotate_direction_lut[player.last_used_direction]
+    player.last_used_direction = dirs.reverse_rotate_direction_lut[player.last_used_direction]
   end
 end)
 
@@ -3178,7 +3180,7 @@ script.on_event(ev.on_player_pipette, function(event)
   local selected = player.player.selected
   if not selected then return end
   local direction = selected.direction
-  if not inverse_direction_lut[direction] then return end
+  if not dirs.inverse_direction_lut[direction] then return end
   player.last_used_direction = direction
 
   if not player.pipette_copies_vectors or not is_real_or_ghost_inserter(selected) then return end
@@ -3313,8 +3315,8 @@ script.on_event(ev.on_built_entity, function(event)
   if not expected_name then return end
   if get_real_or_ghost_name(entity) ~= expected_name then return end
   local direction = entity.direction
-  if not inverse_direction_lut[direction] then return end
-  local rotation = rotation_matrix_lut[direction]
+  if not dirs.inverse_direction_lut[direction] then return end
+  local rotation = dirs.rotation_matrix_lut[direction]
   local position = entity.position
   local pickup_vector = vec.transform_by_matrix(rotation, vec.copy(player.pipetted_pickup_vector))
   local drop_vector = vec.transform_by_matrix(rotation, vec.copy(player.pipetted_drop_vector))
