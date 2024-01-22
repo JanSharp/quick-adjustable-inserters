@@ -79,5 +79,5 @@ A map setting ...
 
 As well as some startup settings ...
 
-- to choose which technologies should even be available (if [Bob's Adjustable Inserters](https://mods.factorio.com/mod/bobinserters) is present it will use its settings)
+- to choose which technologies should even be available (if [Bob's Adjustable Inserters](https://mods.factorio.com/mod/bobinserters) is present it will use its settings, but this mod adds 2 more settings so they'll unfortunately be split between the 2 mods in the settings list)
 - to normalize default inserter vectors, to make modded inserters more consistent

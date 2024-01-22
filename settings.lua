@@ -45,7 +45,7 @@ data:extend({
   {
     type = "bool-setting",
     name = "qai-normalize-default-vectors",
-    order = "d",
+    order = "f",
     setting_type = "startup",
     default_value = true,
   },
@@ -71,13 +71,25 @@ local function add_if_it_does_not_exist(prototype_type, name, prototype_getter)
   return prototype
 end
 
+add_if_it_does_not_exist("bool-setting", "bobmods-near-inserters", function()
+  return {
+    type = "bool-setting",
+    name = "bobmods-near-inserters",
+    localised_name = {"mod-setting-name.qai-near-inserters"},
+    localised_description = {"mod-setting-description.qai-near-inserters"},
+    order = "a",
+    setting_type = "startup",
+    default_value = true,
+  }
+end)
+
 add_if_it_does_not_exist("bool-setting", "bobmods-inserters-long1", function()
   return {
     type = "bool-setting",
     name = "bobmods-inserters-long1",
     localised_name = {"mod-setting-name.qai-long-inserters-1"},
     localised_description = {"mod-setting-description.qai-long-inserters-1"},
-    order = "a",
+    order = "b",
     setting_type = "startup",
     default_value = true,
   }
@@ -89,7 +101,19 @@ add_if_it_does_not_exist("bool-setting", "bobmods-inserters-long2", function()
     name = "bobmods-inserters-long2",
     localised_name = {"mod-setting-name.qai-long-inserters-2"},
     localised_description = {"mod-setting-description.qai-long-inserters-2"},
-    order = "b",
+    order = "c",
+    setting_type = "startup",
+    default_value = true,
+  }
+end)
+
+add_if_it_does_not_exist("bool-setting", "bobmods-inserters-more1", function()
+  return {
+    type = "bool-setting",
+    name = "bobmods-inserters-more1",
+    localised_name = {"mod-setting-name.qai-more-inserters-1"},
+    localised_description = {"mod-setting-description.qai-more-inserters-1"},
+    order = "d",
     setting_type = "startup",
     default_value = true,
   }
@@ -101,7 +125,7 @@ add_if_it_does_not_exist("bool-setting", "bobmods-inserters-more2", function()
     name = "bobmods-inserters-more2",
     localised_name = {"mod-setting-name.qai-more-inserters-2"},
     localised_description = {"mod-setting-description.qai-more-inserters-2"},
-    order = "c",
+    order = "e",
     setting_type = "startup",
     default_value = true,
   }

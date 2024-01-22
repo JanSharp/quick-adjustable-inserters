@@ -96,26 +96,75 @@ local function add_if_it_does_not_exist(prototype_type, name, prototype_getter)
   return prototype
 end
 
-add_if_it_does_not_exist("technology", "near-inserters", function()
-  return {
-    type = "technology",
-    name = "near-inserters",
-    localised_name = {"technology-name.qai-near-inserters"},
-    localised_description = {"technology-description.qai-near-inserters"},
-    icon = "__quick-adjustable-inserters__/graphics/technology/near-inserters.png",
-    icon_size = 256, icon_mipmaps = 1,
-    prerequisites = {"logistics"},
-    effects = {},
-    unit = {
-      count = 25,
-      ingredients = {{"automation-science-pack", 1}},
-      time = 15,
-    },
-    order = "a-d",
-  }--[[@as data.TechnologyPrototype]]
-end)
+---@generic T
+---@param prototype T|{normal: false|T?, expensive: false|T?}
+---@return fun(): T?
+local function normal_expensive_iter(prototype)
+  if not prototype.normal and not prototype.expensive then
+    local done = false
+    return function()
+      if done then return end
+      done = true
+      return prototype
+    end
+  end
+  local checked_normal = false
+  local checked_expensive = false
+  return function()
+    if not checked_normal then
+      checked_normal = true
+      if prototype.normal then
+        return prototype.normal
+      end
+    end
+    if not checked_expensive then
+      checked_expensive = true
+      if prototype.expensive then
+        return prototype.expensive
+      end
+    end
+  end
+end
 
-if data_core.check_setting("bobmods-inserters-long1", true) then
+---Use this to hide technologies existing technologies instead of deleting them. Other mods may not handle the
+---fact that a technology they expect to exist doesn't actually exist.
+---@param name string
+local function hide_technology_if_it_exists(name)
+  local tech = data.raw["technology"][name]
+  if not tech then return end
+  for tech_data in normal_expensive_iter(tech) do
+    tech_data.hidden = true
+    tech_data.enabled = false
+    tech_data.visible_when_disabled = false
+  end
+end
+
+if not data_core.check_setting("bobmods-near-inserters", true) then
+  hide_technology_if_it_exists("near-inserters")
+else
+  add_if_it_does_not_exist("technology", "near-inserters", function()
+    return {
+      type = "technology",
+      name = "near-inserters",
+      localised_name = {"technology-name.qai-near-inserters"},
+      localised_description = {"technology-description.qai-near-inserters"},
+      icon = "__quick-adjustable-inserters__/graphics/technology/near-inserters.png",
+      icon_size = 256, icon_mipmaps = 1,
+      prerequisites = {"logistics"},
+      effects = {},
+      unit = {
+        count = 25,
+        ingredients = {{"automation-science-pack", 1}},
+        time = 15,
+      },
+      order = "a-d",
+    }--[[@as data.TechnologyPrototype]]
+  end)
+end
+
+if not data_core.check_setting("bobmods-inserters-long1", true) then
+  hide_technology_if_it_exists("long-inserters-1")
+else
   add_if_it_does_not_exist("technology", "long-inserters-1", function()
     return {
       type = "technology",
@@ -136,9 +185,11 @@ if data_core.check_setting("bobmods-inserters-long1", true) then
   end)
 end
 
-if data_core.check_setting("bobmods-inserters-long1", true)
-  and data_core.check_setting("bobmods-inserters-long2", true)
+if not data_core.check_setting("bobmods-inserters-long1", true)
+  or not data_core.check_setting("bobmods-inserters-long2", true)
 then
+  hide_technology_if_it_exists("long-inserters-2")
+else
   add_if_it_does_not_exist("technology", "long-inserters-2", function()
     return {
       type = "technology",
@@ -167,39 +218,47 @@ local fast_inserter_icon = mods["base"]
   and "__base__/graphics/technology/fast-inserter.png" -- Reuse existing, no need to duplicate it in VRAM.
   or "__quick-adjustable-inserters__/graphics/technology/fast-inserter.png"
 
-add_if_it_does_not_exist("technology", "more-inserters-1", function()
-  return {
-    type = "technology",
-    name = "more-inserters-1",
-    localised_name = {"technology-name.qai-more-inserters-1"},
-    localised_description = {"technology-description.qai-more-inserters-1"},
-    icons = {
-      {
-        icon = fast_inserter_icon,
-        icon_size = 256, icon_mipmaps = 4,
+if not data_core.check_setting("bobmods-inserters-more1", true) then
+  hide_technology_if_it_exists("more-inserters-1")
+else
+  add_if_it_does_not_exist("technology", "more-inserters-1", function()
+    return {
+      type = "technology",
+      name = "more-inserters-1",
+      localised_name = {"technology-name.qai-more-inserters-1"},
+      localised_description = {"technology-description.qai-more-inserters-1"},
+      icons = {
+        {
+          icon = fast_inserter_icon,
+          icon_size = 256, icon_mipmaps = 4,
+        },
+        {
+          icon = "__quick-adjustable-inserters__/graphics/technology/constant-more-inserters-1.png",
+          icon_size = 128,
+          icon_mipmaps = 3,
+          shift = {100, 100},
+        }
       },
-      {
-        icon = "__quick-adjustable-inserters__/graphics/technology/constant-more-inserters-1.png",
-        icon_size = 128,
-        icon_mipmaps = 3,
-        shift = {100, 100},
-      }
-    },
-    prerequisites = {"logistics-2"},
-    effects = {},
-    unit = {
-      count = 25,
-      ingredients = {
-        {"automation-science-pack", 1},
-        {"logistic-science-pack", 1},
+      prerequisites = {"logistics-2"},
+      effects = {},
+      unit = {
+        count = 25,
+        ingredients = {
+          {"automation-science-pack", 1},
+          {"logistic-science-pack", 1},
+        },
+        time = 30,
       },
-      time = 30,
-    },
-    order = "c-n-a",
-  }--[[@as data.TechnologyPrototype]]
-end)
+      order = "c-n-a",
+    }--[[@as data.TechnologyPrototype]]
+  end)
+end
 
-if data_core.check_setting("bobmods-inserters-more2", true) then
+if not data_core.check_setting("bobmods-inserters-more1", true)
+  or not data_core.check_setting("bobmods-inserters-more2", true)
+then
+  hide_technology_if_it_exists("more-inserters-2")
+else
   add_if_it_does_not_exist("technology", "more-inserters-2", function()
     return {
       type = "technology",

@@ -87,8 +87,8 @@
   - [x] revisit icons, probably using the inserter tech icon and adding something to it in gimp
   - [x] locale name and descriptions
 - [x] add startup settings just like bobinserters, even with the same name, but only if they don't exist already
-- [ ] add startup setting to disable more-inserters-1
-- [ ] add startup setting to disable near-inserters
+- [x] add startup setting to disable more-inserters-1
+- [x] add startup setting to disable near-inserters
 - [x] add logic in data updates and final fixes to enable runtime adjustable vectors
   - [x] remember which ones were touched in data updates and don't touch them again in final fixes
   - [x] ignore hidden inserters
