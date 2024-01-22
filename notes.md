@@ -119,4 +119,4 @@
 - [x] maybe check pickup and drop positions in update_active_player to catch other mods modifying them while an inserter is being adjusted
 - [x] why is it that selected is being set to nil when switching to idle again? wasn't that because of teleporting or something? (in other words outdated?) - yes it was used to get a selected entity changed event when teleportation was used, since an entity would get teleported away and back in the same tick, so selection didn't change.
 - [x] in whenever a state switch happens with keep_rendering true, the following code is not actually cleaning up rendering objects properly, because any other state switch could have happened in between, leaving the old rendering objects floating forever
-- [ ] add key sequence to rect tooltip
+- [x] add key sequence to the tooltips of the selectable entities
