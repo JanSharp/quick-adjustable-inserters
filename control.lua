@@ -2482,22 +2482,21 @@ end
 local function snap_drop_position(player, position, offset_from_tile_center, auto_determine_drop_offset)
   local cache = player.target_inserter_cache
   local tech_level = cache.tech_level
-  local inserter_position = player.target_inserter_position
-  local offset_from_inserter = cache.offset_from_inserter
-  local left_top_x = inserter_position.x + offset_from_inserter.x
-  local left_top_y = inserter_position.y + offset_from_inserter.y
-  local relative_x = position.x - left_top_x
-  local relative_y = position.y - left_top_y
+  local left_top = get_current_grid_left_top(player)
+  local relative_x = position.x - left_top.x
+  local relative_y = position.y - left_top.y
   local x_offset
   local y_offset
   if auto_determine_drop_offset then
     offset_from_tile_center = offset_from_tile_center * cache.default_drop_offset_multiplier
     local max_range = tech_level.range + cache.range_gap_from_center
+    local tile_width = player.should_flip and cache.tile_height or cache.tile_width
+    local tile_height = player.should_flip and cache.tile_width or cache.tile_height
     x_offset = relative_x < max_range and -offset_from_tile_center
-      or (max_range + cache.tile_width) < relative_x and offset_from_tile_center
+      or (max_range + tile_width) < relative_x and offset_from_tile_center
       or 0
     y_offset = relative_y < max_range and -offset_from_tile_center
-      or (max_range + cache.tile_height) < relative_y and offset_from_tile_center
+      or (max_range + tile_height) < relative_y and offset_from_tile_center
       or 0
   else
     -- Modulo always returns a positive number.
@@ -2511,8 +2510,8 @@ local function snap_drop_position(player, position, offset_from_tile_center, aut
       or offset_from_tile_center
   end
   return {
-    x = left_top_x + math.floor(relative_x) + 0.5 + x_offset,
-    y = left_top_y + math.floor(relative_y) + 0.5 + y_offset,
+    x = left_top.x + math.floor(relative_x) + 0.5 + x_offset,
+    y = left_top.y + math.floor(relative_y) + 0.5 + y_offset,
   }
 end
 
