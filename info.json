@@ -17,6 +17,7 @@
       "scenario-scripts/**/*",
       "scenarios/**/*",
       "**/*.xcf"
-    ]
+    ],
+    "sync_portal_details": true
   }
 }
