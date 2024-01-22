@@ -1418,6 +1418,12 @@ local function get_offset_from_inserter(player)
 end
 
 ---@param player PlayerDataQAI
+---@return MapPosition @ A new table, can be modified without worry.
+local function get_current_grid_left_top(player)
+  return vec.add(vec.copy(player.target_inserter_position), get_offset_from_inserter(player))
+end
+
+---@param player PlayerDataQAI
 ---@return MapPosition
 local function get_grid_center(player)
   local cache = player.target_inserter_cache
@@ -1427,15 +1433,9 @@ local function get_grid_center(player)
 end
 
 ---@param player PlayerDataQAI
----@return MapPosition
+---@return MapPosition @ A new table, can be modified without worry.
 local function get_current_grid_center_position(player)
-  return vec.add(
-    vec.add(
-      vec.copy(player.target_inserter_position),
-      get_offset_from_inserter(player)
-    ),
-    get_grid_center(player)
-  )
+  return vec.add(get_current_grid_left_top(player), get_grid_center(player))
 end
 
 ---@param player PlayerDataQAI
@@ -1476,10 +1476,8 @@ end
 
 ---@param player PlayerDataQAI
 local function place_squares(player)
-  local inserter_position = player.target_inserter_position
-  local offset_from_inserter = get_offset_from_inserter(player)
-  local left = inserter_position.x + offset_from_inserter.x
-  local top = inserter_position.y + offset_from_inserter.y
+  local left_top = get_current_grid_left_top(player)
+  local left, top = left_top.x, left_top.y -- Micro optimization.
   local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
   local selectable_entities_by_unit_number = global.selectable_entities_by_unit_number
   local position = {}
@@ -1506,10 +1504,8 @@ end
 
 ---@param player PlayerDataQAI
 local function place_ninths(player)
-  local inserter_position = player.target_inserter_position
-  local offset_from_inserter = get_offset_from_inserter(player)
-  local left = inserter_position.x + offset_from_inserter.x
-  local top = inserter_position.y + offset_from_inserter.y
+  local left_top = get_current_grid_left_top(player)
+  local left, top = left_top.x, left_top.y -- Micro optimization.
   local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
   local selectable_entities_by_unit_number = global.selectable_entities_by_unit_number
   local position = {}
@@ -1691,10 +1687,8 @@ end
 ---@param line_ids int64[]
 ---@param lines LineDefinitionQAI[]
 local function draw_lines_internal(player, line_ids, lines)
-  local inserter_position = player.target_inserter_position
-  local offset_from_inserter = get_offset_from_inserter(player)
-  local left = inserter_position.x + offset_from_inserter.x
-  local top = inserter_position.y + offset_from_inserter.y
+  local left_top = get_current_grid_left_top(player)
+  local left, top = left_top.x, left_top.y -- Micro optimization.
   local from = {}
   local to = {}
   local do_animate, opacity, color_step = get_color_for_potential_animation(1)
@@ -1737,18 +1731,13 @@ end
 
 ---@param player PlayerDataQAI
 local function draw_grid_background(player)
-  local inserter_position = player.target_inserter_position
-  local offset_from_inserter = get_offset_from_inserter(player)
   local do_animate, opacity, color_step = get_color_for_potential_animation(grid_background_opacity)
   player.background_polygon_id = rendering.draw_polygon{
     surface = player.current_surface_index,
     forces = {player.force_index},
     color = color_step,
     vertices = get_tiles_background_vertices(player),
-    target = {
-      x = inserter_position.x + offset_from_inserter.x,
-      y = inserter_position.y + offset_from_inserter.y,
-    },
+    target = get_current_grid_left_top(player),
   }
   if do_animate then
     add_grid_fade_in_animation(player.background_polygon_id, opacity, color_step)
@@ -1879,7 +1868,7 @@ local function snap_position_to_tile_center_relative_to_inserter(player, positio
   if player.state == "idle" then
     error("Attempt to snap_position_to_tile_center_relative_to_inserter when player state is idle.")
   end
-  local left_top = vec.add(vec.copy(player.target_inserter_position), get_offset_from_inserter(player))
+  local left_top = get_current_grid_left_top(player)
   vec.add_scalar(vec.sub(position, vec.mod_scalar(vec.sub(vec.copy(position), left_top), 1)), 0.5)
 end
 
