@@ -81,3 +81,15 @@ As well as some startup settings ...
 
 - to choose which technologies should even be available (if [Bob's Adjustable Inserters](https://mods.factorio.com/mod/bobinserters) is present it will use its settings, but this mod adds 2 more settings so they'll unfortunately be split between the 2 mods in the settings list)
 - to normalize default inserter vectors, to make modded inserters more consistent
+
+## API
+
+### More range
+
+The mod automatically detects more range technologies, they simply have to follow the naming pattern `"long-inserters-"..number` where `number` does not have any leading zeros. Technology hidden and enabled state and dependencies along side handling the settings for `long-inserters-1` and `long-inserters-2` would be 100% up to other mods.
+
+Note that higher technologies should either not be created or be hidden and or disabled if one of the lower levels has been disabled through the settings `bobmods-inserters-long1` and or `bobmods-inserters-long2`.
+
+### Remote
+
+The mod provides a stupidly tiny remote interface called `"qai"`. It's documentation is done through annotations so take a look at the end of the `control.lua` file, or unpack the mod and use intellisense if you're using LuaLS and FMTK.
