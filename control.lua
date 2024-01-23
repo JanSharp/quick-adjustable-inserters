@@ -2876,13 +2876,17 @@ end
 ---find_entity goes by collision boxes and inserters do not take up entire tiles. Basically nothing does.
 ---Note that if it went by position we'd also have to do this. So that detail doesn't really matter.
 ---@param position MapPosition @ Gets modified.
+---@param direction defines.direction
 ---@param cache InserterCacheQAI
-local function snap_build_position(position, cache)
+local function snap_build_position(position, direction, cache)
   if cache.placeable_off_grid then return end
-  position.x = (cache.prototype.tile_width % 2) == 0
+  local is_north_south = direction == defines.direction.north or direction == defines.direction.south
+  local width = is_north_south and cache.prototype.tile_width or cache.prototype.tile_height
+  local height = is_north_south and cache.prototype.tile_height or cache.prototype.tile_width
+  position.x = (width % 2) == 0
     and math.floor(position.x + 0.5) -- even
     or math.floor(position.x) + 0.5 -- odd
-  position.y = (cache.prototype.tile_height % 2) == 0
+  position.y = (height % 2) == 0
     and math.floor(position.y + 0.5) -- even
     or math.floor(position.y) + 0.5 -- odd
 end
@@ -2993,7 +2997,7 @@ local function try_place_held_inserter_and_adjust_it(player, position, cache, is
   if not is_cursor_ghost and not actual_player.can_build_from_cursor(args) then return end
 
   ---@cast args LuaPlayer.build_from_cursor_param
-  snap_build_position(position, cache)
+  snap_build_position(position, args.direction, cache)
   local surface = actual_player.surface
   local inserter
   if is_cursor_ghost then
