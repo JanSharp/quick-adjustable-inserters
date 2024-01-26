@@ -123,5 +123,5 @@
 - [x] add key sequence to the tooltips of the selectable entities
 - [ ] add demonstration videos to readme
 - [ ] maybe explicitly ignore 8 way inserters
-- [ ] with near inserters researched and only mirrored inserters and show inserter throughput on pickup, it should use the mirrored default drop offset for calculation, not the current drop offset
+- [x] with near inserters researched and only mirrored inserters and show inserter throughput on pickup, it should use the mirrored default drop offset for calculation, not the current drop offset
 - [ ] save inserter_target_pickup_count in player data and compare it in update_player to potentially update inserter throughput text

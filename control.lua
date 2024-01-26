@@ -1913,7 +1913,6 @@ local function mirror_position(player, position)
   vec.add(vec.mul_scalar(vec.sub(position, grid_center_position), -1), grid_center_position)
 end
 
-local should_skip_selecting_drop
 local calculate_actual_drop_position
 
 ---@param player PlayerDataQAI
@@ -1943,16 +1942,15 @@ local function estimate_inserter_speed(player, selected_position)
       target_inserter,
       target_inserter_position
     )
-    if not should_skip_selecting_drop(player) then
+    if not global.only_allow_mirrored then
       inserter_throughput.drop_to_drop_target_of_inserter_and_set_drop_vector(def, target_inserter)
-    else -- Only ever used if only_allow_mirrored is true.
+    else
       local drop_position = vec.copy(selected_position)
       mirror_position(player, drop_position)
       inserter_throughput.drop_to_position_and_set_drop_vector(
         def,
         player.current_surface,
-        -- Will use auto drop offset because of should_skip_selecting_drop is only true if auto offset is true.
-        calculate_actual_drop_position(player, drop_position),
+        calculate_actual_drop_position(player, drop_position, true),
         target_inserter,
         target_inserter_position
       )
@@ -2038,6 +2036,8 @@ local function get_inserter_speed_position_next_to_selectable(player, selectable
   position.x = position.x + 0.6
   return position
 end
+
+local should_skip_selecting_drop
 
 ---@param player PlayerDataQAI
 function update_inserter_speed_text(player)
