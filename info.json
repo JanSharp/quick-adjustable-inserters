@@ -7,7 +7,7 @@
   "description": "Adjust inserter pickup and drop positions in world, without GUI.",
   "dependencies": [
     "(?)bobinserters",
-    "inserter-throughput-lib >= 0.1.0"
+    "inserter-throughput-lib >= 1.1.0"
   ],
 
   "package": {

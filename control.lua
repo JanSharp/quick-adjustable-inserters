@@ -1,5 +1,5 @@
 
-local inserter_throughput = require("__inserter-throughput-lib__.api")
+local inserter_throughput = require("__inserter-throughput-lib__.inserter_throughput")
 local vec = require("__inserter-throughput-lib__.vector")
 
 ---cSpell:ignore rects, IDQAI
@@ -1923,44 +1923,48 @@ local calculate_actual_drop_position
 local function estimate_inserter_speed(player, selected_position)
   local cache = player.target_inserter_cache
   local target_inserter = player.target_inserter
+  local target_inserter_position = player.target_inserter_position
   ---@type InserterThroughputDefinition
   local def = {
-    extension_speed = cache.extension_speed,
-    rotation_speed = cache.rotation_speed,
-    chases_belt_items = cache.chases_belt_items,
-    stack_size = target_inserter.inserter_target_pickup_count,
+    inserter = {
+      extension_speed = cache.extension_speed,
+      rotation_speed = cache.rotation_speed,
+      chases_belt_items = cache.chases_belt_items,
+      stack_size = target_inserter.inserter_target_pickup_count,
+      inserter_position_in_tile = inserter_throughput.get_position_in_tile(target_inserter_position),
+    },
   }
 
   if player.state == "selecting-pickup" then
-    inserter_throughput.set_from_based_on_position(
+    inserter_throughput.pickup_from_position_and_set_pickup_vector(
       def,
       player.current_surface,
-      player.target_inserter_position,
       selected_position,
-      target_inserter
+      target_inserter,
+      target_inserter_position
     )
     if not should_skip_selecting_drop(player) then
-      inserter_throughput.set_to_based_on_inserter(def, target_inserter)
+      inserter_throughput.drop_to_drop_target_of_inserter_and_set_drop_vector(def, target_inserter)
     else -- Only ever used if only_allow_mirrored is true.
       local drop_position = vec.copy(selected_position)
       mirror_position(player, drop_position)
-      inserter_throughput.set_to_based_on_position(
+      inserter_throughput.drop_to_position_and_set_drop_vector(
         def,
         player.current_surface,
-        player.target_inserter_position,
         -- Will use auto drop offset because of should_skip_selecting_drop is only true if auto offset is true.
         calculate_actual_drop_position(player, drop_position),
-        target_inserter
+        target_inserter,
+        target_inserter_position
       )
     end
   else
-    inserter_throughput.set_from_based_on_inserter(def, target_inserter)
-    inserter_throughput.set_to_based_on_position(
+    inserter_throughput.pickup_from_pickup_target_of_inserter_and_set_pickup_vector(def, target_inserter)
+    inserter_throughput.drop_to_position_and_set_drop_vector(
       def,
       player.current_surface,
-      player.target_inserter_position,
       calculate_actual_drop_position(player, selected_position),
-      target_inserter
+      target_inserter,
+      target_inserter_position
     )
   end
 
@@ -1971,16 +1975,7 @@ end
 ---@return number items_per_second
 ---@return boolean is_estimate
 local function estimate_inserter_speed_for_inserter(inserter)
-  local prototype = get_real_or_ghost_prototype(inserter)
-  ---@type InserterThroughputDefinition
-  local def = {
-    extension_speed = prototype.inserter_extension_speed,
-    rotation_speed = prototype.inserter_rotation_speed,
-    chases_belt_items = prototype.inserter_chases_belt_items,
-    stack_size = inserter.inserter_target_pickup_count, -- This works on ghosts.
-  }
-  inserter_throughput.set_from_based_on_inserter(def, inserter)
-  inserter_throughput.set_to_based_on_inserter(def, inserter)
+  local def = inserter_throughput.make_full_definition_for_inserter(inserter)
   return inserter_throughput.estimate_inserter_speed(def), inserter_throughput.is_estimate(def)
 end
 
