@@ -3291,20 +3291,25 @@ end
 local function update_active_player(player)
   if not validate_player(player) then return end
   if not validate_target_inserter(player) then return end
+
   local inserter = player.target_inserter
   deactivate_inserter(player, inserter)
+
   if inserter.direction ~= player.target_inserter_direction
     or inserter.force_index ~= player.target_inserter_force_index
     or not vec.vec_equals(inserter.position, player.target_inserter_position)
   then
     switch_to_idle_and_back(player, true)
     update_inserter_speed_text(player)
+    return
   end
+
   if not vec.vec_equals(inserter.pickup_position, player.target_inserter_pickup_position)
     or not vec.vec_equals(inserter.drop_position, player.target_inserter_drop_position)
   then
     switch_to_idle_and_back(player) -- Don't do reach checks.
     update_inserter_speed_text(player)
+    return
   end
 end
 
