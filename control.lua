@@ -157,7 +157,7 @@ local animation_type = {
 ---objects get destroyed if another state switch happens before these objects were able to be reused. Which
 ---can only happen when mods do things in a raised event during our `switch_to_idle`.
 ---@field rendering_is_floating_while_idle boolean?
----@field index_in_active_players integer @ `nil` when idle.
+---@field index_in_active_players integer @ Non `nil` when non idle or has_active_inserter_speed_text.
 ---`nil` when idle. Must be stored, because we can switch to idle _after_ an entity has been invalidated.
 ---@field target_inserter_id EntityIDQAI
 ---@field target_inserter LuaEntity @ `nil` when idle.
@@ -196,6 +196,11 @@ local animation_type = {
 ---`nil` when idle. Ghosts don't need reach checks, and when going from ghost to real, it still shouldn't do
 ---reach checks, because that'd be annoying. Imagine bots kicking you out of adjustment.
 ---@field no_reach_checks boolean?
+---@field has_active_inserter_speed_text boolean? @ Value is entirely unrelated to `state`.
+---@field inserter_speed_reference_inserter LuaEntity @ `nil` when not has_active_inserter_speed_text.
+---@field inserter_speed_stack_size integer @ `nil` when not has_active_inserter_speed_text.
+---@field inserter_speed_pickup_position MapPosition @ `nil` when not has_active_inserter_speed_text.
+---@field inserter_speed_drop_position MapPosition @ `nil` when not has_active_inserter_speed_text.
 ---@field inserter_speed_text_id uint64? @ Only `nil` initially, once it exists, it's never destroyed (by this mod).
 ---@field show_throughput_on_drop boolean
 ---@field show_throughput_on_pickup boolean
@@ -1254,24 +1259,40 @@ local function confirm_rendering_was_kept_successfully(player)
   player.rendering_is_floating_while_idle = nil
 end
 
----@param player PlayerDataQAI
-local function add_active_player(player)
-  local active_players = global.active_players
-  active_players.count = active_players.count + 1
-  active_players[active_players.count] = player
-  player.index_in_active_players = active_players.count
-end
+local update_player_active_state
+do
+  ---@param player PlayerDataQAI
+  local function add_active_player(player)
+    local active_players = global.active_players
+    active_players.count = active_players.count + 1
+    active_players[active_players.count] = player
+    player.index_in_active_players = active_players.count
+  end
 
----@param player PlayerDataQAI
-local function remove_active_player(player)
-  local active_players = global.active_players
-  local count = active_players.count
-  local index = player.index_in_active_players
-  active_players[index] = active_players[count]
-  active_players[index].index_in_active_players = index
-  active_players[count] = nil
-  active_players.count = count - 1
-  player.index_in_active_players = nil
+  ---@param player PlayerDataQAI
+  local function remove_active_player(player)
+    local active_players = global.active_players
+    local count = active_players.count
+    local index = player.index_in_active_players
+    active_players[index] = active_players[count]
+    active_players[index].index_in_active_players = index
+    active_players[count] = nil
+    active_players.count = count - 1
+    player.index_in_active_players = nil
+  end
+
+  ---@param player PlayerDataQAI
+  ---@param is_not_idle boolean? @ When `nil` will be evaluated using the current `player.state`.
+  function update_player_active_state(player, is_not_idle)
+    is_not_idle = is_not_idle == nil and (player.state ~= "idle") or is_not_idle
+    local should_be_active = is_not_idle or player.has_active_inserter_speed_text
+    if (player.index_in_active_players ~= nil) == should_be_active then return end
+    if should_be_active then
+      add_active_player(player)
+    else
+      remove_active_player(player)
+    end
+  end
 end
 
 ---@param player PlayerDataQAI
@@ -1280,6 +1301,12 @@ local function hide_inserter_speed_text(player)
   if id and rendering.is_valid(id) then
     rendering.set_visible(id, false)
   end
+  player.has_active_inserter_speed_text = false
+  player.inserter_speed_reference_inserter = nil
+  player.inserter_speed_stack_size = nil
+  player.inserter_speed_pickup_position = nil
+  player.inserter_speed_drop_position = nil
+  update_player_active_state(player)
 end
 
 ---@param player PlayerDataQAI
@@ -1433,7 +1460,7 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   end
   remove_id(player.target_inserter_id)
   global.inserters_in_use[player.target_inserter_id] = nil
-  remove_active_player(player)
+  update_player_active_state(player, false)
   player.target_inserter_id = nil
   player.target_inserter = nil
   player.target_inserter_cache = nil
@@ -1884,7 +1911,15 @@ end
 ---@param position MapPosition
 ---@param items_per_second number
 ---@param is_estimate boolean
-local function set_inserter_speed_text(player, position, items_per_second, is_estimate)
+---@param reference_inserter LuaEntity
+local function set_inserter_speed_text(player, position, items_per_second, is_estimate, reference_inserter)
+  player.has_active_inserter_speed_text = true
+  player.inserter_speed_reference_inserter = reference_inserter
+  player.inserter_speed_stack_size = reference_inserter.inserter_target_pickup_count
+  player.inserter_speed_pickup_position = reference_inserter.pickup_position
+  player.inserter_speed_drop_position = reference_inserter.drop_position
+  update_player_active_state(player)
+
   local id = player.inserter_speed_text_id
   if not id or not rendering.is_valid(id) then
     player.inserter_speed_text_id = rendering.draw_text{
@@ -1992,7 +2027,7 @@ end
 ---@param position MapPosition
 local function update_inserter_speed_text_using_inserter(player, inserter, position)
   local items_per_second, is_estimate = estimate_inserter_speed_for_inserter(inserter)
-  set_inserter_speed_text(player, position, items_per_second, is_estimate)
+  set_inserter_speed_text(player, position, items_per_second, is_estimate, inserter)
 end
 
 local validate_target_inserter
@@ -2089,7 +2124,7 @@ function update_inserter_speed_text(player)
     snap_position_to_tile_center_relative_to_inserter(player, position)
   end
   position.x = position.x + 0.6
-  set_inserter_speed_text(player, position, items_per_second, is_estimate)
+  set_inserter_speed_text(player, position, items_per_second, is_estimate, player.target_inserter)
 end
 
 ---@param color Color @ Assumes `r`, `g` and `b` to be the color at full opacity. Current `a` is ignored.
@@ -2287,7 +2322,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach, 
   end
 
   global.inserters_in_use[id] = player
-  add_active_player(player)
+  update_player_active_state(player, true)
   player.target_inserter_id = id
   player.target_inserter = target_inserter
   player.target_inserter_cache = cache
@@ -3288,9 +3323,38 @@ local function get_or_init_player(player_index)
 end
 
 ---@param player PlayerDataQAI
+local function update_active_inserter_speed_text(player)
+  local inserter = player.inserter_speed_reference_inserter
+  if not inserter.valid then return end
+
+  local current_stack_size = inserter.inserter_target_pickup_count
+  if current_stack_size ~= player.inserter_speed_stack_size then
+    -- `inserter_speed_stack_size` gets updated by `update_inserter_speed_text`.
+    update_inserter_speed_text(player)
+    return
+  end
+
+  if player.state ~= "idle" and player.target_inserter == inserter then
+    return -- Pickup and drop positions get compared by regular active player update in this case.
+  end
+
+  if not vec.vec_equals(inserter.pickup_position, player.inserter_speed_pickup_position)
+    or not vec.vec_equals(inserter.drop_position, player.inserter_speed_drop_position)
+  then
+    update_inserter_speed_text(player)
+    return
+  end
+end
+
+---@param player PlayerDataQAI
 local function update_active_player(player)
   if not validate_player(player) then return end
-  if not validate_target_inserter(player) then return end
+
+  if player.has_active_inserter_speed_text then
+    update_active_inserter_speed_text(player)
+  end
+
+  if not validate_target_inserter(player) then return end -- Returns when player is idle.
 
   local inserter = player.target_inserter
   deactivate_inserter(player, inserter)
