@@ -1,6 +1,5 @@
 
 local util = require("__core__.lualib.util")
-local shared = require("__quick-adjustable-inserters__.shared_logic")
 
 qai_data = qai_data or {
   touched_inserters = {}--[[@as table<string, {did_allow_custom_vectors: boolean?, prev_drop: data.Vector, prev_pickup: data.Vector}>]],
@@ -15,6 +14,19 @@ local function check_setting(name, default_if_non_existent)
     return default_if_non_existent
   end
   return setting.value--[[@as boolean]]
+end
+
+---@param inserter data.InserterPrototype
+---@return boolean
+local function should_ignore(inserter)
+  local flags = inserter.flags
+  if not flags then return false end
+  for _, flag in pairs(flags) do
+    if flag == "hidden" or flag == "building-direction-8-way" or flag == "not-selectable-in-game" then
+      return true
+    end
+  end
+  return false
 end
 
 ---@param inserter data.InserterPrototype
@@ -111,7 +123,7 @@ end
 
 local function modify_existing_inserters()
   for _, inserter in pairs(data.raw["inserter"]) do
-    if shared.should_ignore(inserter) then
+    if should_ignore(inserter) then
       undo_modification(inserter)
     else
       modify_inserter(inserter)

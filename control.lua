@@ -1,7 +1,6 @@
 
 local inserter_throughput = require("__inserter-throughput-lib__.inserter_throughput")
 local vec = require("__inserter-throughput-lib__.vector")
-local shared = require("__quick-adjustable-inserters__.shared_logic")
 
 ---cSpell:ignore rects, IDQAI
 
@@ -3458,7 +3457,11 @@ end
 local function update_inserter_cache(force)
   force.inserter_cache_lut = {}
   for _, inserter in pairs(game.get_filtered_entity_prototypes{{filter = "type", type = "inserter"}}) do
-    if inserter.allow_custom_vectors and not shared.should_ignore(inserter) then
+    -- No matter what other flags the inserter has set (in other words no matter what crazy things other mods
+    -- might be doing), generate cache for it if it has `allow_custom_vectors` set, allowing this mod to
+    -- adjust it. Even if it isn't selectable or if it is rotatable 8 way, both of which make little sense for
+    -- this mod, the remote interface exists, and the 8 directions won't break this mod.
+    if inserter.allow_custom_vectors then
       force.inserter_cache_lut[inserter.name] = generate_cache_for_inserter(inserter, force.tech_level)
     end
   end

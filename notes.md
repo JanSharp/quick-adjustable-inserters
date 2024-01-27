@@ -129,4 +129,4 @@
 - [x] check non rotatable inserters
 - [x] check not operable inserters
 - [ ] maybe add editor support to bypass checks like force friendliness, rotatable and operable
-- [ ] maybe loosen the restriction on which inserters can be adjusted in the runtime checks to allow for other mods to do crazy things
+- [x] maybe loosen the restriction on which inserters can be adjusted in the runtime checks to allow for other mods to do crazy things
