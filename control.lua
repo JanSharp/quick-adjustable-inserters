@@ -215,27 +215,30 @@ local animation_type = {
 ---@field pipetted_drop_vector MapPosition @ `nil` when `pipetted_inserter_name` is `nil`.
 
 local ev = defines.events
-local square_entity_name = "qai-selectable-square"
-local ninth_entity_name = "qai-selectable-ninth"
-local rect_entity_name = "qai-selectable-rect"
 
-local finish_animation_frames = 16
-local finish_animation_expansion = 3/16
-local finish_animation_highlight_box_step = (finish_animation_expansion / 2) / finish_animation_frames
-local grid_fade_in_frames = 8 -- Valid values are those where 1 / grid_fade_in_frames keeps all precision.
-local grid_fade_out_frames = 12
-local grid_background_opacity = 0.2
-local direction_arrow_opacity = 0.6
+local consts = {
+  square_entity_name = "qai-selectable-square",
+  ninth_entity_name = "qai-selectable-ninth",
+  rect_entity_name = "qai-selectable-rect",
 
-local techs_we_care_about = {
-  ["near-inserters"] = true,
-  ["more-inserters-1"] = true,
-  ["more-inserters-2"] = true,
+  finish_animation_frames = 16,
+  finish_animation_expansion = 3/16,
+  grid_fade_in_frames = 8, -- Valid values are those where 1 / consts.grid_fade_in_frames keeps all precision.
+  grid_fade_out_frames = 12,
+  grid_background_opacity = 0.2,
+  direction_arrow_opacity = 0.6,
+
+  techs_we_care_about = {
+    ["near-inserters"] = true,
+    ["more-inserters-1"] = true,
+    ["more-inserters-2"] = true,
+  },
 }
+consts.finish_animation_highlight_box_step = (consts.finish_animation_expansion / 2) / consts.finish_animation_frames
 
 ---@param name string
 local function do_we_care_about_this_technology(name)
-  return techs_we_care_about[name]
+  return consts.techs_we_care_about[name]
     or string.find(name, "^long%-inserters%-([1-9]%d*)$") -- Does not accept leading zeros.
 end
 
@@ -1162,12 +1165,12 @@ end
 
 ---@param ids uint64[]
 local function animate_lines_disappearing(ids)
-  local opacity = 1 / grid_fade_out_frames
+  local opacity = 1 / consts.grid_fade_out_frames
   local color_step = {r = -opacity, g = -opacity, b = -opacity, a = -opacity}
   for i = #ids, 1, -1 do
     add_animated_color{
       id = ids[i],
-      remaining_updates = grid_fade_out_frames - 1,
+      remaining_updates = consts.grid_fade_out_frames - 1,
       destroy_on_finish = true,
       color = {r = 1, g = 1, b = 1, a = 1},
       color_step = color_step,
@@ -1180,11 +1183,11 @@ end
 ---@param id uint64
 ---@param current_opacity number
 local function animate_id_disappearing(id, current_opacity)
-  local opacity = current_opacity / grid_fade_out_frames
+  local opacity = current_opacity / consts.grid_fade_out_frames
   local color_step = {r = -opacity, g = -opacity, b = -opacity, a = -opacity}
   add_animated_color{
     id = id,
-    remaining_updates = grid_fade_out_frames - 1,
+    remaining_updates = consts.grid_fade_out_frames - 1,
     destroy_on_finish = true,
     color = {r = current_opacity, g = current_opacity, b = current_opacity, a = current_opacity},
     color_step = color_step,
@@ -1206,7 +1209,7 @@ end
 local function destroy_grid_lines_and_background(player)
   if should_animate() then
     animate_lines_disappearing(player.line_ids)
-    animate_id_disappearing(player.background_polygon_id, grid_background_opacity)
+    animate_id_disappearing(player.background_polygon_id, consts.grid_background_opacity)
   else
     destroy_and_clear_rendering_ids(player.line_ids)
     rendering.destroy(player.background_polygon_id)
@@ -1220,11 +1223,11 @@ local function destroy_everything_but_grid_lines_and_background(player)
   local destroy = rendering.destroy
   if should_animate() then
     animate_lines_disappearing(player.direction_arrows_indicator_line_ids)
-    animate_id_disappearing(player.direction_arrow_id, direction_arrow_opacity)
+    animate_id_disappearing(player.direction_arrow_id, consts.direction_arrow_opacity)
     if player.inserter_circle_id then animate_id_disappearing(player.inserter_circle_id, 1) end
-    if player.pickup_highlight_id then fade_out(player.pickup_highlight_id, grid_fade_out_frames) end
+    if player.pickup_highlight_id then fade_out(player.pickup_highlight_id, consts.grid_fade_out_frames) end
     if player.drop_highlight_id then animate_id_disappearing(player.drop_highlight_id, 1) end
-    if player.line_to_pickup_highlight_id then fade_out(player.line_to_pickup_highlight_id, grid_fade_out_frames) end
+    if player.line_to_pickup_highlight_id then fade_out(player.line_to_pickup_highlight_id, consts.grid_fade_out_frames) end
   else
     destroy_and_clear_rendering_ids(player.direction_arrows_indicator_line_ids)
     destroy(player.direction_arrow_id)
@@ -1555,7 +1558,7 @@ end
 ---@param player PlayerDataQAI
 local function place_dummy_square_at_pickup(player)
   local entity = player.current_surface.create_entity{
-    name = square_entity_name,
+    name = consts.square_entity_name,
     force = player.force_index,
     position = player.target_inserter.pickup_position,
   }
@@ -1577,7 +1580,7 @@ local function place_squares(player, specific_tiles)
   local position = {}
   ---@type LuaSurface.create_entity_param
   local arg = {
-    name = square_entity_name,
+    name = consts.square_entity_name,
     force = player.force_index,
     position = position,
   }
@@ -1606,7 +1609,7 @@ local function place_ninths(player, specific_tiles)
   local position = {}
   ---@type LuaSurface.create_entity_param
   local arg = {
-    name = ninth_entity_name,
+    name = consts.ninth_entity_name,
     force = player.force_index,
     position = position,
   }
@@ -1637,7 +1640,7 @@ end
 ---@return Color color_step
 local function get_color_for_potential_animation(full_opacity)
   local do_animate = should_animate()
-  local opacity = do_animate and (full_opacity / grid_fade_in_frames) or full_opacity
+  local opacity = do_animate and (full_opacity / consts.grid_fade_in_frames) or full_opacity
   return do_animate, opacity, {r = opacity, g = opacity, b = opacity, a = opacity}
 end
 
@@ -1647,7 +1650,7 @@ end
 local function add_grid_fade_in_animation(id, opacity, color_step)
   return add_animated_color{ -- Return to make it a tail call.
     id = id,
-    remaining_updates = grid_fade_in_frames - 1,
+    remaining_updates = consts.grid_fade_in_frames - 1,
     color = {r = opacity, g = opacity, b = opacity, a = opacity},
     color_step = color_step,
   }
@@ -1664,7 +1667,7 @@ local function add_non_white_grid_fade_in_animation(id, opacity, color_step, col
   color.a = color.a * opacity
   return add_animated_color{ -- Return to make it a tail call.
     id = id,
-    remaining_updates = grid_fade_in_frames - 1,
+    remaining_updates = consts.grid_fade_in_frames - 1,
     color = color,
     color_step = color_step,
   }
@@ -1676,7 +1679,7 @@ local function draw_direction_arrow(player)
   local cache = player.target_inserter_cache
   inserter_position.x = inserter_position.x + cache.offset_from_inserter.x + cache.direction_arrow_position.x
   inserter_position.y = inserter_position.y + cache.offset_from_inserter.y + cache.direction_arrow_position.y
-  local do_animate, opacity, color_step = get_color_for_potential_animation(direction_arrow_opacity)
+  local do_animate, opacity, color_step = get_color_for_potential_animation(consts.direction_arrow_opacity)
   player.direction_arrow_id = rendering.draw_polygon{
     surface = player.current_surface_index,
     forces = {player.force_index},
@@ -1712,7 +1715,7 @@ local function place_rects(player)
   local position = {}
   ---@type LuaSurface.create_entity_param
   local arg = {
-    name = rect_entity_name,
+    name = consts.rect_entity_name,
     force = player.force_index,
     position = position,
   }
@@ -1826,7 +1829,7 @@ end
 
 ---@param player PlayerDataQAI
 local function draw_grid_background(player)
-  local do_animate, opacity, color_step = get_color_for_potential_animation(grid_background_opacity)
+  local do_animate, opacity, color_step = get_color_for_potential_animation(consts.grid_background_opacity)
   player.background_polygon_id = rendering.draw_polygon{
     surface = player.current_surface_index,
     forces = {player.force_index},
@@ -1851,7 +1854,7 @@ local function draw_single_tile_grid(player, single_tile)
     right_bottom = vec.add_scalar(vec.copy(single_tile), 1),
   }
 
-  local do_animate, opacity, color_step = get_color_for_potential_animation(grid_background_opacity)
+  local do_animate, opacity, color_step = get_color_for_potential_animation(consts.grid_background_opacity)
   arg.color = color_step
   arg.filled = true
   player.background_polygon_id = rendering.draw_rectangle(arg)
@@ -2050,7 +2053,7 @@ end
 ---@return LuaEntity? selected
 local function get_redirected_selected_entity(selected)
   if not selected then return end
-  if selected.name == square_entity_name then
+  if selected.name == consts.square_entity_name then
     local inserter = global.selectable_dummy_redirects[selected.unit_number]
     if inserter then
       -- It is a dummy entity, so it should never be return itself. If the redirection target inserter is
@@ -2065,7 +2068,7 @@ end
 ---@param selectable LuaEntity
 local function get_inserter_speed_position_next_to_selectable(player, selectable)
   local position = selectable.position
-  if selectable.name == ninth_entity_name then
+  if selectable.name == consts.ninth_entity_name then
     snap_position_to_tile_center_relative_to_inserter(player, position)
   end
   position.x = position.x + 0.6
@@ -2111,7 +2114,7 @@ function update_inserter_speed_text(player)
   end
 
   local name = selected.name
-  if not (name == square_entity_name or name == ninth_entity_name) ---@cast selected -nil
+  if not (name == consts.square_entity_name or name == consts.ninth_entity_name) ---@cast selected -nil
     or global.selectable_entities_to_player_lut[selected.unit_number] ~= player
   then
     hide_inserter_speed_text(player)
@@ -2120,7 +2123,7 @@ function update_inserter_speed_text(player)
 
   local position = selected.position
   local items_per_second, is_estimate = estimate_inserter_speed(player, position)
-  if name == ninth_entity_name then
+  if name == consts.ninth_entity_name then
     snap_position_to_tile_center_relative_to_inserter(player, position)
   end
   position.x = position.x + 0.6
@@ -2165,7 +2168,7 @@ local function try_reuse_existing_pickup_highlight(player, final_opacity, color)
   local left_top, right_bottom = get_pickup_box(player)
   if not rectangle_positions_equal(id, left_top, right_bottom) then
     -- Not checking surface or force, because those will trigger switch_to_idle_and_back anyway.
-    fade_out_or_destroy(id, grid_fade_in_frames)
+    fade_out_or_destroy(id, consts.grid_fade_in_frames)
     return false
   end
 
@@ -2175,7 +2178,7 @@ local function try_reuse_existing_pickup_highlight(player, final_opacity, color)
   end
 
   pre_multiply_and_set_alpha(color, final_opacity)
-  animate_fade_to_color(id, color, grid_fade_in_frames)
+  animate_fade_to_color(id, color, consts.grid_fade_in_frames)
   return true
 end
 
@@ -2592,7 +2595,7 @@ do
   local function get_and_validate_selected(player)
     local selected = player.player.selected
     if selected
-      and (selected.name == ninth_entity_name or selected.name == square_entity_name)
+      and (selected.name == consts.ninth_entity_name or selected.name == consts.square_entity_name)
       and global.selectable_entities_to_player_lut[selected.unit_number] == player
     then
       return selected
@@ -2693,7 +2696,7 @@ end
 
 ---@return Color
 local function get_finish_animation_color_step()
-  return {r = 0, g = -1 / finish_animation_frames, b = 0, a = -1 / finish_animation_frames}
+  return {r = 0, g = -1 / consts.finish_animation_frames, b = 0, a = -1 / consts.finish_animation_frames}
 end
 
 ---@param position MapPosition
@@ -2715,7 +2718,7 @@ local function try_reuse_existing_drop_highlight(player, visual_drop_position)
   if not id or not rendering.is_valid(id) then return false end
   local left_top, right_bottom = get_drop_box(visual_drop_position)
   if not rectangle_positions_equal(id, left_top, right_bottom) then
-    fade_out_or_destroy(id, grid_fade_in_frames)
+    fade_out_or_destroy(id, consts.grid_fade_in_frames)
     return false
   end
   -- The color is the same, so nothing to do.
@@ -2750,10 +2753,10 @@ local function play_drop_highlight_animation(player, position)
     right_bottom = right_bottom,
   }
 
-  local step = finish_animation_highlight_box_step
+  local step = consts.finish_animation_highlight_box_step
   add_animated_rectangle{
     id = id,
-    remaining_updates = finish_animation_frames - 1,
+    remaining_updates = consts.finish_animation_frames - 1,
     destroy_on_finish = true,
     color = color,
     left_top = left_top,
@@ -2770,9 +2773,9 @@ end
 ---@return integer frames
 ---@return MapPosition step_vector
 local function get_frames_and_step_vector_for_line_to_highlight(from, to, length)
-  local final_length = length - finish_animation_expansion
-  local length_step = finish_animation_expansion / finish_animation_frames
-  local frames = math.max(1, finish_animation_frames - math.floor(math.max(0, -final_length) / length_step))
+  local final_length = length - consts.finish_animation_expansion
+  local length_step = consts.finish_animation_expansion / consts.finish_animation_frames
+  local frames = math.max(1, consts.finish_animation_frames - math.floor(math.max(0, -final_length) / length_step))
   local step_vector = vec.set_length(vec.sub(vec.copy(to), from), length_step / 2)
   return frames, step_vector
 end
@@ -2819,12 +2822,12 @@ local function play_circle_on_inserter_animation(player)
   rendering.set_color(player.inserter_circle_id, color)
   add_animated_circle{
     id = player.inserter_circle_id,
-    remaining_updates = finish_animation_frames - 1,
+    remaining_updates = consts.finish_animation_frames - 1,
     destroy_on_finish = true,
     color = color,
     radius = player.target_inserter_cache.radius_for_circle_on_inserter,
     color_step = get_finish_animation_color_step(),
-    radius_step = (finish_animation_expansion / 2) / finish_animation_frames,
+    radius_step = (consts.finish_animation_expansion / 2) / consts.finish_animation_frames,
   }
   player.inserter_circle_id = nil -- Destroying is now handled by the animation.
 end
@@ -2832,11 +2835,11 @@ end
 ---@param player PlayerDataQAI
 local function play_pickup_highlight_animation(player)
   if not rendering.is_valid(player.pickup_highlight_id) then return end
-  local step = (finish_animation_expansion / 2) / finish_animation_frames
+  local step = (consts.finish_animation_expansion / 2) / consts.finish_animation_frames
   local left_top, right_bottom = get_pickup_box(player)
   add_animated_rectangle{
     id = player.pickup_highlight_id,
-    remaining_updates = finish_animation_frames - 1,
+    remaining_updates = consts.finish_animation_frames - 1,
     destroy_on_finish = true,
     color = get_finish_animation_color(),
     left_top = left_top,
@@ -3099,12 +3102,12 @@ local on_adjust_handler_lut = {
       end
       return
     end
-    if is_selectable_for_player(selected, square_entity_name, player) then
+    if is_selectable_for_player(selected, consts.square_entity_name, player) then
       set_pickup_position(player, selected.position)
       advance_to_selecting_drop(player)
       return
     end
-    if is_selectable_for_player(selected, rect_entity_name, player) then
+    if is_selectable_for_player(selected, consts.rect_entity_name, player) then
       set_direction_and_update_arrow(player, selected.direction)
       return
     end
@@ -3122,15 +3125,15 @@ local on_adjust_handler_lut = {
       end
       return
     end
-    if is_selectable_for_player(selected, square_entity_name, player)
-      or is_selectable_for_player(selected, ninth_entity_name, player)
+    if is_selectable_for_player(selected, consts.square_entity_name, player)
+      or is_selectable_for_player(selected, consts.ninth_entity_name, player)
     then
       set_drop_position(player, selected.position)
       play_finish_animation(player) -- Before switching to idle because some rendering objects get reused.
       switch_to_idle(player)
       return
     end
-    if is_selectable_for_player(selected, rect_entity_name, player) then
+    if is_selectable_for_player(selected, consts.rect_entity_name, player) then
       set_direction_and_update_arrow(player, selected.direction)
       return
     end
