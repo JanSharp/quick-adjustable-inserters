@@ -126,3 +126,5 @@
 - [ ] handle inserter that got rotated to "usually invalid" directions through script
 - [x] with near inserters researched and only mirrored inserters and show inserter throughput on pickup, it should use the mirrored default drop offset for calculation, not the current drop offset
 - [x] while inserter speed text is active save corresponding inserter_target_pickup_count, pickup_position and drop_position in player data and compare them in active player update to potentially update inserter throughput text
+- [x] check non rotatable inserters
+- [ ] check not operable inserters

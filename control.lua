@@ -123,10 +123,12 @@ local animation_type = {
 ---@field lines LineDefinitionQAI[]
 ---@field lines_flipped LineDefinitionQAI[]
 ---@field direction_arrows_indicator_lines LineDefinitionQAI[]
----@field direction_arrows_indicator_lines_flipped LineDefinitionQAI[]
----@field direction_arrows DirectionArrowDefinitionQAI[] @ 4 when square, otherwise 2 (north and south).
----@field direction_arrow_position MapPosition
----@field direction_arrow_vertices ScriptRenderVertexTarget[]
+---@field direction_arrows_indicator_lines_flipped LineDefinitionQAI[] @ `nil` when not_rotatable.
+---`nil` when not_rotatable. 4 when square, otherwise 2 (north and south).
+---@field direction_arrows DirectionArrowDefinitionQAI[]
+---@field direction_arrow_position MapPosition @ `nil` when not_rotatable.
+---@field direction_arrow_vertices ScriptRenderVertexTarget[] @ `nil` when not_rotatable.
+---@field not_rotatable boolean
 ---@field extension_speed number
 ---@field rotation_speed number
 ---@field chases_belt_items boolean
@@ -174,6 +176,7 @@ local animation_type = {
 ---`true` for non square inserters facing west or east.
 ---Those end up pretending to be north and south, but flipped diagonally.
 ---@field should_flip boolean
+---@field is_rotatable boolean @ `nil` when idle.
 ---@field current_surface_index uint @ `nil` when idle.
 ---@field current_surface LuaSurface @ `nil` when idle.
 ---@field dummy_pickup_square LuaEntity? @ Can be `nil` even when not idle. Only used with only_allow_mirrored.
@@ -187,7 +190,7 @@ local animation_type = {
 ---@field background_polygon_id uint64
 ---`nil` when idle. Can be `nil` when destroying all rendering objects due to being part of an animation.
 ---@field inserter_circle_id uint64
----@field direction_arrow_id uint64 @ `nil` when idle.
+---@field direction_arrow_id uint64 @ Can be `nil` even when not idle. It only exists when `is_rotatable`.
 ---@field pickup_highlight_id uint64? @ `nil` when idle.
 ---@field drop_highlight_id uint64? @ `nil` when idle.
 ---Can be `nil` even when not idle. Can even be `nil` when `pickup_highlight_id` is not `nil`.
@@ -856,6 +859,8 @@ local function generate_cache_for_inserter(inserter, tech_level)
     }
   end
 
+  local not_rotatable = inserter.flags and inserter.flags["not-rotatable"]
+
   ---@type InserterCacheQAI
   local cache = {
     prototype = inserter,
@@ -879,10 +884,13 @@ local function generate_cache_for_inserter(inserter, tech_level)
     tiles_background_vertices_flipped = {},
     lines = {},
     lines_flipped = {},
-    direction_arrows_indicator_lines = {},
-    direction_arrows_indicator_lines_flipped = {},
-    direction_arrows = {},
-    direction_arrow_vertices = {},
+    ---@diagnostic disable: assign-type-mismatch
+    direction_arrows_indicator_lines = not not_rotatable and {} or nil,
+    direction_arrows_indicator_lines_flipped = not not_rotatable and {} or nil,
+    direction_arrows = not not_rotatable and {} or nil,
+    direction_arrow_vertices = not not_rotatable and {} or nil,
+    ---@diagnostic enable: assign-type-mismatch
+    not_rotatable = not_rotatable,
     extension_speed = inserter.inserter_extension_speed,
     rotation_speed = inserter.inserter_rotation_speed,
     chases_belt_items = inserter.inserter_chases_belt_items,
@@ -906,8 +914,10 @@ local function generate_cache_for_inserter(inserter, tech_level)
   generate_tiles_cache(cache)
   generate_tiles_background_cache(cache)
   generate_lines_cache(cache)
-  generate_direction_arrows_indicator_lines_cache(cache)
-  generate_direction_arrow_cache(cache)
+  if not not_rotatable then
+    generate_direction_arrows_indicator_lines_cache(cache)
+    generate_direction_arrow_cache(cache)
+  end
   return cache
 end
 
@@ -1224,14 +1234,14 @@ local function destroy_everything_but_grid_lines_and_background(player)
   local destroy = rendering.destroy
   if should_animate() then
     animate_lines_disappearing(player.direction_arrows_indicator_line_ids)
-    animate_id_disappearing(player.direction_arrow_id, consts.direction_arrow_opacity)
+    if player.direction_arrow_id then animate_id_disappearing(player.direction_arrow_id, consts.direction_arrow_opacity) end
     if player.inserter_circle_id then animate_id_disappearing(player.inserter_circle_id, 1) end
     if player.pickup_highlight_id then fade_out(player.pickup_highlight_id, consts.grid_fade_out_frames) end
     if player.drop_highlight_id then animate_id_disappearing(player.drop_highlight_id, 1) end
     if player.line_to_pickup_highlight_id then fade_out(player.line_to_pickup_highlight_id, consts.grid_fade_out_frames) end
   else
     destroy_and_clear_rendering_ids(player.direction_arrows_indicator_line_ids)
-    destroy(player.direction_arrow_id)
+    if player.direction_arrow_id then destroy(player.direction_arrow_id) end
     if player.inserter_circle_id then destroy(player.inserter_circle_id) end
     if player.pickup_highlight_id then destroy(player.pickup_highlight_id) end
     if player.drop_highlight_id then destroy(player.drop_highlight_id) end
@@ -1474,6 +1484,7 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   player.target_inserter_direction = nil
   player.target_inserter_force_index = nil
   player.should_flip = nil
+  player.is_rotatable = nil
   player.no_reach_checks = nil
   player.state = "idle"
 
@@ -1676,6 +1687,7 @@ end
 
 ---@param player PlayerDataQAI
 local function draw_direction_arrow(player)
+  if not player.is_rotatable then return end
   local inserter_position = player.target_inserter_position
   local cache = player.target_inserter_cache
   inserter_position.x = inserter_position.x + cache.offset_from_inserter.x + cache.direction_arrow_position.x
@@ -1708,6 +1720,7 @@ local flip_direction_lut = {
 
 ---@param player PlayerDataQAI
 local function place_rects(player)
+  if not player.is_rotatable then return end
   local cache = player.target_inserter_cache
   local inserter_position = player.target_inserter_position
   local offset_from_inserter = cache.offset_from_inserter
@@ -1756,11 +1769,18 @@ local function set_direction(player, new_direction)
   player.target_inserter_direction = actual_direction
 end
 
+local switch_to_idle_and_back
+
 ---@param player PlayerDataQAI
 ---@param new_direction defines.direction @
 ---If you look at the feet of the inserter, the forwards pointing feet should be the direction this variable
 ---is defining.
 local function set_direction_and_update_arrow(player, new_direction)
+  -- Recheck if the inserter is rotatable. Don't recheck the cache, because that's a static prototype flag.
+  if not player.target_inserter.rotatable then
+    switch_to_idle_and_back(player)
+    return
+  end
   set_direction(player, new_direction)
   update_direction_arrow(player)
 end
@@ -1821,6 +1841,7 @@ end
 
 ---@param player PlayerDataQAI
 local function draw_direction_arrows_indicator_lines(player)
+  if not player.is_rotatable then return end
   draw_lines_internal(
     player,
     player.direction_arrows_indicator_line_ids,
@@ -2292,6 +2313,11 @@ local function show_error(player, message)
 end
 
 ---@param player PlayerDataQAI
+local function should_be_rotatable(player)
+  return player.target_inserter.rotatable and not player.target_inserter_cache.not_rotatable
+end
+
+---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
 ---It should only perform reach checks when the player is selecting a new inserter. Any other state switching
 ---should not care about being out of reach. Going out of reach while adjusting an inserter is handled in the
@@ -2338,6 +2364,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach, 
   player.target_inserter_force_index = target_inserter.force_index
   player.should_flip = not player.target_inserter_cache.is_square
     and is_east_or_west_lut[target_inserter.direction]
+  player.is_rotatable = should_be_rotatable(player)
   player.current_surface_index = target_inserter.surface_index
   player.current_surface = target_inserter.surface
   player.no_reach_checks = carry_over_no_reach_checks or is_ghost[target_inserter]
@@ -2442,7 +2469,7 @@ end
 ---@param player PlayerDataQAI
 ---@param do_check_reach boolean?
 ---@param new_target_inserter LuaEntity? @ Use this when an inserter changed to/from being real or ghost.
-local function switch_to_idle_and_back(player, do_check_reach, new_target_inserter)
+function switch_to_idle_and_back(player, do_check_reach, new_target_inserter)
   if player.state == "idle" then return end
   if new_target_inserter and do_check_reach then
     error("When an inserter gets revived or dies while being adjusted, do not do reach checks.")
@@ -3024,7 +3051,7 @@ local function try_place_held_inserter_and_adjust_it(player, position, cache, is
   ---@type LuaPlayer.can_build_from_cursor_param
   local args = {
     position = position,
-    direction = player.last_used_direction,
+    direction = cache.not_rotatable and defines.direction.north or player.last_used_direction,
     -- `alt` is evaluated later.
   }
   local actual_player = player.player
@@ -3377,6 +3404,12 @@ local function update_active_player(player)
   then
     switch_to_idle_and_back(player) -- Don't do reach checks.
     update_inserter_speed_text(player)
+    return
+  end
+
+  if should_be_rotatable(player) ~= player.is_rotatable then
+    switch_to_idle_and_back(player) -- Don't do reach checks.
+    -- And don't update inserter speed text.
     return
   end
 end
