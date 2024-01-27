@@ -1,6 +1,8 @@
 
+local util = require("__core__.lualib.util")
+
 qai_data = qai_data or {
-  touched_inserters = {}--[[@as table<string, true>]],
+  touched_inserters = {}--[[@as table<string, {did_allow_custom_vectors: boolean?, prev_drop: data.Vector, prev_pickup: data.Vector}>]],
 }
 
 ---@param name string @ Name of a bool setting.
@@ -27,6 +29,12 @@ end
 
 ---@param inserter data.InserterPrototype
 local function modify_inserter(inserter)
+  if qai_data.touched_inserters[inserter.name] then return end
+  qai_data.touched_inserters[inserter.name] = {
+    did_allow_custom_vectors = inserter.allow_custom_vectors,
+    prev_pickup = util.copy(inserter.pickup_position),
+    prev_drop = util.copy(inserter.insert_position),
+  }
   inserter.allow_custom_vectors = true
   if not check_setting("qai-normalize-default-vectors", false) then return end
 
@@ -77,12 +85,47 @@ local function modify_inserter(inserter)
   drop[y] = drop[y] + y_offset
 end
 
+---@param tab table?
+local function clear_table(tab)
+  if not tab then return end
+  local next = next
+  local k = next(tab)
+  while k do
+    local next_k = next(tab, k)
+    tab[k] = nil
+    k = next_k
+  end
+end
+
+---@generic T : table
+---@param destination T
+---@param source T
+local function overwrite_table(destination, source)
+  clear_table(destination)
+  for k, v in pairs(source) do
+    destination[k] = v
+  end
+end
+
+---Handles inserters becoming hidden after they've been modified.
+---@param inserter data.InserterPrototype
+local function undo_modification(inserter)
+  local backup = qai_data.touched_inserters[inserter.name]
+  if not backup then return end
+  qai_data.touched_inserters[inserter.name] = nil
+  inserter.allow_custom_vectors = backup.did_allow_custom_vectors
+  if not check_setting("qai-normalize-default-vectors", false) then return end
+  overwrite_table(inserter.pickup_position, backup.prev_pickup)
+  overwrite_table(inserter.insert_position, backup.prev_drop)
+end
+
 local function modify_existing_inserters()
-  for name, inserter in pairs(data.raw["inserter"]) do
-    if qai_data.touched_inserters[name] or is_hidden(inserter) then goto continue end
-    qai_data.touched_inserters[name] = true
-    modify_inserter(inserter)
-    ::continue::
+  for _, inserter in pairs(data.raw["inserter"]) do
+    if is_hidden(inserter) then
+      undo_modification(inserter)
+    else
+      modify_inserter(inserter)
+    end
   end
 end
 
