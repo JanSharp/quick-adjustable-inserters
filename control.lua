@@ -2339,6 +2339,10 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach, 
     return show_error(player, {"qai.cant-adjust-enemy-inserters"})
   end
 
+  if not target_inserter.operable then
+    return show_error(player, {"not-operable"})
+  end
+
   if do_check_reach
     and not carry_over_no_reach_checks
     and not player.player.can_reach_entity(target_inserter)
@@ -2514,7 +2518,11 @@ end
 function validate_target_inserter(player)
   if player.state == "idle" then return false end
   local inserter = player.target_inserter
-  if inserter.valid then return true end
+  if inserter.valid then
+    if inserter.operable then return true end
+    switch_to_idle(player)
+    return false
+  end
   ---@diagnostic disable-next-line: cast-local-type
   inserter = player.current_surface.valid and find_real_or_ghost_entity(
     player.current_surface,
