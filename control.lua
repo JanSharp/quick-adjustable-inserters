@@ -825,7 +825,7 @@ local function generate_cache_for_inserter(inserter, tech_level)
   local tile_width
   local tile_height
   local offset_from_inserter
-  local placeable_off_grid = inserter.flags and inserter.flags["placeable-off-grid"] or false
+  local placeable_off_grid = inserter.has_flag("placeable-off-grid")
   if placeable_off_grid then
     local col_width = relevant_box.right_bottom.x - relevant_box.left_top.x
     local col_height = relevant_box.right_bottom.y - relevant_box.left_top.y
@@ -858,7 +858,7 @@ local function generate_cache_for_inserter(inserter, tech_level)
     }
   end
 
-  local not_rotatable = inserter.flags and inserter.flags["not-rotatable"]
+  local not_rotatable = inserter.has_flag("not-rotatable")
 
   ---@type InserterCacheQAI
   local cache = {
