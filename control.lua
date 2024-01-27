@@ -153,8 +153,9 @@ local animation_type = {
 ---I'm guessing. But that's worth the performance improvement of having this cached for all the performance
 ---critical code paths using it. (Same applies to force merging, probably.)
 ---@field force_index uint8
----Direction of last adjusted inserter or pipetted entity, collapsed to only 4 directions.
----@field last_used_direction defines.direction
+---Current internal direction of the cursor, represented as orientation for simplified computation. Performing
+---math on direction values is bad practice because the values of defines is not part of the specification.
+---@field current_cursor_orientation RealOrientation
 ---@field state PlayerStateQAI
 ---Always `nil` when not idle. Set to `true` when `keep_rendering` was set for `switch_to_idle`, because then
 ---the rendering objects are still alive even though the state is idle. This can then be used to ensure these
@@ -284,6 +285,268 @@ dirs.reverse_rotate_direction_lut = {
   [defines.direction.south] = defines.direction.east,
   [defines.direction.west] = defines.direction.south,
 }
+
+local get_cursor_item_prototype
+
+local cursor_direction
+do -- Start of cursor_direction "file"
+-- This is basically like a separate file, but I'm keeping it in here because I'm too committed to putting
+-- everything into this one file.
+-- It's kind of been like an experiment, and I've determined that there is such a thing as too large files.
+-- First of all I did actually hit the 200 locals limit in this file, which was/is annoying.
+-- Second of all there are logically different units/parts of code in this file that are basically asking for
+-- separation into separate files. Animation code, general util functions for interacting with the api, like
+-- real/ghost helper functions, cursor helper functions, all the rendering in general, the constants, the type
+-- annotations. So I suppose it isn't the fact that this file is too long, it's the fact that too many 
+-- different things got thrown into a single file.
+-- To do a bit more recapping, I've successfully written mostly small functions in this file and kept logic
+-- duplication to a minimum, which made adding the mirrored inserters only feature as well as handling of many
+-- random edge cases I thought of very straight forward. And I still believe that even though this file
+-- contains too many logically different parts of the code, with the usage of go to definition, find all
+-- references and control F it is still quite maintainable.
+-- Last note, even though this is a do end block there is no indentation, because if at some point I make the
+-- smart decision and split this file into many files, it'd make git history of this part of the code slightly
+-- cleaner. I also don't like large parts of the code having 1 extra layer of indentation. That's all.
+
+--[[
+
+rotation rules while holding item in cursor
+
+- [x] if place result 8 way, press R: apply 0.125 rotation
+- [x] if place result 4 way (normal, even robots, tanks, chests, spider trons), press R: apply 0.25 rotation.
+  Does not snap, the result can be 0.125 for example
+- [x] if place as tile, press R: behave like above
+- [x] if rolling stock, press R: apply 0.5 rotation, Does not snap, see 4 way
+- [x] if rolling stock, hovering rails: does nothing
+- [x] if rail and using rail planner to build: reset to north. I don't believe we can detect the usage of the rail planner.
+- [x] if signal or train stop, hovering next to rail: sets cursor direction accordingly, impossible to detect.
+  Closest would be on build
+- [x] if offshore pump, hovering at a shore: same as signals. Closest would be using on build
+- [x] finishing selection with a blueprint item: reset to north.
+  Could use on_player_setup_blueprint, however that only gets raised if entities were actually selected, but
+  the direction gets reset even on an empty selection. Not only that, copy or cut do not change the cursor
+  direction, yet they also raise on_player_setup_blueprint _and_ the item name is "blueprint" in all cases.
+  Unfortunate, but at least the best solution is to just not handle it at all, so it's less code.
+- [x] finishing selection with a copy or cut tool: does nothing
+- [x] rotating a blueprint: does nothing - they have a rotation state of their own it seems
+
+depending on the internal cursor rotation state, the actual visualization then rounds down to the nearest
+valid direction. And w hen building it of course also rounds down.
+
+underground belts and pipes appear to have another internal flag saying "flip my current direction" which does
+not affect the internal cursor direction. This flag gets toggled every time one is built. The 2 are actually
+sharing this flag.
+
+pipette:
+
+- [x] on a rolling stock: uses orientation and _rounds_ to nearest 4 way direction (when in the middle, rounds up. Like 0.125 becomes 0.25)
+- [x] on an underground belt: uses direction, if belt_to_ground_type == "output" apply 0.5 rotation (flip)
+- [x] on an underground pipe: uses direction with 0.5 rotation (flip) (both input and output)
+- [x] on a loader: uses direction, if loader_type == "input" apply 0.5 rotation (flip)
+- [x] on an entity that does not support direction: does not affect rotation state
+- [x] on an entity that does support direction: use its direction as is to set cursor direction
+
+send help, please, how does the game determine if an assembling machine has directions or not
+Ah! Saved! Thank you for the api and docs, the answer is simple! LuaEntity::supports_direction! Done!
+supports_direction on an entity also handles entities like assembling machines which can conditionally support
+direction.
+
+]]
+
+---@param orientation RealOrientation
+local function validate_orientation(orientation)
+  if ((orientation * 8) % 1) ~= 0 then
+    error("The cursor rotation, while it is represented using an orientation, is only allowed to have \z
+      steps in 1/8 (0.125) increments. Invalid rotation value: "..orientation.."."
+    )
+  end
+end
+
+---@param player PlayerDataQAI
+---@param reverse boolean
+---@param rotation RealOrientation
+local function rotate_cursor(player, reverse, rotation)
+  validate_orientation(rotation)
+  local current = player.current_cursor_orientation
+  player.current_cursor_orientation = (current + rotation * (reverse and -1 or 1)) % 1
+end
+
+---@param player PlayerDataQAI
+---@param orientation RealOrientation
+local function set_cursor_orientation(player, orientation)
+  validate_orientation(orientation)
+  player.current_cursor_orientation = orientation % 1
+end
+
+local rolling_stock_type_lut = {
+  ["artillery-wagon"] = true,
+  ["cargo-wagon"] = true,
+  ["fluid-wagon"] = true,
+  ["locomotive"] = true,
+}
+
+---@param player PlayerDataQAI
+---@param reverse boolean
+---@param entity LuaEntityPrototype
+local function handle_rotation_for_entity_place_result(player, reverse, entity)
+  if rolling_stock_type_lut[entity.type] then
+    rotate_cursor(player, reverse, 0.5)
+    return
+  end
+  local is_eight_way = entity.has_flag("building-direction-8-way")
+  rotate_cursor(player, reverse, is_eight_way and 0.125 or 0.25)
+end
+
+---@param player PlayerDataQAI
+---@param reverse boolean
+local function handle_rotation_for_tile_place_result(player, reverse)
+  rotate_cursor(player, reverse, 0.25)
+end
+
+---@param player PlayerDataQAI
+---@param reverse boolean
+local function handle_rotation(player, reverse)
+  local item_prototype = get_cursor_item_prototype(player)
+  if not item_prototype then return end
+  local place_result = item_prototype.place_result
+  if place_result then
+    handle_rotation_for_entity_place_result(player, reverse, place_result)
+    return
+  end
+  local tile_place_result = item_prototype.place_as_tile_result
+  if tile_place_result then
+    handle_rotation_for_tile_place_result(player, reverse)
+    return
+  end
+end
+
+---@param player PlayerDataQAI
+---@param pipetted_entity LuaEntity
+local function handle_pipette_direction(player, pipetted_entity)
+  local entity_type = inserter_throughput.get_real_or_ghost_entity_type(pipetted_entity)
+
+  if rolling_stock_type_lut[entity_type] then
+    local orientation = pipetted_entity.orientation
+    orientation = math.floor(orientation * 4 + 0.5) / 4
+    set_cursor_orientation(player, orientation)
+    return
+  end
+
+  -- Rolling stocks don't support direction, however they do affect the cursor direction when pipetted.
+  -- That's why this check is below that logic
+  if not pipetted_entity.supports_direction then return end
+
+  if entity_type == "underground-belt" then
+    local orientation = pipetted_entity.orientation
+    if pipetted_entity.belt_to_ground_type == "output" then
+      orientation = orientation + 0.5
+    end
+    set_cursor_orientation(player, orientation)
+    return
+  end
+
+  if entity_type == "underground-pip" then
+    set_cursor_orientation(player, pipetted_entity.orientation + 0.5)
+    return
+  end
+
+  if entity_type == "loader" or entity_type == "loader-1x1" then
+    local orientation = pipetted_entity.orientation
+    if pipetted_entity.loader_type == "input" then
+      orientation = orientation + 0.5
+    end
+    set_cursor_orientation(player, orientation)
+    return
+  end
+
+  set_cursor_orientation(player, pipetted_entity.orientation)
+end
+
+local snapping_entity_type_lut = {
+  ["offshore-pump"] = true,
+  ["rail-signal"] = true,
+  ["rail-chain-signal"] = true,
+  ["train-stop"] = true,
+}
+
+---This doesn't exist because placing an entity affects the cursor direction. It just exists because these
+---entities have snapping behavior while hovering them, so by using the build event for them we have a higher
+---chance at catching those direction changes through hovers than we would have without this at all.
+---@param player PlayerDataQAI
+---@param created_entity LuaEntity @ Can be any entity.
+---@param entity_type string?
+local function handle_built_rail_connectable_or_offshore_pump(player, created_entity, entity_type)
+  entity_type = entity_type or inserter_throughput.get_real_or_ghost_entity_type(created_entity)
+
+  if snapping_entity_type_lut[entity_type] then
+    set_cursor_orientation(player, created_entity.orientation)
+    return
+  end
+
+  -- It would be bad to use the direction of other created entities, because things like fluid tanks only have
+  -- 2 directions, however holding them in the cursor or placing them does not change the direction of the
+  -- cursor, even if the cursor direction is south or or west. Also for any 4 way entities, placing them
+  -- doesn't have an effect on the cursor direction either, so you can switch to an 8 way entity and it would
+  -- still be diagonal (if it was diagonal previously).
+end
+
+local eight_way_orientation_to_four_directions_lut = {
+  [0] = defines.direction.north,
+  [0.125] = defines.direction.north,
+  [0.25] = defines.direction.east,
+  [0.375] = defines.direction.east,
+  [0.5] = defines.direction.south,
+  [0.625] = defines.direction.south,
+  [0.75] = defines.direction.west,
+  [0.875] = defines.direction.west,
+}
+
+---@param player PlayerDataQAI
+---@return defines.direction
+local function get_cursor_direction_four_way(player)
+  return eight_way_orientation_to_four_directions_lut[player.current_cursor_orientation]
+end
+
+local eight_way_orientation_to_eight_directions_lut = {
+  [0] = defines.direction.north,
+  [0.125] = defines.direction.northeast,
+  [0.25] = defines.direction.east,
+  [0.375] = defines.direction.southeast,
+  [0.5] = defines.direction.south,
+  [0.625] = defines.direction.southwest,
+  [0.75] = defines.direction.west,
+  [0.875] = defines.direction.northwest,
+}
+
+---@param player PlayerDataQAI
+---@return defines.direction
+local function get_cursor_direction_eight_way(player)
+  return eight_way_orientation_to_eight_directions_lut[player.current_cursor_orientation]
+end
+
+---Because it isn't part of the game state, it'll reset to north on game load. Cannot detect that in single
+---player, but in multiplayer we can so might as well.
+---@param player PlayerDataQAI
+local function on_player_joined(player)
+  set_cursor_orientation(player, 0)
+end
+
+---@param player PlayerDataQAI
+local function init_player(player)
+  set_cursor_orientation(player, 0)
+end
+
+cursor_direction = {
+  handle_rotation = handle_rotation,
+  handle_pipette_direction = handle_pipette_direction,
+  handle_built_rail_connectable_or_offshore_pump = handle_built_rail_connectable_or_offshore_pump,
+  get_cursor_direction_four_way = get_cursor_direction_four_way,
+  get_cursor_direction_eight_way = get_cursor_direction_eight_way,
+  on_player_joined = on_player_joined,
+  init_player = init_player,
+}
+
+end -- End of cursor_direction "file".
 
 ---The created iterator allows removal of the current key while iterating. Not the next key though, that one
 ---must continue to exist.
@@ -1371,7 +1634,7 @@ end
 ---@param player PlayerDataQAI
 ---@return LuaItemPrototype?
 ---@return boolean is_cursor_ghost
-local function get_cursor_item_prototype(player)
+function get_cursor_item_prototype(player)
   local actual_player = player.player
   local cursor = actual_player.cursor_stack
   if cursor and cursor.valid_for_read then
@@ -3061,7 +3324,9 @@ local function try_place_held_inserter_and_adjust_it(player, position, cache, is
   ---@type LuaPlayer.can_build_from_cursor_param
   local args = {
     position = position,
-    direction = cache.not_rotatable and defines.direction.north or player.last_used_direction,
+    direction = cache.not_rotatable
+      and defines.direction.north
+      or cursor_direction.get_cursor_direction_four_way(player)
     -- `alt` is evaluated later.
   }
   local actual_player = player.player
@@ -3329,7 +3594,6 @@ local function init_player(player)
     player = player,
     player_index = player.index,
     force_index = player.force_index--[[@as uint8]],
-    last_used_direction = defines.direction.north,
     state = "idle",
     used_squares = {},
     used_ninths = {},
@@ -3343,6 +3607,7 @@ local function init_player(player)
     pipette_after_place_and_adjust = player_settings["qai-pipette-after-place-and-adjust"].value--[[@as boolean]],
     pipette_copies_vectors = player_settings["qai-pipette-copies-vectors"].value--[[@as boolean]],
   }
+  cursor_direction.init_player(player_data)
   global.players[player_data.player_index] = player_data
   return player_data
 end
@@ -3569,17 +3834,13 @@ end)
 script.on_event("qai-rotate", function(event)
   local player = get_player(event)
   if not player then return end
-  if get_cursor_item_prototype(player) then
-    player.last_used_direction = dirs.rotate_direction_lut[player.last_used_direction]
-  end
+  cursor_direction.handle_rotation(player, false)
 end)
 
 script.on_event("qai-reverse-rotate", function(event)
   local player = get_player(event)
   if not player then return end
-  if get_cursor_item_prototype(player) then
-    player.last_used_direction = dirs.reverse_rotate_direction_lut[player.last_used_direction]
-  end
+  cursor_direction.handle_rotation(player, true)
 end)
 
 script.on_event(ev.on_player_pipette, function(event)
@@ -3589,7 +3850,7 @@ script.on_event(ev.on_player_pipette, function(event)
   -- the entity that was pipetted, so this is the best guess.
   local selected = player.player.selected
   if not selected then return end
-  player.last_used_direction = dirs.collapse_direction_lut[selected.direction]
+  cursor_direction.handle_pipette_direction(player, selected)
 
   if not player.pipette_copies_vectors or not is_real_or_ghost_inserter(selected) then return end
   local force = get_or_init_force(player.force_index)
@@ -3721,6 +3982,14 @@ end, {{filter = "type", type = "inserter"}})
 
 script.on_event(ev.on_built_entity, function(event)
   local entity = event.created_entity
+  local entity_type = inserter_throughput.get_real_or_ghost_entity_type(entity)
+  if entity_type ~= "inserter" then
+    local player = get_player(event)
+    if not player then return end
+    cursor_direction.handle_built_rail_connectable_or_offshore_pump(player, entity, entity_type)
+    return
+  end
+
   if not is_ghost[entity] and potential_revive(event.created_entity) then return end
   local player = get_player(event)
   if not player then return end
@@ -3734,7 +4003,18 @@ script.on_event(ev.on_built_entity, function(event)
   local drop_vector = vec.rotate_by_direction(vec.copy(player.pipetted_drop_vector), direction)
   entity.pickup_position = vec.add(pickup_vector, position)
   entity.drop_position = vec.add(drop_vector, position)
-end)
+end, { -- Is this even worth it at this point? I have no idea. Maybe.
+  {--[[      ]] filter = "type", type = "inserter"},
+  {mode = "or", filter = "type", type = "offshore-pump"},
+  {mode = "or", filter = "type", type = "rail-signal"},
+  {mode = "or", filter = "type", type = "rail-chain-signal"},
+  {mode = "or", filter = "type", type = "train-stop"},
+  {mode = "or", filter = "ghost_type", type = "inserter"},
+  {mode = "or", filter = "ghost_type", type = "offshore-pump"},
+  {mode = "or", filter = "ghost_type", type = "rail-signal"},
+  {mode = "or", filter = "ghost_type", type = "rail-chain-signal"},
+  {mode = "or", filter = "ghost_type", type = "train-stop"},
+})
 
 script.on_event({ev.on_research_finished, ev.on_research_reversed}, function(event)
   local research = event.research
@@ -3890,5 +4170,25 @@ remote.add_interface("qai", {
         return try_place_held_inserter_and_adjust_it(player, position, cache, is_cursor_ghost)
       end
     end
+  end,
+  ---Get the current best guess for what the given player's cursor/hand direction might be.\
+  ---This being in quick-adjustable-inserter's remote interface makes little sense, but the rotation state
+  ---tracking exists in the mod, so might as well expose it.
+  ---@param player_index integer
+  ---@return defines.direction @ north, east, south or west.
+  get_cursor_direction_four_way = function(player_index)
+    local player = get_or_init_player(player_index)
+    if not player then return defines.direction.north end
+    return cursor_direction.get_cursor_direction_four_way(player)
+  end,
+  ---Get the current best guess for what the given player's cursor/hand direction might be.\
+  ---This being in quick-adjustable-inserter's remote interface makes little sense, but the rotation state
+  ---tracking exists in the mod, so might as well expose it.
+  ---@param player_index integer
+  ---@return defines.direction @ Any of the 8 possible directions.
+  get_cursor_direction_eight_way = function(player_index)
+    local player = get_or_init_player(player_index)
+    if not player then return defines.direction.north end
+    return cursor_direction.get_cursor_direction_eight_way(player)
   end,
 })

@@ -14,7 +14,7 @@ Stop adjusting an inserter by pressing `SHIFT + F` anywhere else, or instantly s
 
 While having an inserter in hand/cursor, place it and instantly adjust it by pressing `SHIFT + F` instead of the usual left click.
 
-**Known Issue:** Sometimes the inserter will be placed facing the wrong way. The mod tries its best to get it right, but there are cases that simply cannot be handled. Pipette an existing inserter and it will face the right way the next time you place an inserter again.
+**Known Issue:** Sometimes the inserter will be placed facing the wrong way. The mod tries its best to get it right, but there are cases that simply cannot be handled. Pipette an existing inserter (or entity with direction) and it will face the right way the next time you place an inserter again.
 
 ## Mirrored Inserters only
 
