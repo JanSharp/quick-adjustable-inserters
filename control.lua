@@ -825,7 +825,7 @@ local function generate_cache_for_inserter(inserter, tech_level)
   local tile_width
   local tile_height
   local offset_from_inserter
-  local placeable_off_grid = inserter.flags["placeable-off-grid"] or false
+  local placeable_off_grid = inserter.flags and inserter.flags["placeable-off-grid"] or false
   if placeable_off_grid then
     local col_width = relevant_box.right_bottom.x - relevant_box.left_top.x
     local col_height = relevant_box.right_bottom.y - relevant_box.left_top.y
