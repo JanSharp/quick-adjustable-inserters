@@ -153,7 +153,8 @@ local animation_type = {
 ---I'm guessing. But that's worth the performance improvement of having this cached for all the performance
 ---critical code paths using it. (Same applies to force merging, probably.)
 ---@field force_index uint8
----@field last_used_direction defines.direction @ Direction of last adjusted inserter or pipetted entity.
+---Direction of last adjusted inserter or pipetted entity, collapsed to only 4 directions.
+---@field last_used_direction defines.direction
 ---@field state PlayerStateQAI
 ---Always `nil` when not idle. Set to `true` when `keep_rendering` was set for `switch_to_idle`, because then
 ---the rendering objects are still alive even though the state is idle. This can then be used to ensure these
@@ -248,7 +249,21 @@ end
 
 local dirs = {}
 
----Can also be used to check if a given direction is a supported direction by this mod.
+---Inserters can have any of the 8 directions, even with the "not-rotatable" flag when set through script.
+---This mod only works with 4 directions for inserters however.
+---"simple-entity-with-owner" only have 4 directions, it appears to be impossible to set their direction to
+---any of the diagonals. Don't have to worry about those.
+dirs.collapse_direction_lut = {
+  [defines.direction.north] = defines.direction.north,
+  [defines.direction.northeast] = defines.direction.north,
+  [defines.direction.east] = defines.direction.east,
+  [defines.direction.southeast] = defines.direction.east,
+  [defines.direction.south] = defines.direction.south,
+  [defines.direction.southwest] = defines.direction.south,
+  [defines.direction.west] = defines.direction.west,
+  [defines.direction.northwest] = defines.direction.west,
+}
+
 dirs.inverse_direction_lut = {
   [defines.direction.north] = defines.direction.south,
   [defines.direction.east] = defines.direction.west,
@@ -268,22 +283,6 @@ dirs.reverse_rotate_direction_lut = {
   [defines.direction.east] = defines.direction.north,
   [defines.direction.south] = defines.direction.east,
   [defines.direction.west] = defines.direction.south,
-}
-
----Rotate something that's facing north to a given direction.
-dirs.rotation_matrix_lut = {
-  [defines.direction.north] = vec.new_identity_matrix(),
-  [defines.direction.east] = vec.rotation_matrix_by_orientation(0.25),
-  [defines.direction.south] = vec.rotation_matrix_by_orientation(0.5),
-  [defines.direction.west] = vec.rotation_matrix_by_orientation(0.75),
-}
-
----Rotate something that's facing a given direction to the north.
-dirs.reverse_rotation_matrix_lut = {
-  [defines.direction.north] = vec.new_identity_matrix(),
-  [defines.direction.east] = vec.rotation_matrix_by_orientation(-0.25),
-  [defines.direction.south] = vec.rotation_matrix_by_orientation(-0.5),
-  [defines.direction.west] = vec.rotation_matrix_by_orientation(-0.75),
 }
 
 ---The created iterator allows removal of the current key while iterating. Not the next key though, that one
@@ -1357,15 +1356,16 @@ local function forget_about_restoring(player, target_inserter)
   player.pipette_when_done = nil
 end
 
+---Supports all directions, not just 4.
 ---@param player PlayerDataQAI
 ---@param inserter_name string
 ---@param inserter LuaEntity
 local function save_pipetted_vectors(player, inserter_name, inserter)
-  local rotation = dirs.reverse_rotation_matrix_lut[inserter.direction]
+  local direction = inserter.direction
   local position = inserter.position
   player.pipetted_inserter_name = inserter_name
-  player.pipetted_pickup_vector = vec.transform_by_matrix(rotation, vec.sub(inserter.pickup_position, position))
-  player.pipetted_drop_vector = vec.transform_by_matrix(rotation, vec.sub(inserter.drop_position, position))
+  player.pipetted_pickup_vector = vec.rotate_by_direction(vec.sub(inserter.pickup_position, position), -direction)
+  player.pipetted_drop_vector = vec.rotate_by_direction(vec.sub(inserter.drop_position, position), -direction)
 end
 
 ---@param player PlayerDataQAI
@@ -1774,7 +1774,9 @@ local switch_to_idle_and_back
 ---@param player PlayerDataQAI
 ---@param new_direction defines.direction @
 ---If you look at the feet of the inserter, the forwards pointing feet should be the direction this variable
----is defining.
+---is defining.\
+---Only accepts 4 directions. If the direction is obtained from "simple-entity-with-owner" then nothing needs
+---to be done because those can only have 4 directions anyway.
 local function set_direction_and_update_arrow(player, new_direction)
   -- Recheck if the inserter is rotatable. Don't recheck the cache, because that's a static prototype flag.
   if not player.target_inserter.rotatable then
@@ -2363,11 +2365,11 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach, 
   player.target_inserter_position = target_inserter.position
   player.target_inserter_pickup_position = target_inserter.pickup_position
   player.target_inserter_drop_position = target_inserter.drop_position
-  local direction = target_inserter.direction
+  local direction = dirs.collapse_direction_lut[target_inserter.direction]
   player.target_inserter_direction = direction
   player.target_inserter_force_index = target_inserter.force_index
   player.should_flip = not player.target_inserter_cache.is_square
-    and is_east_or_west_lut[target_inserter.direction]
+    and is_east_or_west_lut[direction]
   player.is_rotatable = should_be_rotatable(player)
   player.current_surface_index = target_inserter.surface_index
   player.current_surface = target_inserter.surface
@@ -3398,7 +3400,7 @@ local function update_active_player(player)
   local inserter = player.target_inserter
   deactivate_inserter(player, inserter)
 
-  if inserter.direction ~= player.target_inserter_direction
+  if dirs.collapse_direction_lut[inserter.direction] ~= player.target_inserter_direction
     or inserter.force_index ~= player.target_inserter_force_index
     or not vec.vec_equals(inserter.position, player.target_inserter_position)
   then
@@ -3587,9 +3589,7 @@ script.on_event(ev.on_player_pipette, function(event)
   -- the entity that was pipetted, so this is the best guess.
   local selected = player.player.selected
   if not selected then return end
-  local direction = selected.direction
-  if not dirs.inverse_direction_lut[direction] then return end
-  player.last_used_direction = direction
+  player.last_used_direction = dirs.collapse_direction_lut[selected.direction]
 
   if not player.pipette_copies_vectors or not is_real_or_ghost_inserter(selected) then return end
   local force = get_or_init_force(player.force_index)
@@ -3728,12 +3728,10 @@ script.on_event(ev.on_built_entity, function(event)
   local expected_name = player.pipetted_inserter_name
   if not expected_name then return end
   if get_real_or_ghost_name(entity) ~= expected_name then return end
-  local direction = entity.direction
-  if not dirs.inverse_direction_lut[direction] then return end
-  local rotation = dirs.rotation_matrix_lut[direction]
+  local direction = entity.direction -- Supports all directions, not just 4.
   local position = entity.position
-  local pickup_vector = vec.transform_by_matrix(rotation, vec.copy(player.pipetted_pickup_vector))
-  local drop_vector = vec.transform_by_matrix(rotation, vec.copy(player.pipetted_drop_vector))
+  local pickup_vector = vec.rotate_by_direction(vec.copy(player.pipetted_pickup_vector), direction)
+  local drop_vector = vec.rotate_by_direction(vec.copy(player.pipetted_drop_vector), direction)
   entity.pickup_position = vec.add(pickup_vector, position)
   entity.drop_position = vec.add(drop_vector, position)
 end)
