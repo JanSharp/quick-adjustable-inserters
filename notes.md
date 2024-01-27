@@ -122,6 +122,7 @@
 - [x] in whenever a state switch happens with keep_rendering true, the following code is not actually cleaning up rendering objects properly, because any other state switch could have happened in between, leaving the old rendering objects floating forever
 - [x] add key sequence to the tooltips of the selectable entities
 - [ ] add demonstration videos to readme
-- [ ] maybe explicitly ignore 8 way inserters
+- [x] maybe explicitly ignore 8 way inserters
+- [ ] handle inserter that got rotated to "usually invalid" directions through script
 - [x] with near inserters researched and only mirrored inserters and show inserter throughput on pickup, it should use the mirrored default drop offset for calculation, not the current drop offset
 - [x] while inserter speed text is active save corresponding inserter_target_pickup_count, pickup_position and drop_position in player data and compare them in active player update to potentially update inserter throughput text
