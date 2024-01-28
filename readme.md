@@ -10,7 +10,7 @@ Quickly adjust inserter pickup and drop positions in world using a single key bi
 
 Stop adjusting an inserter by pressing `SHIFT + F` anywhere else, or instantly switch to adjusting a different inserter.
 
-![quick-adjustable-inserters.mp4](videos/quick-adjustable-inserters.mp4)
+<video src="videos/quick-adjustable-inserters.mp4" controls title="quick-adjustable-inserters.mp4"></video>
 
 ## Place and Adjust
 
@@ -18,31 +18,31 @@ While having an inserter in hand/cursor, place it and instantly adjust it by pre
 
 **Known Issue:** Sometimes the inserter will be placed facing the wrong way. The mod tries its best to get it right, but there are cases that simply cannot be handled. Pipette an existing inserter (or entity with direction) and it will face the right way the next time you place an inserter again.
 
-![place-and-adjust.mp4](videos/place-and-adjust.mp4)
+<video src="videos/place-and-adjust.mp4" controls title="place-and-adjust.mp4"></video>
 
 ## Mirrored Inserters only
 
 There is a map setting (off by default) to restrict how inserters can be adjusted. WHen enabled the pickup and drop positions (tiles) must be exactly mirrored/opposite of each other in relation to the center of the inserter. Basically if you like a bit of adjustment, but being able to make inserters pickup and drop on 2 adjacent tiles is too over powered, this setting might just be for you.
 
-![mirrored-inserters-only.mp4](videos/mirrored-inserters-only.mp4)
+<video src="videos/mirrored-inserters-only.mp4" controls title="mirrored-inserters-only.mp4"></video>
 
 ## Pipette copies Vectors
 
 This is an opt in feature (a mod settings) to make smart pipette (`Q`) remember the pickup and drop vectors of the inserter that got picked, and applies these vectors to newly placed inserters. This stays in effect so long as the inserter is in hand/cursor.
 
-![pipette-copies-vectors.mp4](videos/pipette-copies-vectors.mp4)
+<video src="videos/pipette-copies-vectors.mp4" controls title="pipette-copies-vectors.mp4"></video>
 
 ## Inserter Direction
 
 While adjusting an inserter there are 4 big selection boxes on the outside of the adjustment grid. Hovering them and pressing `SHIFT + F` changes the base direction of the inserter while keeping the pickup and drop positions the same. This is useful to have consistent inserter directions for predictable copy paste and placement behavior.
 
-![inserter-direction.mp4](videos/inserter-direction.mp4)
+<video src="videos/inserter-direction.mp4" controls title="inserter-direction.mp4"></video>
 
 ## Disabled by Script
 
 Inserters are disabled by script while being adjusted, which works nicely with place and adjust. They won't start moving until adjustment is complete.
 
-![disabled-by-script.mp4](videos/disabled-by-script.mp4)
+<video src="videos/disabled-by-script.mp4" controls title="disabled-by-script.mp4"></video>
 
 ## Inserter Throughput Estimation
 
@@ -50,7 +50,7 @@ This mod shows estimated inserter speed. By default only while choosing a drop p
 
 It is using the [Inserter Throughput Library](https://mods.factorio.com/mod/inserter-throughput-lib), see there for technical details. If you are a mod creator yourself and one of your mods would benefit from inserter speed calculations and estimations, I'd recommend to take a look. The library also helps with ghost support.
 
-![inserter-throughput-estimation.mp4](videos/inserter-throughput-estimation.mp4)
+<video src="videos/inserter-throughput-estimation.mp4" controls title="inserter-throughput-estimation.mp4"></video>
 
 ## Ghosts Support
 
