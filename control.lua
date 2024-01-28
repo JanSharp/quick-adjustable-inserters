@@ -2377,9 +2377,19 @@ function update_inserter_speed_text(player)
   end
   ---@cast actual_selected -nil
 
-  if player.show_throughput_on_inserter
-    and is_real_or_ghost_inserter(selected)
-    and selected.force.is_friend(player.force_index)
+  local show_due_to_state = player.state == "selecting-drop" and player.show_throughput_on_drop
+    or player.state == "selecting-pickup" and (
+      player.show_throughput_on_pickup
+        or should_skip_selecting_drop(player) and player.show_throughput_on_drop
+    )
+
+  if (show_due_to_state
+      and selected == player.target_inserter
+    )
+    or (player.show_throughput_on_inserter
+      and is_real_or_ghost_inserter(selected)
+      and selected.force.is_friend(player.force_index)
+    )
   then
     local position = is_real_or_ghost_inserter(actual_selected)
       and get_inserter_speed_position_next_to_inserter(actual_selected)
@@ -2388,13 +2398,7 @@ function update_inserter_speed_text(player)
     return
   end
 
-  if player.state == "idle"
-    or (player.state == "selecting-pickup"
-      and not player.show_throughput_on_pickup
-      and not (should_skip_selecting_drop(player) and player.show_throughput_on_drop)
-    )
-    or player.state == "selecting-drop" and not player.show_throughput_on_drop
-  then
+  if not show_due_to_state then
     hide_inserter_speed_text(player)
     return
   end
