@@ -18,7 +18,6 @@
       "scenarios/**/*",
       "videos/**/*",
       "**/*.xcf"
-    ],
-    "sync_portal_details": true
+    ]
   }
 }
