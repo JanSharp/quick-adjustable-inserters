@@ -80,8 +80,28 @@
 - [x] don't restore when rotating and similar
 - [x] ~~try using render_player_index for selectable entities. See if the selection box shows up for other players as well~~ Tried it, they are still selectable for other players, so this is not an option
 - [x] ~~look into renai transportation and see if it needs special support just for fun~~ scope creep, and I sense that performance would be horrific with a large grid
+  - [ ] alright, at least give it a look. Maybe it is possible
 - [ ] wait, but why do we not get a selection changed event with selected being nil when we move the cursor off of a selectable entity from this mod and pressing the adjust key bind in the same tick, causing it to delete the previously selected entity?
 - [ ] maybe look into smart inserters and see how hard compatibility with that mod would be. For things like tech unlocks maybe
+  - [ ] when smart inserters is enabled, hide all technology settings from qai, and do not create technologies in qai (fully rely on smart inserters)
+  - [x] ignore offset selector setting entirely. The visualization of the default drop offset handles this in qai (per player)
+  - [ ] handle si-unlock-offsets (same as near-inserters)
+  - [ ] handle diagonal techs setting
+    - [ ] if the setting is disabled it is as though more-inserters-2 was researched from the beginning of the game
+    - [ ] if the setting is enabled
+      - [ ] add si-unlock-cross. Without it unlocked no inserters can be adjusted at all
+      - [ ] handle si-unlock-x-diagonals (same as more-inserters-1)
+      - [ ] handle si-unlock-all-diagonals (same as more-inserters-2)
+  - [ ] handle range techs setting
+    - [ ] if the setting is disabled it is as though the max range was researched from the beginning of the game. Using si-max-inserters-range
+    - [ ] with the setting enabled
+      - [ ] start at range 1, as per usual. The setting description says that without the first level the inserters won't be adjustable, but they are...
+      - [ ] handle si-unlock-range-x (same as long-inserters-x)
+  - [ ] handle si-range-adder
+    - [ ] when "equal" just do the exact same thing qai is already doing. every inserter has the same range. However qai will handle long handed inserters (or other longer range inserters) differently (and better) by starting at a further range, then moving inwards until it can reach the tiles next to the inserter, and then start moving outwards. smart inserters is giving every single inserter the same range (starting on the tiles directly next to the inserter even for long handed inserters) which I do not like at all, so i'm doing it my way
+    - [ ] when "inserter" then do the exact same thing qai is already doing, except that it is not allowed to reach further than the default reach of an inserter. In the case of vanilla that means that any range 2 (so 1 tech unlock) doesn't do anything anymore, but the fact that the technologies exist anyway is not an issue for qai to fix, that's smart inserters's problem
+    - [ ] when "incremental" then use the default range of an inserter as the starting range, it can reach any tiles starting directly next to the inserter up to its default range, and any range technologies extend that by 1. so inserters could go to range 5, long handed inserters could go to 6 for example
+    - [x] note that "incremental" is bugged in smart inserters if the range techs are entirely disabled. Aside from that it also seems to think there's an inserter that can reach 1 tile further than any inserter actually can in vanilla. I'm going to pretend that it isn't bugged and implement it according to what makes sense and what the description of the setting describes
 - [x] change hard dependency on bobinserters to hidden optional (for mod load order)
 - [x] add own technologies with the same names and own custom icons
   - [x] revisit icons, probably using the inserter tech icon and adding something to it in gimp
@@ -130,3 +150,4 @@
 - [x] check not operable inserters
 - [ ] maybe add editor support to bypass checks like force friendliness, rotatable and operable
 - [x] maybe loosen the restriction on which inserters can be adjusted in the runtime checks to allow for other mods to do crazy things
+- [ ] maybe make inserter speed text smaller? Or make it a setting?
