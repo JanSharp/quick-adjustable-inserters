@@ -3515,30 +3515,88 @@ local function update_inserter_cache(force)
   end
 end
 
----@param force ForceDataQAI
-local function update_tech_level_for_force(force)
-  local tech_level = force.tech_level
-  local techs = force.force.technologies
-  local cardinal_inserters = consts.cardinal_inserters_name and techs[consts.cardinal_inserters_name]
-  local near_inserters = techs[consts.near_inserters_name]
-  local more_inserters_1 = techs[consts.more_inserters_1_name]
-  local more_inserters_2 = techs[consts.more_inserters_2_name]
-  local range = 1
-  for level = 1, 1/0 do -- No artificial limit, the practical limit will be hit pretty quickly anyway.
-    local tech = techs[string.format(consts.range_technology_format, level)]
-    if not tech then break end -- Gaps in technologies are not accepted.
-    if tech.researched then
-      range = level + 1 -- "long-inserters-1" equates to having 2 range.
+local update_tech_level_for_force
+do
+  ---@generic T
+  ---@param name string
+  ---@param default_value T
+  ---@return T
+  local function get_startup_setting_value(name, default_value)
+    local setting = settings.startup[name]
+    -- A setting from another mod, we cannot trust it actually existing.
+    -- There's an argument to be made that this should throw an error if the setting does not exist, and yea
+    -- I'm considering it. But also :shrug:.
+    if setting then
+      return setting.value
+    else
+      return default_value
     end
-    -- Continue even if a technology isn't researched to find the highest technology which has been researched.
-    -- The highest technology is unknown, so it's just a loop from the bottom up.
   end
-  tech_level.range = range
-  tech_level.drop_offset = near_inserters and near_inserters.researched or false
-  tech_level.all_tiles = more_inserters_2 and more_inserters_2.researched or false
-  tech_level.cardinal = tech_level.all_tiles or (cardinal_inserters == nil and true or cardinal_inserters.researched)
-  tech_level.diagonal = tech_level.all_tiles or more_inserters_1 and more_inserters_1.researched or false
-  update_inserter_cache(force)
+
+  ---@param tech_level TechnologyLevelQAI
+  ---@param techs LuaCustomTable<string, LuaTechnology>
+  local function evaluate_near(tech_level, techs)
+    if consts.use_smart_inserters and not get_startup_setting_value("si-offset-technologies", false) then
+      tech_level.drop_offset = true
+      return
+    end
+    local near_inserters = techs[consts.near_inserters_name]
+    tech_level.drop_offset = near_inserters and near_inserters.researched or false
+  end
+
+  ---@param tech_level TechnologyLevelQAI
+  ---@param techs LuaCustomTable<string, LuaTechnology>
+  local function evaluate_tiles(tech_level, techs)
+    if consts.use_smart_inserters and not get_startup_setting_value("si-diagonal-technologies", false) then
+      tech_level.all_tiles = true
+      tech_level.cardinal = true
+      tech_level.diagonal = true
+      return
+    end
+    local cardinal_inserters = consts.cardinal_inserters_name and techs[consts.cardinal_inserters_name]
+    local more_inserters_1 = techs[consts.more_inserters_1_name]
+    local more_inserters_2 = techs[consts.more_inserters_2_name]
+    tech_level.all_tiles = more_inserters_2 and more_inserters_2.researched or false
+    tech_level.cardinal = tech_level.all_tiles or (cardinal_inserters == nil and true or cardinal_inserters.researched)
+    tech_level.diagonal = tech_level.all_tiles or more_inserters_1 and more_inserters_1.researched or false
+  end
+
+  ---@param techs LuaCustomTable<string, LuaTechnology>
+  ---@return integer
+  local function get_range_from_technologies(techs)
+    local range = 1
+    for level = 1, 1/0 do -- No artificial limit, the practical limit will be hit pretty quickly anyway.
+      local tech = techs[string.format(consts.range_technology_format, level)]
+      if not tech then break end -- Gaps in technologies are not accepted.
+      if tech.researched then
+        range = level + 1 -- "long-inserters-1" equates to having 2 range.
+      end
+      -- Continue even if a technology isn't researched to find the highest technology which has been researched.
+      -- The highest technology is unknown, so it's just a loop from the bottom up.
+    end
+    return range
+  end
+
+  ---@param tech_level TechnologyLevelQAI
+  ---@param techs LuaCustomTable<string, LuaTechnology>
+  local function evaluate_range(tech_level, techs)
+    if consts.use_smart_inserters and not get_startup_setting_value("si-range-technologies", false) then
+      -- Using math.max because this is the setting from another mod therefore we cannot trust it.
+      tech_level.range = math.max(1, get_startup_setting_value("si-max-inserters-range", 3))
+      return
+    end
+    tech_level.range = get_range_from_technologies(techs)
+  end
+
+  ---@param force ForceDataQAI
+  function update_tech_level_for_force(force)
+    local tech_level = force.tech_level
+    local techs = force.force.technologies
+    evaluate_near(tech_level, techs)
+    evaluate_tiles(tech_level, techs)
+    evaluate_range(tech_level, techs)
+    update_inserter_cache(force)
+  end
 end
 
 ---@param force LuaForce

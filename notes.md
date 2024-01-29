@@ -83,19 +83,24 @@
   - [ ] alright, at least give it a look. Maybe it is possible
 - [ ] wait, but why do we not get a selection changed event with selected being nil when we move the cursor off of a selectable entity from this mod and pressing the adjust key bind in the same tick, causing it to delete the previously selected entity?
 - [ ] maybe look into smart inserters and see how hard compatibility with that mod would be. For things like tech unlocks maybe
+  - [ ] what are slim inserters? is that a renai transportation thing?
   - [x] when smart inserters is enabled, hide all technology settings from qai, and do not create technologies in qai (fully rely on smart inserters)
     - [x] don't set forced_value, just hide the setting and pretend like their value is false in data stage
   - [x] ignore offset selector setting entirely. The visualization of the default drop offset handles this in qai (per player)
-  - [x] handle si-unlock-offsets (same as near-inserters)
-  - [ ] handle diagonal techs setting
-    - [ ] if the setting is disabled it is as though more-inserters-2 was researched from the beginning of the game
-    - [ ] if the setting is enabled
+  - [ ] support having cardinal, diagonal and all tiles being false, yet drop_offset being true. In this case there should be a way to just adjust the drop offset and nothing more
+  - [x] handle offsets tech setting
+    - [x] if the setting is disabled it is as though near-inserters was researched from the beginning of the game
+    - [x] if the setting is disabled
+      - [x] handle si-unlock-offsets (same as near-inserters)
+  - [x] handle diagonal techs setting
+    - [x] if the setting is disabled it is as though more-inserters-2 was researched from the beginning of the game
+    - [x] if the setting is enabled
       - [x] add si-unlock-cross. Without it unlocked no inserters can be adjusted at all
       - [x] handle si-unlock-x-diagonals (same as more-inserters-1)
       - [x] handle si-unlock-all-diagonals (same as more-inserters-2)
-  - [ ] handle range techs setting
-    - [ ] if the setting is disabled it is as though the max range was researched from the beginning of the game. Using si-max-inserters-range
-    - [ ] with the setting enabled
+  - [x] handle range techs setting
+    - [x] if the setting is disabled it is as though the max range was researched from the beginning of the game. Using si-max-inserters-range
+    - [x] with the setting enabled
       - [x] start at range 1, as per usual. The setting description says that without the first level the inserters won't be adjustable, but they are...
       - [x] handle si-unlock-range-x (same as long-inserters-x)
   - [ ] handle si-range-adder
