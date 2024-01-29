@@ -16,6 +16,18 @@ local function check_setting(name, default_if_non_existent)
   return setting.value--[[@as boolean]]
 end
 
+---@param name string @ Name of a bool setting.
+---@param default_if_non_existent boolean @ What value should it return if the setting doesn't exist?
+---@return boolean
+local function check_tech_setting(name, default_if_non_existent)
+  if mods["Smart_Inserters"] then return false end
+  local setting = settings.startup[name]
+  if not setting then
+    return default_if_non_existent
+  end
+  return setting.value--[[@as boolean]]
+end
+
 ---@param inserter data.InserterPrototype
 ---@return boolean
 local function should_ignore(inserter)
@@ -133,5 +145,6 @@ end
 
 return {
   check_setting = check_setting,
+  check_tech_setting = check_tech_setting,
   modify_existing_inserters = modify_existing_inserters,
 }

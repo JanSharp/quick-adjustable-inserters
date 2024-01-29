@@ -132,19 +132,15 @@ add_if_it_does_not_exist("bool-setting", "bobmods-inserters-more2", function()
 end)
 
 ---@param setting_name string
----@param forced_value boolean?
-local function hide_bool_setting(setting_name, forced_value)
+local function hide_bool_setting(setting_name)
   local setting = assert(data.raw["bool-setting"][setting_name])
   setting.hidden = true
-  if setting.forced_value == nil then
-    setting.forced_value = forced_value
-  end
 end
 
 if mods["Smart_Inserters"] then
-  hide_bool_setting("bobmods-near-inserters", false)
-  hide_bool_setting("bobmods-inserters-long1", false)
-  hide_bool_setting("bobmods-inserters-long2", false)
-  hide_bool_setting("bobmods-inserters-more1", false)
-  hide_bool_setting("bobmods-inserters-more2", false)
+  hide_bool_setting("bobmods-near-inserters")
+  hide_bool_setting("bobmods-inserters-long1")
+  hide_bool_setting("bobmods-inserters-long2")
+  hide_bool_setting("bobmods-inserters-more1")
+  hide_bool_setting("bobmods-inserters-more2")
 end

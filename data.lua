@@ -139,7 +139,7 @@ local function hide_technology_if_it_exists(name)
   end
 end
 
-if not data_core.check_setting("bobmods-near-inserters", true) then
+if not data_core.check_tech_setting("bobmods-near-inserters", true) then
   hide_technology_if_it_exists("near-inserters")
 else
   add_if_it_does_not_exist("technology", "near-inserters", function()
@@ -162,7 +162,7 @@ else
   end)
 end
 
-if not data_core.check_setting("bobmods-inserters-long1", true) then
+if not data_core.check_tech_setting("bobmods-inserters-long1", true) then
   hide_technology_if_it_exists("long-inserters-1")
 else
   add_if_it_does_not_exist("technology", "long-inserters-1", function()
@@ -185,8 +185,8 @@ else
   end)
 end
 
-if not data_core.check_setting("bobmods-inserters-long1", true)
-  or not data_core.check_setting("bobmods-inserters-long2", true)
+if not data_core.check_tech_setting("bobmods-inserters-long1", true)
+  or not data_core.check_tech_setting("bobmods-inserters-long2", true)
 then
   hide_technology_if_it_exists("long-inserters-2")
 else
@@ -218,7 +218,7 @@ local fast_inserter_icon = mods["base"]
   and "__base__/graphics/technology/fast-inserter.png" -- Reuse existing, no need to duplicate it in VRAM.
   or "__quick-adjustable-inserters__/graphics/technology/fast-inserter.png"
 
-if not data_core.check_setting("bobmods-inserters-more1", true) then
+if not data_core.check_tech_setting("bobmods-inserters-more1", true) then
   hide_technology_if_it_exists("more-inserters-1")
 else
   add_if_it_does_not_exist("technology", "more-inserters-1", function()
@@ -254,8 +254,8 @@ else
   end)
 end
 
-if not data_core.check_setting("bobmods-inserters-more1", true)
-  or not data_core.check_setting("bobmods-inserters-more2", true)
+if not data_core.check_tech_setting("bobmods-inserters-more1", true)
+  or not data_core.check_tech_setting("bobmods-inserters-more2", true)
 then
   hide_technology_if_it_exists("more-inserters-2")
 else
