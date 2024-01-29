@@ -1090,7 +1090,6 @@ end
 ---@param cache InserterCacheQAI
 local function generate_collision_box_related_cache(cache)
   local inserter = cache.prototype
-  local range = cache.tech_level.range
   local collision_box = inserter.collision_box
   local selection_box = inserter.selection_box
   local relevant_box = {
@@ -1119,9 +1118,9 @@ local function generate_collision_box_related_cache(cache)
     local col_height = relevant_box.right_bottom.y - relevant_box.left_top.y
     tile_width = math.ceil(col_width)
     tile_height = math.ceil(col_height)
-    offset_from_inserter = {
-      x = relevant_box.left_top.x - ((tile_width - col_width) / 2) - range,
-      y = relevant_box.left_top.y - ((tile_height - col_height) / 2) - range,
+    offset_from_inserter = { -- Range will be taken into account later.
+      x = relevant_box.left_top.x - ((tile_width - col_width) / 2),
+      y = relevant_box.left_top.y - ((tile_height - col_height) / 2),
     }
   else
     local odd_width = (inserter.tile_width % 2) == 1
@@ -1140,9 +1139,9 @@ local function generate_collision_box_related_cache(cache)
     }
     tile_width = snapped_right_bottom.x - snapped_left_top.x
     tile_height = snapped_right_bottom.y - snapped_left_top.y
-    offset_from_inserter = {
-      x = relevant_box.left_top.x - (shifted_left_top.x - snapped_left_top.x) - range,
-      y = relevant_box.left_top.y - (shifted_left_top.y - snapped_left_top.y) - range,
+    offset_from_inserter = { -- Range will be taken into account later.
+      x = relevant_box.left_top.x - (shifted_left_top.x - snapped_left_top.x),
+      y = relevant_box.left_top.y - (shifted_left_top.y - snapped_left_top.y),
     }
   end
 
@@ -1154,7 +1153,7 @@ local function generate_collision_box_related_cache(cache)
   )
   cache.is_square = tile_width == tile_height
   cache.offset_from_inserter = offset_from_inserter
-  cache.offset_from_inserter_flipped = (nil)--[[@as any]] -- Set in generate_base_range_affected_collision_box_related_cache.
+  cache.offset_from_inserter_flipped = (nil)--[[@as any]] -- Set in generate_left_top_and_center_cache.
   cache.placeable_off_grid = placeable_off_grid
   cache.tile_width = tile_width
   cache.tile_height = tile_height
@@ -1162,17 +1161,18 @@ local function generate_collision_box_related_cache(cache)
 end
 
 ---@param cache InserterCacheQAI
-local function generate_base_range_affected_collision_box_related_cache(cache)
+local function generate_left_top_offset_and_grid_center_cache(cache)
   local offset_from_inserter = cache.offset_from_inserter
-  offset_from_inserter.x = offset_from_inserter.x - cache.range_gap_from_center
-  offset_from_inserter.y = offset_from_inserter.y - cache.range_gap_from_center
+  local total_grid_range = cache.tech_level.range + cache.range_gap_from_center
+  offset_from_inserter.x = offset_from_inserter.x - total_grid_range
+  offset_from_inserter.y = offset_from_inserter.y - total_grid_range
   cache.offset_from_inserter_flipped = {
     x = offset_from_inserter.y,
     y = offset_from_inserter.x,
   }
   cache.grid_center = {
-    x = cache.tech_level.range + cache.range_gap_from_center + (cache.tile_width / 2),
-    y = cache.tech_level.range + cache.range_gap_from_center + (cache.tile_height / 2),
+    x = total_grid_range + (cache.tile_width / 2),
+    y = total_grid_range + (cache.tile_height / 2),
   }
   cache.grid_center_flipped = {
     x = cache.grid_center.y,
@@ -1215,7 +1215,7 @@ function generate_cache_for_inserter(inserter, tech_level)
 
   generate_collision_box_related_cache(cache)
   generate_pickup_and_drop_position_related_cache(cache)
-  generate_base_range_affected_collision_box_related_cache(cache)
+  generate_left_top_offset_and_grid_center_cache(cache)
   generate_tiles_cache(cache)
   generate_tiles_background_cache(cache)
   generate_lines_cache(cache)
