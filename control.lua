@@ -222,6 +222,8 @@ local animation_type = {
 local ev = defines.events
 
 local consts = {
+  use_smart_inserters = not not script.active_mods["Smart_Inserters"],
+
   square_entity_name = "qai-selectable-square",
   ninth_entity_name = "qai-selectable-ninth",
   rect_entity_name = "qai-selectable-rect",
@@ -232,19 +234,40 @@ local consts = {
   grid_fade_out_frames = 12,
   grid_background_opacity = 0.2,
   direction_arrow_opacity = 0.6,
+}
+consts.finish_animation_highlight_box_step = (consts.finish_animation_expansion / 2) / consts.finish_animation_frames
 
-  techs_we_care_about = {
+if consts.use_smart_inserters then
+  consts.techs_we_care_about = {
+    ["si-unlock-cross"] = true,
+    ["si-unlock-offsets"] = true,
+    ["si-unlock-x-diagonals"] = true,
+    ["si-unlock-all-diagonals"] = true,
+  }
+  consts.unlock_adjustment_name = "si-unlock-cross" -- TODO: does nothing yet.
+  consts.near_inserters_name = "si-unlock-offsets"
+  consts.more_inserters_1_name = "si-unlock-x-diagonals"
+  consts.more_inserters_2_name = "si-unlock-all-diagonals"
+  consts.range_technology_pattern = "^si%-unlock%-range%-([1-9]%d*)$" -- Does not accept leading zeros.
+  consts.range_technology_format = "si-unlock-range-%d"
+else
+  consts.techs_we_care_about = {
     ["near-inserters"] = true,
     ["more-inserters-1"] = true,
     ["more-inserters-2"] = true,
-  },
-}
-consts.finish_animation_highlight_box_step = (consts.finish_animation_expansion / 2) / consts.finish_animation_frames
+  }
+  consts.unlock_adjustment_name = nil
+  consts.near_inserters_name = "near-inserters"
+  consts.more_inserters_1_name = "more-inserters-1"
+  consts.more_inserters_2_name = "more-inserters-2"
+  consts.range_technology_pattern = "^long%-inserters%-([1-9]%d*)$" -- Does not accept leading zeros.
+  consts.range_technology_format = "long-inserters-%d"
+end
 
 ---@param name string
 local function do_we_care_about_this_technology(name)
   return consts.techs_we_care_about[name]
-    or string.find(name, "^long%-inserters%-([1-9]%d*)$") -- Does not accept leading zeros.
+    or string.find(name, consts.range_technology_pattern)
 end
 
 local dirs = {}
@@ -3481,12 +3504,12 @@ end
 local function update_tech_level_for_force(force)
   local tech_level = force.tech_level
   local techs = force.force.technologies
-  local near_inserters = techs["near-inserters"]
-  local more_inserters_1 = techs["more-inserters-1"]
-  local more_inserters_2 = techs["more-inserters-2"]
+  local near_inserters = techs[consts.near_inserters_name]
+  local more_inserters_1 = techs[consts.more_inserters_1_name]
+  local more_inserters_2 = techs[consts.more_inserters_2_name]
   local range = 1
   for level = 1, 1/0 do -- No artificial limit, the practical limit will be hit pretty quickly anyway.
-    local tech = techs[string.format("long-inserters-%d", level)]
+    local tech = techs[string.format(consts.range_technology_format, level)]
     if not tech then break end -- Gaps in technologies are not accepted.
     if tech.researched then
       range = level + 1 -- "long-inserters-1" equates to having 2 range.

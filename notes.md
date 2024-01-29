@@ -85,18 +85,18 @@
 - [ ] maybe look into smart inserters and see how hard compatibility with that mod would be. For things like tech unlocks maybe
   - [x] when smart inserters is enabled, hide all technology settings from qai, and do not create technologies in qai (fully rely on smart inserters)
   - [x] ignore offset selector setting entirely. The visualization of the default drop offset handles this in qai (per player)
-  - [ ] handle si-unlock-offsets (same as near-inserters)
+  - [x] handle si-unlock-offsets (same as near-inserters)
   - [ ] handle diagonal techs setting
     - [ ] if the setting is disabled it is as though more-inserters-2 was researched from the beginning of the game
     - [ ] if the setting is enabled
       - [ ] add si-unlock-cross. Without it unlocked no inserters can be adjusted at all
-      - [ ] handle si-unlock-x-diagonals (same as more-inserters-1)
-      - [ ] handle si-unlock-all-diagonals (same as more-inserters-2)
+      - [x] handle si-unlock-x-diagonals (same as more-inserters-1)
+      - [x] handle si-unlock-all-diagonals (same as more-inserters-2)
   - [ ] handle range techs setting
     - [ ] if the setting is disabled it is as though the max range was researched from the beginning of the game. Using si-max-inserters-range
     - [ ] with the setting enabled
-      - [ ] start at range 1, as per usual. The setting description says that without the first level the inserters won't be adjustable, but they are...
-      - [ ] handle si-unlock-range-x (same as long-inserters-x)
+      - [x] start at range 1, as per usual. The setting description says that without the first level the inserters won't be adjustable, but they are...
+      - [x] handle si-unlock-range-x (same as long-inserters-x)
   - [ ] handle si-range-adder
     - [ ] when "equal" just do the exact same thing qai is already doing. every inserter has the same range. However qai will handle long handed inserters (or other longer range inserters) differently (and better) by starting at a further range, then moving inwards until it can reach the tiles next to the inserter, and then start moving outwards. smart inserters is giving every single inserter the same range (starting on the tiles directly next to the inserter even for long handed inserters) which I do not like at all, so i'm doing it my way
     - [ ] when "inserter" then do the exact same thing qai is already doing, except that it is not allowed to reach further than the default reach of an inserter. In the case of vanilla that means that any range 2 (so 1 tech unlock) doesn't do anything anymore, but the fact that the technologies exist anyway is not an issue for qai to fix, that's smart inserters's problem
