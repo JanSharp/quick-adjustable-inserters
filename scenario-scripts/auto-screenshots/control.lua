@@ -53,7 +53,7 @@ end
 local function place_inserter(surface, player, range)
   local position = get_inserter_position(range)
   global.inserter = surface.create_entity{
-    name = "inserter",
+    name = "qai-inserter-for-screenshots",
     position = position,
     direction = defines.direction.south,
     force = "player",

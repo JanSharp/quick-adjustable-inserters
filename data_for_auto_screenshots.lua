@@ -1,4 +1,6 @@
 
+local util = require("__core__.lualib.util")
+
 data:extend{
   {
     type = "tile",
@@ -22,8 +24,14 @@ data:extend{
   } --[[@as data.TilePrototype]],
 }
 
+local inserter_for_screenshots = util.copy(data.raw["inserter"]["inserter"])
+inserter_for_screenshots.name = "qai-inserter-for-screenshots"
+inserter_for_screenshots.energy_source = {type = "void"}
+inserter_for_screenshots.rotation_speed = 1024
+inserter_for_screenshots.extension_speed = 1024
+data:extend{inserter_for_screenshots}
+
+-- This isn't for auto screenshots but for easier development.
 for _, inserter in pairs(data.raw["inserter"]) do
   inserter.energy_source = {type = "void"}
-  inserter.rotation_speed = 1024
-  inserter.extension_speed = 1024
 end
