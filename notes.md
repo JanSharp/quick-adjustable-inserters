@@ -151,3 +151,5 @@
 - [ ] maybe add editor support to bypass checks like force friendliness, rotatable and operable
 - [x] maybe loosen the restriction on which inserters can be adjusted in the runtime checks to allow for other mods to do crazy things
 - [ ] maybe make inserter speed text smaller? Or make it a setting?
+- [ ] probably add some opt in key binds to adjust inserters without opening the grid. Look at bob inserters and or smart inserters key binds
+- [ ] probably add a setting to disable drop offset selection per player, especially with the addition of a "toggle near/far" offset key bind
