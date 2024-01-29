@@ -96,6 +96,7 @@ local animation_type = {
 ---@field disabled_because_of_tech_level boolean? @ When true everything else is `nil`.
 ---@field prototype LuaEntityPrototype
 ---@field tech_level TechnologyLevelQAI
+---@field range integer @ Without smart inserters this is always equal to tech_level.range.
 ---@field min_extra_reach_distance number @ The minimum extra reach distance when building this entity.
 ---@field diagonal_by_default boolean
 ---@field default_drop_offset_multiplier -1|0|1 @ -1 = near, 0 = center, 1 = far. Vanilla is all far, fyi.
@@ -683,6 +684,32 @@ end
 local generate_cache_for_inserter
 do -- Similar to cursor_direction, this is like a separate file. See up there as to why this isn't indented.
 
+---@return "equal"|"inserter"|"incremental"|string
+local function get_range_adder_setting_value()
+  local setting = settings.startup["si-range-adder"]
+  -- A setting from another mod, we cannot trust it actually existing.
+  -- There's an argument to be made that this should throw an error if the setting does not exist, and yea
+  -- I'm considering it. But also :shrug:.
+  return setting and setting.value--[[@as string]] or "equal"
+end
+
+---Needs `cache.base_range`.
+---@param cache InserterCacheQAI
+local function generate_range_cache(cache)
+  if not consts.use_smart_inserters then
+    cache.range = cache.tech_level.range
+    return
+  end
+  local range_adder_type = get_range_adder_setting_value()
+  if range_adder_type == "incremental" then
+    cache.range = cache.base_range + cache.tech_level.range - 1
+  elseif range_adder_type == "inserter" then
+    cache.range = math.min(cache.base_range, cache.tech_level.range)
+  else -- not elseif, because this is a setting from another mod so we cannot trust its values.
+    cache.range = cache.tech_level.range
+  end
+end
+
 ---@param cache InserterCacheQAI
 local function generate_pickup_and_drop_position_related_cache(cache)
   local tile_width = cache.tile_width
@@ -700,7 +727,8 @@ local function generate_pickup_and_drop_position_related_cache(cache)
     drop_x - (tile_width / 2),
     drop_y - (tile_height / 2)
   ))
-  cache.range_gap_from_center = math.max(0, cache.base_range - cache.tech_level.range)
+  generate_range_cache(cache)
+  cache.range_gap_from_center = math.max(0, cache.base_range - cache.range)
 
   cache.diagonal_by_default = math.abs(pickup_x - pickup_y) < 1/16 and math.abs(drop_x - drop_y) < 1/16
 
@@ -732,7 +760,7 @@ local function generate_tiles_cache(cache)
   local tile_height = cache.tile_height
   local gap = cache.range_gap_from_center
   local tech_level = cache.tech_level
-  local max_range = tech_level.range + gap
+  local max_range = cache.range + gap
   local grid_width = tile_width + max_range * 2
   local grid_height = tile_height + max_range * 2
 
@@ -753,8 +781,8 @@ local function generate_tiles_cache(cache)
   if tech_level.all_tiles then
     for y = 1, grid_height do
       for x = 1, grid_width do
-        if not (tech_level.range < x and x <= tech_level.range + tile_width + gap * 2
-          and tech_level.range < y and y <= tech_level.range + tile_height + gap * 2)
+        if not (cache.range < x and x <= cache.range + tile_width + gap * 2
+          and cache.range < y and y <= cache.range + tile_height + gap * 2)
         then
           add(x, y)
         end
@@ -776,16 +804,16 @@ local function generate_tiles_cache(cache)
 
   if cardinal then
     for y = max_range + 1, max_range + tile_height do
-      for x = 1, tech_level.range * 2 do
-        if x > tech_level.range then
+      for x = 1, cache.range * 2 do
+        if x > cache.range then
           x = x + tile_width + gap * 2
         end
         add(x, y)
       end
     end
     for x = max_range + 1, max_range + tile_width do
-      for y = 1, tech_level.range * 2 do
-        if y > tech_level.range then
+      for y = 1, cache.range * 2 do
+        if y > cache.range then
           y = y + tile_height + gap * 2
         end
         add(x, y)
@@ -794,15 +822,15 @@ local function generate_tiles_cache(cache)
   end
 
   if diagonal then
-    for i = 1, tech_level.range * 2 do
+    for i = 1, cache.range * 2 do
       add(
-        i > tech_level.range and (i + tile_width + gap * 2) or i,
-        i > tech_level.range and (i + tile_height + gap * 2) or i
+        i > cache.range and (i + tile_width + gap * 2) or i,
+        i > cache.range and (i + tile_height + gap * 2) or i
       )
-      local x = tech_level.range * 2 - i + 1
+      local x = cache.range * 2 - i + 1
       add(
-        x > tech_level.range and (x + tile_width + gap * 2) or x,
-        i > tech_level.range and (i + tile_height + gap * 2) or i
+        x > cache.range and (x + tile_width + gap * 2) or x,
+        i > cache.range and (i + tile_height + gap * 2) or i
       )
     end
   end
@@ -987,7 +1015,7 @@ local function generate_direction_arrows_indicator_lines_cache(cache)
   local line_length = 0.5
   local arrow_width = 3 -- For north and south, otherwise it would be height.
   local arrow_height = 2 -- For north and south, otherwise it would be width.
-  local max_range = cache.tech_level.range + cache.range_gap_from_center
+  local max_range = cache.range + cache.range_gap_from_center
   local grid_width = max_range * 2 + cache.tile_width
   local grid_height = max_range * 2 + cache.tile_height
   local from_top = max_range - (arrow_width - cache.tile_height) / 2
@@ -1030,7 +1058,7 @@ end
 local function generate_direction_arrow_cache(cache)
   local tile_width = cache.tile_width
   local tile_height = cache.tile_height
-  local max_range = cache.tech_level.range + cache.range_gap_from_center
+  local max_range = cache.range + cache.range_gap_from_center
   cache.direction_arrows = {
     {
       direction = defines.direction.north,
@@ -1163,7 +1191,7 @@ end
 ---@param cache InserterCacheQAI
 local function generate_left_top_offset_and_grid_center_cache(cache)
   local offset_from_inserter = cache.offset_from_inserter
-  local total_grid_range = cache.tech_level.range + cache.range_gap_from_center
+  local total_grid_range = cache.range + cache.range_gap_from_center
   offset_from_inserter.x = offset_from_inserter.x - total_grid_range
   offset_from_inserter.y = offset_from_inserter.y - total_grid_range
   cache.offset_from_inserter_flipped = {
@@ -2868,7 +2896,6 @@ end
 ---@param auto_determine_drop_offset boolean? @ Should it move the drop offset away from the inserter?
 local function snap_drop_position(player, position, offset_from_tile_center, auto_determine_drop_offset)
   local cache = player.target_inserter_cache
-  local tech_level = cache.tech_level
   local left_top = get_current_grid_left_top(player)
   local relative_x = position.x - left_top.x
   local relative_y = position.y - left_top.y
@@ -2876,7 +2903,7 @@ local function snap_drop_position(player, position, offset_from_tile_center, aut
   local y_offset
   if auto_determine_drop_offset then
     offset_from_tile_center = offset_from_tile_center * cache.default_drop_offset_multiplier
-    local max_range = tech_level.range + cache.range_gap_from_center
+    local max_range = cache.range + cache.range_gap_from_center
     local tile_width = player.should_flip and cache.tile_height or cache.tile_width
     local tile_height = player.should_flip and cache.tile_width or cache.tile_height
     x_offset = relative_x < max_range and -offset_from_tile_center
