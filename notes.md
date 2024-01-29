@@ -81,9 +81,9 @@
 - [x] ~~try using render_player_index for selectable entities. See if the selection box shows up for other players as well~~ Tried it, they are still selectable for other players, so this is not an option
 - [x] ~~look into renai transportation and see if it needs special support just for fun~~ scope creep, and I sense that performance would be horrific with a large grid
   - [ ] alright, at least give it a look. Maybe it is possible
+- [ ] maybe add support for kux slim inserters
 - [ ] wait, but why do we not get a selection changed event with selected being nil when we move the cursor off of a selectable entity from this mod and pressing the adjust key bind in the same tick, causing it to delete the previously selected entity?
 - [ ] maybe look into smart inserters and see how hard compatibility with that mod would be. For things like tech unlocks maybe
-  - [ ] what are slim inserters? is that a renai transportation thing?
   - [x] when smart inserters is enabled, hide all technology settings from qai, and do not create technologies in qai (fully rely on smart inserters)
     - [x] don't set forced_value, just hide the setting and pretend like their value is false in data stage
   - [x] ignore offset selector setting entirely. The visualization of the default drop offset handles this in qai (per player)

@@ -680,8 +680,11 @@ local function flip(player, pos)
   return pos
 end
 
+local generate_cache_for_inserter
+do -- Similar to cursor_direction, this is like a separate file. See up there as to why this isn't indented.
+
 ---@param cache InserterCacheQAI
-local function calculate_pickup_and_drop_position_related_cache(cache)
+local function generate_pickup_and_drop_position_related_cache(cache)
   local tile_width = cache.tile_width
   local tile_height = cache.tile_height
   local pickup_position = cache.prototype.inserter_pickup_position ---@cast pickup_position -nil
@@ -1084,16 +1087,10 @@ local function normalize_box(box)
   box.right_bottom.y = y_distance
 end
 
----@param inserter LuaEntityPrototype
----@param tech_level TechnologyLevelQAI
----@return InserterCacheQAI
-local function generate_cache_for_inserter(inserter, tech_level)
-  if not tech_level.cardinal and not tech_level.diagonal then
-    -- If both cardinal and diagonal are false then all_tiles is also false.
-    return {disabled_because_of_tech_level = true}
-  end
-
-  local range = tech_level.range
+---@param cache InserterCacheQAI
+local function generate_collision_box_related_cache(cache)
+  local inserter = cache.prototype
+  local range = cache.tech_level.range
   local collision_box = inserter.collision_box
   local selection_box = inserter.selection_box
   local relevant_box = {
@@ -1149,25 +1146,55 @@ local function generate_cache_for_inserter(inserter, tech_level)
     }
   end
 
+  cache.min_extra_build_distance = math.min(
+    -collision_box.left_top.x,
+    -collision_box.left_top.y,
+    collision_box.right_bottom.x,
+    collision_box.right_bottom.y
+  )
+  cache.is_square = tile_width == tile_height
+  cache.offset_from_inserter = offset_from_inserter
+  cache.offset_from_inserter_flipped = (nil)--[[@as any]] -- Set in generate_base_range_affected_collision_box_related_cache.
+  cache.placeable_off_grid = placeable_off_grid
+  cache.tile_width = tile_width
+  cache.tile_height = tile_height
+  cache.radius_for_circle_on_inserter = math.min(tile_width, tile_height) / 2 - 0.25
+end
+
+---@param cache InserterCacheQAI
+local function generate_base_range_affected_collision_box_related_cache(cache)
+  local offset_from_inserter = cache.offset_from_inserter
+  offset_from_inserter.x = offset_from_inserter.x - cache.range_gap_from_center
+  offset_from_inserter.y = offset_from_inserter.y - cache.range_gap_from_center
+  cache.offset_from_inserter_flipped = {
+    x = offset_from_inserter.y,
+    y = offset_from_inserter.x,
+  }
+  cache.grid_center = {
+    x = cache.tech_level.range + cache.range_gap_from_center + (cache.tile_width / 2),
+    y = cache.tech_level.range + cache.range_gap_from_center + (cache.tile_height / 2),
+  }
+  cache.grid_center_flipped = {
+    x = cache.grid_center.y,
+    y = cache.grid_center.x,
+  }
+end
+
+---@param inserter LuaEntityPrototype
+---@param tech_level TechnologyLevelQAI
+---@return InserterCacheQAI
+function generate_cache_for_inserter(inserter, tech_level)
+  if not tech_level.cardinal and not tech_level.diagonal then
+    -- If both cardinal and diagonal are false then all_tiles is also false.
+    return {disabled_because_of_tech_level = true}
+  end
+
   local not_rotatable = inserter.has_flag("not-rotatable")
 
   ---@type InserterCacheQAI
   local cache = {
     prototype = inserter,
     tech_level = tech_level,
-    min_extra_build_distance = math.min(
-      -collision_box.left_top.x,
-      -collision_box.left_top.y,
-      collision_box.right_bottom.x,
-      collision_box.right_bottom.y
-    ),
-    is_square = tile_width == tile_height,
-    offset_from_inserter = offset_from_inserter,
-    offset_from_inserter_flipped = (nil)--[[@as any]], -- Set after the `calculate_cached_base_reach` call.
-    placeable_off_grid = placeable_off_grid,
-    tile_width = tile_width,
-    tile_height = tile_height,
-    radius_for_circle_on_inserter = math.min(tile_width, tile_height) / 2 - 0.25,
     tiles = {},
     tiles_flipped = {},
     tiles_background_vertices = {},
@@ -1185,22 +1212,10 @@ local function generate_cache_for_inserter(inserter, tech_level)
     rotation_speed = inserter.inserter_rotation_speed,
     chases_belt_items = inserter.inserter_chases_belt_items,
   }
-  calculate_pickup_and_drop_position_related_cache(cache)
-  offset_from_inserter.x = offset_from_inserter.x - cache.range_gap_from_center
-  offset_from_inserter.y = offset_from_inserter.y - cache.range_gap_from_center
-  cache.offset_from_inserter_flipped = {
-    x = offset_from_inserter.y,
-    y = offset_from_inserter.x,
-  }
-  cache.grid_center = {
-    x = range + cache.range_gap_from_center + (tile_width / 2),
-    y = range + cache.range_gap_from_center + (tile_height / 2),
-  }
-  cache.grid_center_flipped = {
-    x = cache.grid_center.y,
-    y = cache.grid_center.x,
-  }
 
+  generate_collision_box_related_cache(cache)
+  generate_pickup_and_drop_position_related_cache(cache)
+  generate_base_range_affected_collision_box_related_cache(cache)
   generate_tiles_cache(cache)
   generate_tiles_background_cache(cache)
   generate_lines_cache(cache)
@@ -1210,6 +1225,8 @@ local function generate_cache_for_inserter(inserter, tech_level)
   end
   return cache
 end
+
+end -- End of generate_cache_for_inserter "file".
 
 ---This is effectively adding a field to the LuaEntity class, it's just that you do `is_ghost[entity]` instead
 ---of `entity.is_ghost`.
