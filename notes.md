@@ -84,12 +84,13 @@
 - [ ] wait, but why do we not get a selection changed event with selected being nil when we move the cursor off of a selectable entity from this mod and pressing the adjust key bind in the same tick, causing it to delete the previously selected entity?
 - [ ] maybe look into smart inserters and see how hard compatibility with that mod would be. For things like tech unlocks maybe
   - [x] when smart inserters is enabled, hide all technology settings from qai, and do not create technologies in qai (fully rely on smart inserters)
+    - [ ] don't set force value, just hide the setting and pretend like their value is false in data stage
   - [x] ignore offset selector setting entirely. The visualization of the default drop offset handles this in qai (per player)
   - [x] handle si-unlock-offsets (same as near-inserters)
   - [ ] handle diagonal techs setting
     - [ ] if the setting is disabled it is as though more-inserters-2 was researched from the beginning of the game
     - [ ] if the setting is enabled
-      - [ ] add si-unlock-cross. Without it unlocked no inserters can be adjusted at all
+      - [x] add si-unlock-cross. Without it unlocked no inserters can be adjusted at all
       - [x] handle si-unlock-x-diagonals (same as more-inserters-1)
       - [x] handle si-unlock-all-diagonals (same as more-inserters-2)
   - [ ] handle range techs setting

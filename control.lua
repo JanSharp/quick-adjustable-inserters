@@ -93,6 +93,7 @@ local animation_type = {
 ---@field direction defines.direction
 
 ---@class InserterCacheQAI
+---@field disabled_because_of_tech_level boolean? @ When true everything else is `nil`.
 ---@field prototype LuaEntityPrototype
 ---@field tech_level TechnologyLevelQAI
 ---@field min_extra_reach_distance number @ The minimum extra reach distance when building this entity.
@@ -244,7 +245,7 @@ if consts.use_smart_inserters then
     ["si-unlock-x-diagonals"] = true,
     ["si-unlock-all-diagonals"] = true,
   }
-  consts.unlock_adjustment_name = "si-unlock-cross" -- TODO: does nothing yet.
+  consts.cardinal_inserters_name = "si-unlock-cross"
   consts.near_inserters_name = "si-unlock-offsets"
   consts.more_inserters_1_name = "si-unlock-x-diagonals"
   consts.more_inserters_2_name = "si-unlock-all-diagonals"
@@ -256,7 +257,7 @@ else
     ["more-inserters-1"] = true,
     ["more-inserters-2"] = true,
   }
-  consts.unlock_adjustment_name = nil
+  consts.cardinal_inserters_name = nil
   consts.near_inserters_name = "near-inserters"
   consts.more_inserters_1_name = "more-inserters-1"
   consts.more_inserters_2_name = "more-inserters-2"
@@ -1087,6 +1088,11 @@ end
 ---@param tech_level TechnologyLevelQAI
 ---@return InserterCacheQAI
 local function generate_cache_for_inserter(inserter, tech_level)
+  if not tech_level.cardinal and not tech_level.diagonal then
+    -- If both cardinal and diagonal are false then all_tiles is also false.
+    return {disabled_because_of_tech_level = true}
+  end
+
   local range = tech_level.range
   local collision_box = inserter.collision_box
   local selection_box = inserter.selection_box
@@ -2625,6 +2631,10 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach, 
     return show_error(player, {"qai.cant-change-inserter-at-runtime"})
   end
 
+  if cache.disabled_because_of_tech_level then
+    return show_error(player, {"qai.cant-adjust-due-to-lack-of-tech"})
+  end
+
   -- Specifically check if the force of the inserter is friends with the player. Friendship is one directional.
   if not target_inserter.force.is_friend(player.force_index) then
     return show_error(player, {"qai.cant-adjust-enemy-inserters"})
@@ -3347,6 +3357,11 @@ end
 ---@param is_cursor_ghost boolean?
 ---@return LuaEntity? inserter @ The placed inserter if successful.
 local function try_place_held_inserter_and_adjust_it(player, position, cache, is_cursor_ghost)
+  if cache.disabled_because_of_tech_level then
+    show_error(player, {"qai.cant-adjust-due-to-lack-of-tech"})
+    return
+  end
+
   ---@type LuaPlayer.can_build_from_cursor_param
   local args = {
     position = position,
@@ -3504,6 +3519,7 @@ end
 local function update_tech_level_for_force(force)
   local tech_level = force.tech_level
   local techs = force.force.technologies
+  local cardinal_inserters = consts.cardinal_inserters_name and techs[consts.cardinal_inserters_name]
   local near_inserters = techs[consts.near_inserters_name]
   local more_inserters_1 = techs[consts.more_inserters_1_name]
   local more_inserters_2 = techs[consts.more_inserters_2_name]
@@ -3519,8 +3535,8 @@ local function update_tech_level_for_force(force)
   end
   tech_level.range = range
   tech_level.drop_offset = near_inserters and near_inserters.researched or false
-  tech_level.cardinal = true
   tech_level.all_tiles = more_inserters_2 and more_inserters_2.researched or false
+  tech_level.cardinal = tech_level.all_tiles or (cardinal_inserters == nil and true or cardinal_inserters.researched)
   tech_level.diagonal = tech_level.all_tiles or more_inserters_1 and more_inserters_1.researched or false
   update_inserter_cache(force)
 end
@@ -3887,7 +3903,7 @@ script.on_event(ev.on_player_pipette, function(event)
   if not force then return end
   local name = get_real_or_ghost_name(selected)
   local cache = force.inserter_cache_lut[name]
-  if not cache then return end
+  if not cache or cache.disabled_because_of_tech_level then return end
   save_pipetted_vectors(player, name, selected)
 end)
 
