@@ -117,19 +117,20 @@ local animation_type = {
 ---@field placeable_off_grid boolean
 ---@field tile_width integer @ The width of the open inner grid, occupied by the collision box of the inserter.
 ---@field tile_height integer @ The height of the open inner grid, occupied by the collision box of the inserter.
----@field tiles MapPosition[]
----@field tiles_flipped MapPosition[]
----@field tiles_background_vertices ScriptRenderVertexTarget[]
----@field tiles_background_vertices_flipped ScriptRenderVertexTarget[]
----@field lines LineDefinitionQAI[]
----@field lines_flipped LineDefinitionQAI[]
----@field direction_arrows_indicator_lines LineDefinitionQAI[]
+---@field only_drop_offset boolean
+---@field tiles MapPosition[] @ `nil` when only_drop_offset.
+---@field tiles_flipped MapPosition[] @ `nil` when only_drop_offset.
+---@field tiles_background_vertices ScriptRenderVertexTarget[] @ `nil` when only_drop_offset.
+---@field tiles_background_vertices_flipped ScriptRenderVertexTarget[] @ `nil` when only_drop_offset.
+---@field lines LineDefinitionQAI[] @ `nil` when only_drop_offset.
+---@field lines_flipped LineDefinitionQAI[] @ `nil` when only_drop_offset.
+---@field not_rotatable boolean
+---@field direction_arrows_indicator_lines LineDefinitionQAI[] @ `nil` when not_rotatable.
 ---@field direction_arrows_indicator_lines_flipped LineDefinitionQAI[] @ `nil` when not_rotatable.
 ---`nil` when not_rotatable. 4 when square, otherwise 2 (north and south).
 ---@field direction_arrows DirectionArrowDefinitionQAI[]
 ---@field direction_arrow_position MapPosition @ `nil` when not_rotatable.
 ---@field direction_arrow_vertices ScriptRenderVertexTarget[] @ `nil` when not_rotatable.
----@field not_rotatable boolean
 ---@field extension_speed number
 ---@field rotation_speed number
 ---@field chases_belt_items boolean
@@ -1212,30 +1213,34 @@ end
 ---@param tech_level TechnologyLevelQAI
 ---@return InserterCacheQAI
 function generate_cache_for_inserter(inserter, tech_level)
-  if not tech_level.cardinal and not tech_level.diagonal then
+  if not tech_level.cardinal and not tech_level.diagonal and not tech_level.drop_offset then
     -- If both cardinal and diagonal are false then all_tiles is also false.
     return {disabled_because_of_tech_level = true}
   end
 
+  local only_drop_offset = not tech_level.cardinal and not tech_level.diagonal and tech_level.drop_offset
   local not_rotatable = inserter.has_flag("not-rotatable")
 
   ---@type InserterCacheQAI
   local cache = {
     prototype = inserter,
     tech_level = tech_level,
-    tiles = {},
-    tiles_flipped = {},
-    tiles_background_vertices = {},
-    tiles_background_vertices_flipped = {},
-    lines = {},
-    lines_flipped = {},
+    only_drop_offset = only_drop_offset,
+    ---@diagnostic disable: assign-type-mismatch
+    tiles = not only_drop_offset and {} or nil,
+    tiles_flipped = not only_drop_offset and {} or nil,
+    tiles_background_vertices = not only_drop_offset and {} or nil,
+    tiles_background_vertices_flipped = not only_drop_offset and {} or nil,
+    lines = not only_drop_offset and {} or nil,
+    lines_flipped = not only_drop_offset and {} or nil,
+    ---@diagnostic enable: assign-type-mismatch
+    not_rotatable = not_rotatable,
     ---@diagnostic disable: assign-type-mismatch
     direction_arrows_indicator_lines = not not_rotatable and {} or nil,
     direction_arrows_indicator_lines_flipped = not not_rotatable and {} or nil,
     direction_arrows = not not_rotatable and {} or nil,
     direction_arrow_vertices = not not_rotatable and {} or nil,
     ---@diagnostic enable: assign-type-mismatch
-    not_rotatable = not_rotatable,
     extension_speed = inserter.inserter_extension_speed,
     rotation_speed = inserter.inserter_rotation_speed,
     chases_belt_items = inserter.inserter_chases_belt_items,
@@ -1244,9 +1249,11 @@ function generate_cache_for_inserter(inserter, tech_level)
   generate_collision_box_related_cache(cache)
   generate_pickup_and_drop_position_related_cache(cache)
   generate_left_top_offset_and_grid_center_cache(cache)
-  generate_tiles_cache(cache)
-  generate_tiles_background_cache(cache)
-  generate_lines_cache(cache)
+  if not only_drop_offset then
+    generate_tiles_cache(cache)
+    generate_tiles_background_cache(cache)
+    generate_lines_cache(cache)
+  end
   if not not_rotatable then
     generate_direction_arrows_indicator_lines_cache(cache)
     generate_direction_arrow_cache(cache)
@@ -1904,11 +1911,16 @@ local function get_tiles_background_vertices(player)
 end
 
 ---@param player PlayerDataQAI
-local function place_dummy_square_at_pickup(player)
+---@param single_drop_tile MapPosition
+local function place_dummy_square_at_pickup(player, single_drop_tile)
+  local drop_tile_position = vec.add(get_current_grid_left_top(player), single_drop_tile)
+  local pickup_position = player.target_inserter.pickup_position
+  -- TODO: check for them being in the same tile instead of being equal.
+  if vec.vec_equals(pickup_position, drop_tile_position) then return end
   local entity = player.current_surface.create_entity{
     name = consts.square_entity_name,
     force = player.force_index,
-    position = player.target_inserter.pickup_position,
+    position = pickup_position,
   }
   if not entity then
     error("Creating an internal entity required by Quick Adjustable Inserters failed.")
@@ -2258,12 +2270,6 @@ local function draw_grid_everything_but_lines_and_background(player)
   draw_direction_arrow(player)
   draw_direction_arrows_indicator_lines(player)
   draw_circle_on_inserter(player)
-end
-
----@param player PlayerDataQAI
-local function draw_all_rendering_objects(player)
-  draw_grid_lines_and_background(player)
-  draw_grid_everything_but_lines_and_background(player)
 end
 
 local function format_inserter_speed(items_per_second, is_estimate)
@@ -2660,6 +2666,14 @@ local function should_be_rotatable(player)
 end
 
 ---@param player PlayerDataQAI
+---@param inserter LuaEntity
+---@return InserterCacheQAI?
+local function get_cache_for_inserter(player, inserter)
+  local force = get_or_init_force(player.force_index)
+  return force and force.inserter_cache_lut[get_real_or_ghost_name(inserter)]
+end
+
+---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
 ---It should only perform reach checks when the player is selecting a new inserter. Any other state switching
 ---should not care about being out of reach. Going out of reach while adjusting an inserter is handled in the
@@ -2670,6 +2684,7 @@ end
 local function try_set_target_inserter(player, target_inserter, do_check_reach, carry_over_no_reach_checks)
   local force = get_or_init_force(player.force_index)
   if not force then return false end
+  -- Can't use get_cache_for_inserter because the force not existing is handled differently here.
 
   local cache = force.inserter_cache_lut[get_real_or_ghost_name(target_inserter)]
   if not cache then
@@ -2764,13 +2779,25 @@ local function switch_to_selecting_pickup(player, target_inserter, do_check_reac
   if player.state == "selecting-pickup" and player.target_inserter == target_inserter then return end
   if not ensure_is_idle_and_try_set_target_inserter(player, target_inserter, do_check_reach) then return end
 
-  place_squares(player)
-  place_rects(player)
-  draw_all_rendering_objects(player)
+  -- When only_drop_offset is true, selecting pickup makes no sense. However if the validations above pass,
+  -- then it is no longer valid to say "nope, not switching into this state". By allowing switching to
+  -- selecting pickup even when only_drop_offset is true, it's handling potential edge cases, and if this
+  -- function were to be exposed through the remote interface then mods could do crazy things.
+  if not player.target_inserter_cache.only_drop_offset then
+    place_squares(player)
+    place_rects(player)
+    draw_grid_lines_and_background(player)
+  end
+  draw_grid_everything_but_lines_and_background(player)
   draw_white_pickup_highlight(player)
   draw_white_drop_highlight(player)
   player.state = "selecting-pickup"
   update_inserter_speed_text(player)
+end
+
+---@param player PlayerDataQAI
+local function can_only_select_single_drop_tile(player)
+  return global.only_allow_mirrored or player.target_inserter_cache.only_drop_offset
 end
 
 ---@param player PlayerDataQAI
@@ -2796,14 +2823,15 @@ local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
   if player.state == "selecting-drop" and player.target_inserter == target_inserter then return end
   if not ensure_is_idle_and_try_set_target_inserter(player, target_inserter, do_check_reach) then return end
 
-  local single_drop_tile = global.only_allow_mirrored and get_single_drop_tile(player) or nil
+  local is_single_tile = can_only_select_single_drop_tile(player)
+  local single_drop_tile = is_single_tile and get_single_drop_tile(player) or nil
   if should_use_auto_drop_offset(player) then
-    place_squares(player, single_drop_tile and {single_drop_tile} or nil)
+    place_squares(player, is_single_tile and {single_drop_tile} or nil)
   else
-    place_ninths(player, single_drop_tile and {single_drop_tile} or nil)
+    place_ninths(player, is_single_tile and {single_drop_tile} or nil)
   end
-  if global.only_allow_mirrored then
-    place_dummy_square_at_pickup(player)
+  if is_single_tile then ---@cast single_drop_tile -nil
+    place_dummy_square_at_pickup(player, single_drop_tile)
   end
   place_rects(player)
 
@@ -2814,6 +2842,25 @@ local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
   draw_line_to_pickup_highlight(player)
   player.state = "selecting-drop"
   update_inserter_speed_text(player)
+end
+
+---@param player PlayerDataQAI
+---@param target_inserter LuaEntity
+---@return boolean
+local function should_skip_selecting_pickup(player, target_inserter)
+  local cache = get_cache_for_inserter(player, target_inserter)
+  return cache and cache.only_drop_offset or false
+end
+
+---@param player PlayerDataQAI
+---@param target_inserter LuaEntity
+---@param do_check_reach boolean?
+local function advance_to_selecting_pickup(player, target_inserter, do_check_reach)
+  if should_skip_selecting_pickup(player, target_inserter) then
+    switch_to_selecting_drop(player, target_inserter, do_check_reach) -- TODO: advance instead of switch.
+  else
+    switch_to_selecting_pickup(player, target_inserter, do_check_reach)
+  end
 end
 
 ---@param player PlayerDataQAI
@@ -2843,9 +2890,9 @@ function switch_to_idle_and_back(player, do_check_reach, new_target_inserter)
   if not target_inserter then return end
 
   if original_player_state == "selecting-pickup" then
-    switch_to_selecting_pickup(player, target_inserter, do_check_reach)
+    switch_to_selecting_pickup(player, target_inserter, do_check_reach) -- TODO: advance instead of switch.
   else
-    switch_to_selecting_drop(player, target_inserter, do_check_reach)
+    switch_to_selecting_drop(player, target_inserter, do_check_reach) -- TODO: advance instead of switch.
   end
 
   -- Carry it over for things like tech level changes, etc. Set it when `new_target_inserter` is non `nil`
@@ -3440,8 +3487,10 @@ local function try_place_held_inserter_and_adjust_it(player, position, cache, is
   if not actual_player.clear_cursor() then return end
   -- Docs say clear_cursor raises an event in the current tick, not instantly, but a valid check does not hurt.
   if not inserter.valid then return end
-  switch_to_selecting_pickup(player, inserter)
-  if player.state == "selecting-pickup" and player.target_inserter == inserter then
+  advance_to_selecting_pickup(player, inserter)
+  -- Accept both selecting pickup and selecting drop as states after the call above, because skipping
+  -- selecting pickup is possible.
+  if player.state ~= "idle" and player.target_inserter == inserter then
     player.pipette_when_done = true
     return inserter.valid and inserter or nil
   end
@@ -3477,7 +3526,7 @@ end
 local on_adjust_handler_lut = {
   ["idle"] = function(player, selected)
     if not is_real_or_ghost_inserter(selected) then return end
-    switch_to_selecting_pickup(player, selected, true)
+    advance_to_selecting_pickup(player, selected, true)
   end,
 
   ["selecting-pickup"] = function(player, selected)
@@ -3486,7 +3535,7 @@ local on_adjust_handler_lut = {
       if selected == player.target_inserter then
         advance_to_selecting_drop(player)
       else
-        switch_to_selecting_pickup(player, selected, true)
+        advance_to_selecting_pickup(player, selected, true)
       end
       return
     end
@@ -3509,7 +3558,7 @@ local on_adjust_handler_lut = {
         play_finish_animation(player) -- Before switching to idle because some rendering objects get reused.
         switch_to_idle(player)
       else
-        switch_to_selecting_pickup(player, selected, true)
+        advance_to_selecting_pickup(player, selected, true)
       end
       return
     end

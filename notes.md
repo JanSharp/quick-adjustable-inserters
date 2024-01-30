@@ -83,11 +83,11 @@
   - [ ] alright, at least give it a look. Maybe it is possible
 - [ ] maybe add support for kux slim inserters
 - [ ] wait, but why do we not get a selection changed event with selected being nil when we move the cursor off of a selectable entity from this mod and pressing the adjust key bind in the same tick, causing it to delete the previously selected entity?
-- [ ] maybe look into smart inserters and see how hard compatibility with that mod would be. For things like tech unlocks maybe
+- [x] maybe look into smart inserters and see how hard compatibility with that mod would be. For things like tech unlocks maybe
   - [x] when smart inserters is enabled, hide all technology settings from qai, and do not create technologies in qai (fully rely on smart inserters)
     - [x] don't set forced_value, just hide the setting and pretend like their value is false in data stage
   - [x] ignore offset selector setting entirely. The visualization of the default drop offset handles this in qai (per player)
-  - [ ] support having cardinal, diagonal and all tiles being false, yet drop_offset being true. In this case there should be a way to just adjust the drop offset and nothing more
+  - [x] support having cardinal, diagonal and all tiles being false, yet drop_offset being true. In this case there should be a way to just adjust the drop offset and nothing more
   - [x] handle offsets tech setting
     - [x] if the setting is disabled it is as though near-inserters was researched from the beginning of the game
     - [x] if the setting is disabled
@@ -159,3 +159,4 @@
 - [ ] maybe make inserter speed text smaller? Or make it a setting?
 - [ ] probably add some opt in key binds to adjust inserters without opening the grid. Look at bob inserters and or smart inserters key binds
 - [ ] probably add a setting to disable drop offset selection per player, especially with the addition of a "toggle near/far" offset key bind
+- [ ] snap pickup highlight to grid
