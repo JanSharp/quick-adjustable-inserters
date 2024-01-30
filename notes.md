@@ -84,6 +84,8 @@
 - [ ] maybe add support for kux slim inserters
 - [ ] wait, but why do we not get a selection changed event with selected being nil when we move the cursor off of a selectable entity from this mod and pressing the adjust key bind in the same tick, causing it to delete the previously selected entity?
 - [x] maybe look into smart inserters and see how hard compatibility with that mod would be. For things like tech unlocks maybe
+  - [ ] update readme to include the smart inserters support oddities
+    - [ ] maybe, probably add a "does nothing" startup setting to inform players that settings have been hidden because smart inserters is enabled
   - [x] when smart inserters is enabled, hide all technology settings from qai, and do not create technologies in qai (fully rely on smart inserters)
     - [x] don't set forced_value, just hide the setting and pretend like their value is false in data stage
   - [x] ignore offset selector setting entirely. The visualization of the default drop offset handles this in qai (per player)
