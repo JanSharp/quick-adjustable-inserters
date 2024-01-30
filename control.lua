@@ -2853,11 +2853,35 @@ local function should_skip_selecting_pickup(player, target_inserter)
 end
 
 ---@param player PlayerDataQAI
+---@return boolean
+function should_skip_selecting_drop(player)
+  return global.only_allow_mirrored and should_use_auto_drop_offset(player)
+end
+
+local play_finish_animation
+
+---@param player PlayerDataQAI
+---@param target_inserter LuaEntity
+---@param do_check_reach boolean?
+local function advance_to_selecting_drop(player, target_inserter, do_check_reach)
+  if should_skip_selecting_drop(player) then
+    if player.state == "idle" then return end -- Cannot player finish animation on idle player.
+    play_finish_animation(player) -- Before switching to idle because some rendering objects get reused.
+    switch_to_idle(player)
+    return
+  end
+  switch_to_selecting_drop(player, target_inserter, do_check_reach)
+end
+
+---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
 ---@param do_check_reach boolean?
 local function advance_to_selecting_pickup(player, target_inserter, do_check_reach)
   if should_skip_selecting_pickup(player, target_inserter) then
-    switch_to_selecting_drop(player, target_inserter, do_check_reach) -- TODO: advance instead of switch.
+    if should_skip_selecting_drop(player) then
+      error("There should never be a case where both selecting pickup and selecting drop would be skipped.")
+    end
+    switch_to_selecting_drop(player, target_inserter, do_check_reach)
   else
     switch_to_selecting_pickup(player, target_inserter, do_check_reach)
   end
@@ -2890,9 +2914,9 @@ function switch_to_idle_and_back(player, do_check_reach, new_target_inserter)
   if not target_inserter then return end
 
   if original_player_state == "selecting-pickup" then
-    switch_to_selecting_pickup(player, target_inserter, do_check_reach) -- TODO: advance instead of switch.
+    advance_to_selecting_pickup(player, target_inserter, do_check_reach)
   else
-    switch_to_selecting_drop(player, target_inserter, do_check_reach) -- TODO: advance instead of switch.
+    advance_to_selecting_drop(player, target_inserter, do_check_reach)
   end
 
   -- Carry it over for things like tech level changes, etc. Set it when `new_target_inserter` is non `nil`
@@ -3322,8 +3346,13 @@ local function play_line_to_pickup_highlight_animation(player)
 end
 
 ---@param player PlayerDataQAI
-local function play_finish_animation(player)
+function play_finish_animation(player)
   if not should_animate() then return end
+  if player.state == "idle" then
+    error("Attempt to play finish animation on idle player. The finish animation requires the current \
+      target_inserter as well as its cache and it reuses some of the rendering objects."
+    )
+  end
   local drop_position = calculate_visualized_drop_position(player, player.target_inserter.drop_position)
   play_drop_highlight_animation(player, drop_position)
   play_line_to_drop_highlight_animation(player, drop_position)
@@ -3505,23 +3534,6 @@ local function is_selectable_for_player(entity, selectable_name, player)
     and global.selectable_entities_to_player_lut[entity.unit_number] == player
 end
 
----@param player PlayerDataQAI
----@return boolean
-function should_skip_selecting_drop(player)
-  return global.only_allow_mirrored and should_use_auto_drop_offset(player)
-end
-
----Only use this function when the current state is "selecting-pickup".
----@param player PlayerDataQAI
-local function advance_to_selecting_drop(player)
-  if should_skip_selecting_drop(player) then
-    play_finish_animation(player) -- Before switching to idle because some rendering objects get reused.
-    switch_to_idle(player)
-    return
-  end
-  switch_to_selecting_drop(player, player.target_inserter)
-end
-
 ---@type table<string, fun(player: PlayerDataQAI, selected: LuaEntity)>
 local on_adjust_handler_lut = {
   ["idle"] = function(player, selected)
@@ -3533,7 +3545,7 @@ local on_adjust_handler_lut = {
     if not validate_target_inserter(player) then return end
     if is_real_or_ghost_inserter(selected) then
       if selected == player.target_inserter then
-        advance_to_selecting_drop(player)
+        advance_to_selecting_drop(player, player.target_inserter)
       else
         advance_to_selecting_pickup(player, selected, true)
       end
@@ -3541,7 +3553,7 @@ local on_adjust_handler_lut = {
     end
     if is_selectable_for_player(selected, consts.square_entity_name, player) then
       set_pickup_position(player, selected.position)
-      advance_to_selecting_drop(player)
+      advance_to_selecting_drop(player, player.target_inserter)
       return
     end
     if is_selectable_for_player(selected, consts.rect_entity_name, player) then
