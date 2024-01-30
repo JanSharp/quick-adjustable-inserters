@@ -1910,12 +1910,20 @@ local function get_tiles_background_vertices(player)
     or cache.tiles_background_vertices
 end
 
+local snap_position_to_tile_center_relative_to_inserter
+
+---@param player PlayerDataQAI
+local function get_snapped_pickup_position(player)
+  local pickup_position = player.target_inserter.pickup_position
+  snap_position_to_tile_center_relative_to_inserter(player, pickup_position)
+  return pickup_position
+end
+
 ---@param player PlayerDataQAI
 ---@param single_drop_tile MapPosition
 local function place_dummy_square_at_pickup(player, single_drop_tile)
   local drop_tile_position = vec.add(get_current_grid_left_top(player), single_drop_tile)
-  local pickup_position = player.target_inserter.pickup_position
-  -- TODO: check for them being in the same tile instead of being equal.
+  local pickup_position = get_snapped_pickup_position(player)
   if vec.vec_equals(pickup_position, drop_tile_position) then return end
   local entity = player.current_surface.create_entity{
     name = consts.square_entity_name,
@@ -2403,7 +2411,7 @@ local validate_target_inserter
 
 ---@param player PlayerDataQAI
 ---@param position MapPosition @ Gets modified.
-local function snap_position_to_tile_center_relative_to_inserter(player, position)
+function snap_position_to_tile_center_relative_to_inserter(player, position)
   -- Not checking state == "idle" because it is valid to use this
   -- function in the process of switching to selecting pickup or drop.
   if not player.target_inserter_position then
@@ -2513,7 +2521,7 @@ end
 ---@return MapPosition left_top
 ---@return MapPosition right_bottom
 local function get_pickup_box(player)
-  local pickup_pos = player.target_inserter.pickup_position
+  local pickup_pos = get_snapped_pickup_position(player)
   return {x = pickup_pos.x - 0.5, y = pickup_pos.y - 0.5},
     {x = pickup_pos.x + 0.5, y = pickup_pos.y + 0.5}
 end
@@ -2629,7 +2637,7 @@ end
 
 ---@param player PlayerDataQAI
 local function draw_line_to_pickup_highlight(player)
-  local from, to = get_from_and_to_for_line_from_center(player, player.target_inserter.pickup_position, 0.5)
+  local from, to = get_from_and_to_for_line_from_center(player, get_snapped_pickup_position(player), 0.5)
   if not from then return end ---@cast to -nil
   local do_animate, opacity, color_step = get_color_for_potential_animation(1)
   color_step.r = 0
@@ -3307,7 +3315,7 @@ end
 local function play_line_to_pickup_highlight_animation(player)
   local from, to, length = get_from_and_to_for_line_from_center(
     player,
-    player.target_inserter.pickup_position,
+    get_snapped_pickup_position(player),
     0.5
   )
   -- The pickup position might have changed since the last time we checked.
