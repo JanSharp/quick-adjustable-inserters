@@ -1,7 +1,8 @@
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.2
 Date: ????
-  Changes:
+  Features:
+    - Added explicit support for Smart Inserters. If SI is enabled its settings will be used
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.1
 Date: 2024-01-28
