@@ -183,20 +183,22 @@ local animation_type = {
 ---@field is_rotatable boolean @ `nil` when idle.
 ---@field current_surface_index uint @ `nil` when idle.
 ---@field current_surface LuaSurface @ `nil` when idle.
----@field dummy_pickup_square LuaEntity? @ Can be `nil` even when not idle. Only used with only_allow_mirrored.
+---Can be `nil` even when not idle. Only used when `only_allow_mirrored` or `cache.only_drop_offset`.
+---@field dummy_pickup_square LuaEntity?
 ---@field dummy_pickup_square_unit_number uint32? @ Can be `nil` even when not idle.
 ---@field used_squares uint[]
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
----@field line_ids uint64[] @ When `only_allow_mirrored` this will contain a rectangle while selecting drop.
+---When `only_allow_mirrored` or `cache.only_drop_offset` this will contain a rectangle while selecting drop.
+---@field line_ids uint64[]
 ---@field direction_arrows_indicator_line_ids uint64[]
 ---`nil` when idle. When `only_allow_mirrored` this will be a rectangle while selecting drop.
 ---@field background_polygon_id uint64
 ---`nil` when idle. Can be `nil` when destroying all rendering objects due to being part of an animation.
 ---@field inserter_circle_id uint64
----@field direction_arrow_id uint64 @ Can be `nil` even when not idle. It only exists when `is_rotatable`.
----@field pickup_highlight_id uint64? @ `nil` when idle.
----@field drop_highlight_id uint64? @ `nil` when idle.
+---@field direction_arrow_id uint64? @ Can be `nil` even when not idle. It only exists when `is_rotatable`.
+---@field pickup_highlight_id uint64 @ `nil` when idle.
+---@field drop_highlight_id uint64 @ `nil` when idle.
 ---Can be `nil` even when not idle. Can even be `nil` when `pickup_highlight_id` is not `nil`.
 ---@field line_to_pickup_highlight_id uint64?
 ---@field default_drop_highlight LuaEntity? @ Can be `nil` even when not idle.
