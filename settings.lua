@@ -50,12 +50,46 @@ data:extend({
     default_value = true,
   },
   {
+    type = "string-setting",
+    name = "qai-about-smart-inserters",
+    order = "g",
+    hidden = true,
+    setting_type = "startup",
+    default_value = "got-it",
+    allowed_values = {
+      "got-it",
+      "yup",
+      "yes",
+      "mhm",
+      "i-see",
+      "yea",
+      "right",
+      "left",
+      "up",
+      "down",
+      "over",
+      "under",
+      "in-front",
+      "behind",
+      "upside-down",
+      "understood",
+      "uhm",
+      "sure",
+      "alright",
+      "confirmed",
+      "totally",
+      "oh",
+      "yeah",
+      "affirmative",
+    },
+  },
+  {
     type = "bool-setting",
     name = "qai-mirrored-inserters-only",
     order = "a",
     setting_type = "runtime-global",
     default_value = false,
-  }
+  },
 })
 
 ---@generic T
@@ -143,4 +177,5 @@ if mods["Smart_Inserters"] then
   hide_bool_setting("bobmods-inserters-long2")
   hide_bool_setting("bobmods-inserters-more1")
   hide_bool_setting("bobmods-inserters-more2")
+  data.raw["string-setting"]["qai-about-smart-inserters"].hidden = false
 end
