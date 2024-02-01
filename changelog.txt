@@ -1,7 +1,8 @@
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.3
 Date: ????
-  Changes:
+  Bugfixes:
+    - Fixed throughput text not changing surface, therefore only being visible on the first surface
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.2
 Date: 2024-01-30

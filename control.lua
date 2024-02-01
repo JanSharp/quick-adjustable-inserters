@@ -212,6 +212,7 @@ local animation_type = {
 ---@field inserter_speed_pickup_position MapPosition @ `nil` when not has_active_inserter_speed_text.
 ---@field inserter_speed_drop_position MapPosition @ `nil` when not has_active_inserter_speed_text.
 ---@field inserter_speed_text_id uint64? @ Only `nil` initially, once it exists, it's never destroyed (by this mod).
+---@field inserter_speed_text_surface_index uint32? @ Only `nil` initially, once it exists, it exists.
 ---@field show_throughput_on_drop boolean
 ---@field show_throughput_on_pickup boolean
 ---@field show_throughput_on_inserter boolean
@@ -1672,6 +1673,7 @@ local function destroy_inserter_speed_text(player)
   if player.inserter_speed_text_id then
     rendering.destroy(player.inserter_speed_text_id)
     player.inserter_speed_text_id = nil
+    player.inserter_speed_text_surface_index = nil
   end
 end
 
@@ -2300,10 +2302,13 @@ local function set_inserter_speed_text(player, position, items_per_second, is_es
   update_player_active_state(player)
 
   local id = player.inserter_speed_text_id
-  if not id or not rendering.is_valid(id) then
+  local surface_index = reference_inserter.surface_index
+  if not id or not rendering.is_valid(id) or player.inserter_speed_text_surface_index ~= surface_index then
+    if id then rendering.destroy(id) end -- Was on a different surface.
+    player.inserter_speed_text_surface_index = surface_index
     player.inserter_speed_text_id = rendering.draw_text{
       -- Can't use `player.current_surface_index` because that's nil when idle.
-      surface = player.player.surface_index,
+      surface = surface_index,
       players = {player.player_index},
       color = {1, 1, 1},
       target = position,
