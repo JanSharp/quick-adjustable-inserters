@@ -1,6 +1,8 @@
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.4
 Date: ????
+  Features:
+    - Added long handed inserter range map setting. Overall useful and can help with renai transportation
   Changes:
     - Improved inserter throughput text size for high resolution displays with higher pixel density
 ---------------------------------------------------------------------------------------------------

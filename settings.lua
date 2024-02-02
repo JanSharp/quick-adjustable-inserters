@@ -90,6 +90,18 @@ data:extend({
     setting_type = "runtime-global",
     default_value = false,
   },
+  {
+    type = "string-setting",
+    name = "qai-range-for-long-inserters",
+    order = "b",
+    setting_type = "runtime-global",
+    default_value = "retract-then-extend",
+    allowed_values = {
+      "retract-then-extend",
+      "extend-only",
+      "extend-only-without-gap",
+    },
+  },
 })
 
 ---@generic T
@@ -178,4 +190,10 @@ if mods["Smart_Inserters"] then
   hide_bool_setting("bobmods-inserters-more1")
   hide_bool_setting("bobmods-inserters-more2")
   data.raw["string-setting"]["qai-about-smart-inserters"].hidden = false
+  local qai_range_setting = data.raw["string-setting"]["qai-range-for-long-inserters"]
+  qai_range_setting.localised_name = {"mod-setting-name.qai-range-for-long-inserters-overridden"}
+  qai_range_setting.localised_description = {
+    "mod-setting-description.qai-range-for-long-inserters-overridden",
+    {"mod-setting-description.qai-range-for-long-inserters"},
+  }
 end
