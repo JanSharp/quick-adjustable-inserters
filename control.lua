@@ -4385,10 +4385,10 @@ script.on_configuration_changed(function(event)
     end
   end
 
-  if consts.use_smart_inserters or is_older_than(1, 1, 4) then
-    -- Always update when using smart inserters, because SI uses a startup setting while QAI uses a map setting.
-    update_range_for_long_inserters_setting(true)
-  end
+  -- Technically this only needs to be updated when the mod version is older than 1.1.4, or while smart
+  -- inserters is enabled or when smart inserters is removed. But updating the setting is cheap, so adding all
+  -- of those checks just isn't worth it.
+  update_range_for_long_inserters_setting(true)
 
   -- Do this before updating forces, because updating forces potentially involves changing player states.
   for _, player in safer_pairs(global.players) do
