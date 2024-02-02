@@ -885,7 +885,7 @@ local function generate_tiles_background_cache(cache)
   ---@type table<uint32, true>
   local grid = {}
 
-  for _, tile in pairs(cache.tiles) do
+  for _, tile in ipairs(cache.tiles) do
     grid[get_point(tile.x, tile.y)] = true
   end
 
@@ -958,7 +958,7 @@ local function generate_lines_cache(cache)
   local vertical_grid = {}
 
   -- Define grid lines.
-  for _, tile in pairs(cache.tiles) do
+  for _, tile in ipairs(cache.tiles) do
     horizontal_grid[get_point(tile.x, tile.y)] = true
     horizontal_grid[get_point(tile.x, tile.y + 1)] = true
     vertical_grid[get_point(tile.x, tile.y)] = true
@@ -1954,7 +1954,7 @@ local function place_squares(player, specific_tiles)
     position = position,
   }
   local create_entity = player.current_surface.create_entity
-  for i, tile in pairs(specific_tiles or get_tiles(player)) do
+  for i, tile in ipairs(specific_tiles or get_tiles(player)) do
     position.x = left + tile.x + 0.5
     position.y = top + tile.y + 0.5
     local entity = create_entity(arg)
@@ -1984,7 +1984,7 @@ local function place_ninths(player, specific_tiles)
   }
   local create_entity = player.current_surface.create_entity
   local count = 0
-  for _, tile in pairs(specific_tiles or get_tiles(player)) do
+  for _, tile in ipairs(specific_tiles or get_tiles(player)) do
     for inner_x = 0, 2 do
       for inner_y = 0, 2 do
         position.x = left + tile.x + inner_x / 3 + 1 / 6
@@ -2091,7 +2091,7 @@ local function place_rects(player)
     position = position,
   }
   local create_entity = player.current_surface.create_entity
-  for _, dir_arrow in pairs(cache.direction_arrows) do
+  for _, dir_arrow in ipairs(cache.direction_arrows) do
     position.x = offset_from_inserter.x + dir_arrow.position.x
     position.y = offset_from_inserter.y + dir_arrow.position.y
     flip(player, position)
@@ -2180,7 +2180,7 @@ local function draw_lines_internal(player, line_ids, lines)
     to = to,
   }
 
-  for i, line in pairs(lines) do
+  for i, line in ipairs(lines) do
     from.x = left + line.from.x
     from.y = top + line.from.y
     to.x = left + line.to.x
@@ -3640,7 +3640,7 @@ local function update_inserter_cache(force)
       force.inserter_cache_lut[inserter.name] = generate_cache_for_inserter(inserter, force.tech_level)
     end
   end
-  for _, player in pairs(force.force.players) do
+  for _, player in ipairs(force.force.players) do
     local player_data = global.players[player.index]
     if player_data then
       switch_to_idle_and_back(player_data)
@@ -4152,7 +4152,7 @@ script.on_event(ev.on_player_changed_position, function(event)
   end
 end)
 
-for _, data in pairs{
+for _, data in ipairs{
   {event_name = ev.on_player_rotated_entity, do_check_reach = false},
   {event_name = ev.script_raised_teleported, do_check_reach = true},
 }
@@ -4173,7 +4173,7 @@ do
   end)
 end
 
-for _, destroy_event in pairs{
+for _, destroy_event in ipairs{
   ev.on_robot_mined_entity,
   ev.on_player_mined_entity,
   ev.script_raised_destroy,
@@ -4269,7 +4269,7 @@ end)
 
 ---@param force LuaForce
 local function recheck_players_in_force(force)
-  for _, player in pairs(force.players) do
+  for _, player in ipairs(force.players) do
     local player_data = get_player_raw(player.index)
     if player_data then
       switch_to_idle_and_back(player_data)
