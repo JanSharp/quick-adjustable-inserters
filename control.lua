@@ -2285,6 +2285,15 @@ local function format_inserter_speed(items_per_second, is_estimate)
   return string.format((is_estimate and "~ " or "").."%.3f/s", items_per_second)
 end
 
+---Using `display_scale` for better support for large displays. Not going directly off of `display_resolution`
+---because the pixel density is unknown, however players will adjust the scale to make the GUI look good,
+---which is basically them adjusting based on pixel density.
+---@param player PlayerDataQAI
+---@return number
+local function get_scale_for_inserter_speed_text(player)
+  return 1.5 * player.player.display_scale
+end
+
 ---@param player PlayerDataQAI
 ---@param position MapPosition
 ---@param items_per_second number
@@ -2310,7 +2319,7 @@ local function set_inserter_speed_text(player, position, items_per_second, is_es
       color = {1, 1, 1},
       target = position,
       text = format_inserter_speed(items_per_second, is_estimate),
-      scale = 1.5,
+      scale = get_scale_for_inserter_speed_text(player),
       scale_with_zoom = true,
       vertical_alignment = "middle",
     }
@@ -2320,6 +2329,13 @@ local function set_inserter_speed_text(player, position, items_per_second, is_es
   rendering.set_target(id, position)
   rendering.set_visible(id, true)
   rendering.bring_to_front(id)
+end
+
+---@param player PlayerDataQAI
+local function update_inserter_speed_text_scale(player)
+  local id = player.inserter_speed_text_id
+  if not id or not rendering.is_valid(id) then return end
+  rendering.set_scale(id, get_scale_for_inserter_speed_text(player))
 end
 
 ---@param player PlayerDataQAI
@@ -4272,6 +4288,12 @@ script.on_event(ev.on_player_changed_force, function(event)
   player.force_index = player.player.force_index--[[@as uint8]]
   switch_to_idle_and_back(player)
   update_inserter_speed_text(player)
+end)
+
+script.on_event(ev.on_player_display_scale_changed, function(event)
+  local player = get_player(event)
+  if not player then return end
+  update_inserter_speed_text_scale(player)
 end)
 
 script.on_configuration_changed(function(event)
