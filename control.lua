@@ -4368,23 +4368,6 @@ script.on_configuration_changed(function(event)
   local mod_changes = event.mod_changes["quick-adjustable-inserters"]
   if mod_changes and not mod_changes.old_version then return end
 
-  local is_older_than
-  if not mod_changes then
-    is_older_than = function() return false end -- This mod's version didn't change.
-  else
-    local major, minor, patch = string.match(mod_changes.old_version, "^(%d+)%.(%d+)%.(%d+)S")
-    major, minor, patch = tonumber(major), tonumber(minor), tonumber(patch)
-    ---@param test_major integer
-    ---@param test_minor integer
-    ---@param test_patch integer
-    ---@return boolean
-    function is_older_than(test_major, test_minor, test_patch)
-      return major < test_major
-        or major == test_major and minor < test_minor
-        or major == test_major and minor == test_minor and patch < test_patch
-    end
-  end
-
   -- Technically this only needs to be updated when the mod version is older than 1.1.4, or while smart
   -- inserters is enabled or when smart inserters is removed. But updating the setting is cheap, so adding all
   -- of those checks just isn't worth it.
