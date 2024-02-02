@@ -161,5 +161,10 @@
 - [x] maybe loosen the restriction on which inserters can be adjusted in the runtime checks to allow for other mods to do crazy things
 - [ ] maybe make inserter speed text smaller? Or make it a setting?
 - [ ] probably add some opt in key binds to adjust inserters without opening the grid. Look at bob inserters and or smart inserters key binds
+  - [ ] add several key binds which affect the drop offset. something like near/far toggle, left/middle/right cycle... maybe that's it.
+  - [ ] handle key binds which change drop offset while not idle and selecting a selectable differently
+  - [ ] record a new video showcasing just all of the key bind interactions at once
 - [ ] probably add a setting to disable drop offset selection per player, especially with the addition of a "toggle near/far" offset key bind
+  - [ ] add key bind which enabled being able to pick the drop offset just this once
+  - [ ] rerecord videos in which the settings window is visible, since settings have changed now
 - [x] snap pickup highlight to grid
