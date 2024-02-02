@@ -2827,8 +2827,8 @@ local function switch_to_selecting_pickup(player, target_inserter, do_check_reac
     draw_grid_lines_and_background(player)
   end
   draw_grid_everything_but_lines_and_background(player)
+  draw_white_drop_highlight(player) -- Below pickup highlight.
   draw_white_pickup_highlight(player)
-  draw_white_drop_highlight(player)
   player.state = "selecting-pickup"
   update_inserter_speed_text(player)
 end
@@ -2875,8 +2875,8 @@ local function switch_to_selecting_drop(player, target_inserter, do_check_reach)
 
   draw_grid_lines_and_background(player, single_drop_tile)
   draw_grid_everything_but_lines_and_background(player)
+  draw_white_drop_highlight(player) -- Below pickup highlight and line to pickup.
   draw_green_pickup_highlight(player)
-  draw_white_drop_highlight(player)
   draw_line_to_pickup_highlight(player)
   player.state = "selecting-drop"
   update_inserter_speed_text(player)
