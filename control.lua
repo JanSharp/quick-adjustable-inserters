@@ -234,6 +234,7 @@ local animation_type = {
 ---@field show_throughput_on_pickup boolean
 ---@field show_throughput_on_inserter boolean
 ---@field highlight_default_drop_offset boolean
+---@field always_use_default_drop_offset boolean
 ---@field pipette_after_place_and_adjust boolean
 ---@field pipette_copies_vectors boolean
 ---@field pipette_when_done boolean?
@@ -2849,7 +2850,8 @@ end
 ---@param player PlayerDataQAI
 ---@return boolean
 local function should_use_auto_drop_offset(player)
-  return not player.target_inserter_cache.tech_level.drop_offset
+  return player.always_use_default_drop_offset
+    or not player.target_inserter_cache.tech_level.drop_offset
 end
 
 ---Similar to switch_to_idle, this function can raise an event, so make sure to expect the world and the mod
@@ -3817,6 +3819,12 @@ local update_setting_lut = {
       destroy_default_drop_highlight(player)
     end
   end,
+  ["qai-always-use-default-drop-offset"] = function(player)
+    local new_value = settings.get_player_settings(player.player_index)["qai-always-use-default-drop-offset"].value--[[@as boolean]]
+    if new_value == player.always_use_default_drop_offset then return end
+    player.always_use_default_drop_offset = new_value
+    switch_to_idle_and_back(player)
+  end,
   ["qai-pipette-after-place-and-adjust"] = function(player)
     local new_value = settings.get_player_settings(player.player_index)["qai-pipette-after-place-and-adjust"].value--[[@as boolean]]
     player.pipette_after_place_and_adjust = new_value
@@ -3904,6 +3912,7 @@ local function init_player(player)
     show_throughput_on_pickup = player_settings["qai-show-throughput-on-pickup"].value--[[@as boolean]],
     show_throughput_on_drop = player_settings["qai-show-throughput-on-drop"].value--[[@as boolean]],
     highlight_default_drop_offset = player_settings["qai-highlight-default-drop-offset"].value--[[@as boolean]],
+    always_use_default_drop_offset = player_settings["qai-always-use-default-drop-offset"].value--[[@as boolean]],
     pipette_after_place_and_adjust = player_settings["qai-pipette-after-place-and-adjust"].value--[[@as boolean]],
     pipette_copies_vectors = player_settings["qai-pipette-copies-vectors"].value--[[@as boolean]],
   }
@@ -4381,6 +4390,9 @@ script.on_configuration_changed(function(event)
     end
   end
 
+  -- It is expected for on_configuration_changed to switch all players to idle and back. Updating all tech
+  -- levels does currently ultimately do that. If at any point that isn't guaranteed anymore, there must be
+  -- a loop through all players in here to switch them to idle and back.
   update_tech_level_for_all_forces()
 end)
 
