@@ -1,7 +1,8 @@
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.4
 Date: ????
-  Changes:
+  Features:
+    - Added long handed inserter range map setting. Overall useful and can help with renai transportation
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.3
 Date: 2024-02-01

@@ -17,6 +17,7 @@ local vec = require("__inserter-throughput-lib__.vector")
 ---@alias EntityIDQAI uint32|EntityGhostIDQAI
 
 ---@class GlobalDataQAI
+---@field data_structure_version 2 @ `nil` is version `1`. Use `(global.data_structure_version or 1)`.
 ---@field players table<int, PlayerDataQAI>
 ---@field forces table<uint8, ForceDataQAI>
 ---@field inserters_in_use table<EntityIDQAI, PlayerDataQAI>
@@ -30,7 +31,21 @@ local vec = require("__inserter-throughput-lib__.vector")
 ---@field selectable_dummy_redirects table<uint32, LuaEntity>
 ---@field ghost_ids table<uint32, table<double, table<double, EntityGhostIDQAI>>>
 ---@field only_allow_mirrored boolean
+---@field range_for_long_inserters LongInserterRangeTypeQAI
 global = {}
+
+---@enum LongInserterRangeTypeQAI
+local long_inserter_range_type = {
+  retract_then_extend = 1,
+  extend_only = 2,
+  extend_only_without_gap = 3,
+  ---Only used with smart inserters, because it's pretty nonsensical. I'd much prefer playing without any
+  ---range technologies, so just having 1 range. I mean yea that is different because long handed inserters
+  ---won't be able to reach closer to their base, which is fair I suppose, but balance and logic wise I'd
+  ---prefer just having 1 range and that's it. Could play with extend_only_without_gap as well, the only
+  ---difference then is that you've got all the range from the start of the game. But :shrug:.
+  retract_only = 4,
+}
 
 ---@alias AnimationQAI
 ---| AnimatedCircleQAI
@@ -685,31 +700,26 @@ end
 local generate_cache_for_inserter
 do -- Similar to cursor_direction, this is like a separate file. See up there as to why this isn't indented.
 
----@return "equal"|"inserter"|"incremental"|string
-local function get_range_adder_setting_value()
-  local setting = settings.startup["si-range-adder"]
-  -- A setting from another mod, we cannot trust it actually existing.
-  -- There's an argument to be made that this should throw an error if the setting does not exist, and yea
-  -- I'm considering it. But also :shrug:.
-  return setting and setting.value--[[@as string]] or "equal"
-end
-
----Needs `cache.base_range`.
----@param cache InserterCacheQAI
-local function generate_range_cache(cache)
-  if not consts.use_smart_inserters then
+---Require `cache.base_range` to be set.
+---@type table<LongInserterRangeTypeQAI, fun(cache: InserterCacheQAI)>
+local generate_range_cache_lut = {
+  [long_inserter_range_type.retract_then_extend] = function(cache)
     cache.range = cache.tech_level.range
-    return
-  end
-  local range_adder_type = get_range_adder_setting_value()
-  if range_adder_type == "incremental" then
+    cache.range_gap_from_center = math.max(0, cache.base_range - cache.range)
+  end,
+  [long_inserter_range_type.extend_only] = function(cache)
+    cache.range = cache.tech_level.range
+    cache.range_gap_from_center = cache.base_range - 1
+  end,
+  [long_inserter_range_type.extend_only_without_gap] = function(cache)
     cache.range = cache.base_range + cache.tech_level.range - 1
-  elseif range_adder_type == "inserter" then
+    cache.range_gap_from_center = 0
+  end,
+  [long_inserter_range_type.retract_only] = function(cache)
     cache.range = math.min(cache.base_range, cache.tech_level.range)
-  else -- not elseif, because this is a setting from another mod so we cannot trust its values.
-    cache.range = cache.tech_level.range
-  end
-end
+    cache.range_gap_from_center = cache.base_range - cache.range
+  end,
+}
 
 ---@param cache InserterCacheQAI
 local function generate_pickup_and_drop_position_related_cache(cache)
@@ -728,8 +738,8 @@ local function generate_pickup_and_drop_position_related_cache(cache)
     drop_x - (tile_width / 2),
     drop_y - (tile_height / 2)
   ))
+  local generate_range_cache = generate_range_cache_lut[global.range_for_long_inserters]
   generate_range_cache(cache)
-  cache.range_gap_from_center = math.max(0, cache.base_range - cache.range)
 
   cache.diagonal_by_default = math.abs(pickup_x - pickup_y) < 1/16 and math.abs(drop_x - drop_y) < 1/16
 
@@ -3716,6 +3726,14 @@ do
   end
 end
 
+local function update_tech_level_for_all_forces()
+  for _, force in safer_pairs(global.forces) do
+    if validate_force(force) then
+      update_tech_level_for_force(force)
+    end
+  end
+end
+
 ---@param force LuaForce
 ---@return ForceDataQAI
 function init_force(force)
@@ -3803,6 +3821,51 @@ local function update_only_allow_mirrored_setting()
     if validate_player(player) then
       switch_to_idle_and_back(player)
     end
+  end
+end
+
+local update_range_for_long_inserters_setting
+do
+  ---@return "equal"|"inserter"|"incremental"|string
+  local function get_range_adder_setting_value()
+    local setting = settings.startup["si-range-adder"]
+    -- A setting from another mod, we cannot trust it actually existing.
+    -- There's an argument to be made that this should throw an error if the setting does not exist, and yea
+    -- I'm considering it. But also :shrug:.
+    return setting and setting.value--[[@as string]] or "equal"
+  end
+
+  local function update_using_smart_inserters_setting()
+    local range_adder_type = get_range_adder_setting_value()
+    if range_adder_type == "incremental" then
+      global.range_for_long_inserters = long_inserter_range_type.extend_only_without_gap
+    elseif range_adder_type == "inserter" then
+      global.range_for_long_inserters = long_inserter_range_type.retract_only
+    else -- not elseif, because this is a setting from another mod so we cannot trust its values.
+      global.range_for_long_inserters = long_inserter_range_type.retract_then_extend
+    end
+  end
+
+  local function update_using_qai_setting()
+    local value = settings.global["qai-range-for-long-inserters"].value--[[@as string]]
+    if value == "retract-then-extend" then
+      global.range_for_long_inserters = long_inserter_range_type.retract_then_extend
+    elseif value == "extend-only" then
+      global.range_for_long_inserters = long_inserter_range_type.extend_only
+    elseif value == "extend-only-without-gap" then
+      global.range_for_long_inserters = long_inserter_range_type.extend_only_without_gap
+    end
+  end
+
+  ---@param do_not_update_forces boolean?
+  function update_range_for_long_inserters_setting(do_not_update_forces)
+    if consts.use_smart_inserters then
+      update_using_smart_inserters_setting()
+    else
+      update_using_qai_setting()
+    end
+    if do_not_update_forces then return end
+    update_tech_level_for_all_forces()
   end
 end
 
@@ -4115,6 +4178,10 @@ script.on_event(ev.on_runtime_mod_setting_changed, function(event)
     update_only_allow_mirrored_setting()
     return
   end
+  if event.setting == "qai-range-for-long-inserters" then
+    update_range_for_long_inserters_setting()
+    return
+  end
   -- Per player settings.
   local update_setting = update_setting_lut[event.setting]
   if not update_setting then return end
@@ -4279,6 +4346,28 @@ script.on_configuration_changed(function(event)
   local mod_changes = event.mod_changes["quick-adjustable-inserters"]
   if mod_changes and not mod_changes.old_version then return end
 
+  local is_older_than
+  if not mod_changes then
+    is_older_than = function() return false end -- This mod's version didn't change.
+  else
+    local major, minor, patch = string.match(mod_changes.old_version, "^(%d+)%.(%d+)%.(%d+)S")
+    major, minor, patch = tonumber(major), tonumber(minor), tonumber(patch)
+    ---@param test_major integer
+    ---@param test_minor integer
+    ---@param test_patch integer
+    ---@return boolean
+    function is_older_than(test_major, test_minor, test_patch)
+      return major < test_major
+        or major == test_major and minor < test_minor
+        or major == test_major and minor == test_minor and patch < test_patch
+    end
+  end
+
+  if consts.use_smart_inserters or is_older_than(1, 1, 4) then
+    -- Always update when using smart inserters, because SI uses a startup setting while QAI uses a map setting.
+    update_range_for_long_inserters_setting(true)
+  end
+
   -- Do this before updating forces, because updating forces potentially involves changing player states.
   for _, player in safer_pairs(global.players) do
     if validate_player(player)then
@@ -4287,11 +4376,7 @@ script.on_configuration_changed(function(event)
     end
   end
 
-  for _, force in safer_pairs(global.forces) do
-    if validate_force(force) then
-      update_tech_level_for_force(force)
-    end
-  end
+  update_tech_level_for_all_forces()
 end)
 
 script.on_event(ev.on_force_created, function(event)
@@ -4325,6 +4410,7 @@ end)
 script.on_init(function()
   ---@type GlobalDataQAI
   global = {
+    data_structure_version = 2,
     players = {},
     forces = {},
     inserters_in_use = {},
@@ -4336,6 +4422,7 @@ script.on_init(function()
     ghost_ids = {},
     only_allow_mirrored = settings.global["qai-mirrored-inserters-only"].value--[[@as boolean]],
   }
+  update_range_for_long_inserters_setting(true)
   for _, force in pairs(game.forces) do
     init_force(force)
   end
