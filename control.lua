@@ -369,7 +369,7 @@ pipette:
 
 - [x] on a rolling stock: uses orientation and _rounds_ to nearest 4 way direction (when in the middle, rounds up. Like 0.125 becomes 0.25)
 - [x] on an underground belt: uses direction, if belt_to_ground_type == "output" apply 0.5 rotation (flip)
-- [x] on an underground pipe: uses direction with 0.5 rotation (flip) (both input and output)
+- [x] on an underground pipe: uses direction, nothing special
 - [x] on a loader: uses direction, if loader_type == "input" apply 0.5 rotation (flip)
 - [x] on an entity that does not support direction: does not affect rotation state
 - [x] on an entity that does support direction: use its direction as is to set cursor direction
@@ -470,11 +470,6 @@ local function handle_pipette_direction(player, pipetted_entity)
       orientation = orientation + 0.5
     end
     set_cursor_orientation(player, orientation)
-    return
-  end
-
-  if entity_type == "underground-pip" then
-    set_cursor_orientation(player, pipetted_entity.orientation + 0.5)
     return
   end
 
