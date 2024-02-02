@@ -26,7 +26,7 @@ local vec = require("__inserter-throughput-lib__.vector")
 ---@field selectable_entities_to_player_lut table<uint32, PlayerDataQAI>
 ---Selectable entity unit number => entity with that unit number.
 ---@field selectable_entities_by_unit_number table<uint32, LuaEntity>
----Selectable square unit number => inserter. Only used with only_allow_mirrored.
+---Selectable square unit number => inserter.
 ---@field selectable_dummy_redirects table<uint32, LuaEntity>
 ---@field ghost_ids table<uint32, table<double, table<double, EntityGhostIDQAI>>>
 ---@field only_allow_mirrored boolean
@@ -183,16 +183,18 @@ local animation_type = {
 ---@field is_rotatable boolean @ `nil` when idle.
 ---@field current_surface_index uint @ `nil` when idle.
 ---@field current_surface LuaSurface @ `nil` when idle.
----Can be `nil` even when not idle. Only used when `only_allow_mirrored` or `cache.only_drop_offset`.
+---Can be `nil` even when not idle. Used to redirect interaction to the inserter itself when selecting drop
+---within a single tile. Allows for quick double tap to finish adjustment when using only_allow_mirrored for
+---example.
 ---@field dummy_pickup_square LuaEntity?
 ---@field dummy_pickup_square_unit_number uint32? @ Can be `nil` even when not idle.
 ---@field used_squares uint[]
 ---@field used_ninths uint[]
 ---@field used_rects uint[]
----When `only_allow_mirrored` or `cache.only_drop_offset` this will contain a rectangle while selecting drop.
+---Contains a rectangle id instead, when highlighting a single tile as the drop position.
 ---@field line_ids uint64[]
 ---@field direction_arrows_indicator_line_ids uint64[]
----`nil` when idle. When `only_allow_mirrored` this will be a rectangle while selecting drop.
+---`nil` when idle. Contains a rectangle id instead, when highlighting a single tile as the drop position.
 ---@field background_polygon_id uint64
 ---`nil` when idle. Can be `nil` when destroying all rendering objects due to being part of an animation.
 ---@field inserter_circle_id uint64
@@ -2262,7 +2264,7 @@ end
 ---@param single_tile MapPosition?
 local function draw_grid_lines_and_background(player, single_tile)
   if single_tile then
-    -- Do not check keep_rendering. This only happens with only_allow_mirrored where the grid is not kept.
+    -- Do not check keep_rendering. This only happens when the grid is not kept.
     draw_single_tile_grid(player, single_tile)
     return
   end
@@ -2423,8 +2425,8 @@ function snap_position_to_tile_center_relative_to_inserter(player, position)
   vec.add_scalar(vec.sub(position, vec.mod_scalar(vec.sub(vec.copy(position), left_top), 1)), 0.5)
 end
 
----If the selected entity is a dummy entity for the pickup position when using only_allow_mirrored then this
----function will pretend as though the selected entity is the inserter itself.
+---If the selected entity is a dummy entity for the pickup position then this function will pretend as though
+---the selected entity is the inserter itself.
 ---@param selected LuaEntity?
 ---@return LuaEntity? selected
 local function get_redirected_selected_entity(selected)
@@ -2483,7 +2485,7 @@ function update_inserter_speed_text(player)
   then
     local position = is_real_or_ghost_inserter(actual_selected)
       and get_inserter_speed_position_next_to_inserter(actual_selected)
-      or get_inserter_speed_position_next_to_selectable(player, actual_selected) -- Just for only_allow_mirrored.
+      or get_inserter_speed_position_next_to_selectable(player, actual_selected)
     update_inserter_speed_text_using_inserter(player, selected, position)
     return
   end
