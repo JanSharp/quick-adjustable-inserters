@@ -94,7 +94,11 @@ local animation_type = {
 
 ---@class InserterCacheQAI
 ---@field disabled_because_of_tech_level boolean? @ When true everything else is `nil`.
+---Always check valid before using, because prototypes can be removed and in the process of migrating before
+---or in on_configuration_changed any other could could still end up running.
 ---@field prototype LuaEntityPrototype
+---@field raw_tile_width integer @ Raw value from the prototype.
+---@field raw_tile_height integer @ Raw value from the prototype.
 ---@field tech_level TechnologyLevelQAI
 ---@field range integer @ Without smart inserters this is always equal to tech_level.range.
 ---@field min_extra_reach_distance number @ The minimum extra reach distance when building this entity.
@@ -115,8 +119,10 @@ local animation_type = {
 ---@field grid_center_flipped MapPosition
 ---@field radius_for_circle_on_inserter number
 ---@field placeable_off_grid boolean
----@field tile_width integer @ The width of the open inner grid, occupied by the collision box of the inserter.
----@field tile_height integer @ The height of the open inner grid, occupied by the collision box of the inserter.
+---The width of the open inner grid, occupied by the collision box and selection box of the inserter.
+---@field tile_width integer
+---The height of the open inner grid, occupied by the collision box and selection box of the inserter.
+---@field tile_height integer
 ---@field only_drop_offset boolean
 ---@field tiles MapPosition[] @ `nil` when only_drop_offset.
 ---@field tiles_flipped MapPosition[] @ `nil` when only_drop_offset.
@@ -712,11 +718,12 @@ local function generate_range_cache(cache)
 end
 
 ---@param cache InserterCacheQAI
-local function generate_pickup_and_drop_position_related_cache(cache)
+---@param inserter LuaEntityPrototype
+local function generate_pickup_and_drop_position_related_cache(cache, inserter)
   local tile_width = cache.tile_width
   local tile_height = cache.tile_height
-  local pickup_position = cache.prototype.inserter_pickup_position ---@cast pickup_position -nil
-  local drop_position = cache.prototype.inserter_drop_position ---@cast drop_position -nil
+  local pickup_position = inserter.inserter_pickup_position ---@cast pickup_position -nil
+  local drop_position = inserter.inserter_drop_position ---@cast drop_position -nil
   local pickup_x = math.abs(pickup_position[1])
   local pickup_y = math.abs(pickup_position[2])
   local drop_x = math.abs(drop_position[1])
@@ -740,8 +747,8 @@ local function generate_pickup_and_drop_position_related_cache(cache)
   }
   -- Using prototype values here instead of cached, because cached values actually have different meaning.
   local offset_vector = {
-    x = ((drop_x + (cache.prototype.tile_width % 2) / 2) % 1) - 0.5,
-    y = ((drop_y + (cache.prototype.tile_height % 2) / 2) % 1) - 0.5,
+    x = ((drop_x + (cache.raw_tile_width % 2) / 2) % 1) - 0.5,
+    y = ((drop_y + (cache.raw_tile_height % 2) / 2) % 1) - 0.5,
   }
   -- What this basically does is project the offset vector which originates from the center of the target tile
   -- onto the drop vector. The resulting number can be interpreted as the length of said projected vector,
@@ -1117,8 +1124,8 @@ local function normalize_box(box)
 end
 
 ---@param cache InserterCacheQAI
-local function generate_collision_box_related_cache(cache)
-  local inserter = cache.prototype
+---@param inserter LuaEntityPrototype
+local function generate_collision_box_related_cache(cache, inserter)
   local collision_box = inserter.collision_box
   local selection_box = inserter.selection_box
   local relevant_box = {
@@ -1152,8 +1159,8 @@ local function generate_collision_box_related_cache(cache)
       y = relevant_box.left_top.y - ((tile_height - col_height) / 2),
     }
   else
-    local odd_width = (inserter.tile_width % 2) == 1
-    local odd_height = (inserter.tile_height % 2) == 1
+    local odd_width = (cache.raw_tile_width % 2) == 1
+    local odd_height = (cache.raw_tile_height % 2) == 1
     local shifted_left_top = {
       x = relevant_box.left_top.x + (odd_width and 0.5 or 0),
       y = relevant_box.left_top.y + (odd_height and 0.5 or 0),
@@ -1223,7 +1230,9 @@ function generate_cache_for_inserter(inserter, tech_level)
 
   ---@type InserterCacheQAI
   local cache = {
-    prototype = inserter,
+    name = inserter.name,
+    raw_tile_width = inserter.tile_width,
+    raw_tile_height = inserter.tile_height,
     tech_level = tech_level,
     only_drop_offset = only_drop_offset,
     ---@diagnostic disable: assign-type-mismatch
@@ -1246,8 +1255,8 @@ function generate_cache_for_inserter(inserter, tech_level)
     chases_belt_items = inserter.inserter_chases_belt_items,
   }
 
-  generate_collision_box_related_cache(cache)
-  generate_pickup_and_drop_position_related_cache(cache)
+  generate_collision_box_related_cache(cache, inserter)
+  generate_pickup_and_drop_position_related_cache(cache, inserter)
   generate_left_top_offset_and_grid_center_cache(cache)
   if not only_drop_offset then
     generate_tiles_cache(cache)
@@ -1320,6 +1329,15 @@ local function find_real_or_ghost_entity(surface, name, position)
   local entity = surface.find_entity(name, position)
   if entity then return entity end
   return find_ghost_entity(surface, name, position)
+end
+
+---@param surface LuaSurface
+---@param prototype LuaEntityPrototype
+---@param position MapPosition
+---@return LuaEntity?
+local function find_real_or_ghost_entity_from_prototype(surface, prototype, position)
+  if not prototype.valid then return end -- Could be removed while a player is adjusting it.
+  return find_real_or_ghost_entity(surface, prototype.name, position)
 end
 
 ---@param inserter LuaEntity @ Can actually be a real or a ghost entity, but it always uses `global.ghost_ids`.
@@ -2938,7 +2956,7 @@ function switch_to_idle_and_back(player, do_check_reach, new_target_inserter)
   end
   ---@diagnostic disable-next-line: cast-local-type
   target_inserter = target_inserter.valid and target_inserter
-    or surface.valid and find_real_or_ghost_entity(surface, cache.prototype.name, position)
+    or surface.valid and find_real_or_ghost_entity_from_prototype(surface, cache.prototype, position)
   if not target_inserter then return end
 
   if original_player_state == "selecting-pickup" then
@@ -2969,9 +2987,9 @@ function validate_target_inserter(player)
     return false
   end
   ---@diagnostic disable-next-line: cast-local-type
-  inserter = player.current_surface.valid and find_real_or_ghost_entity(
+  inserter = player.current_surface.valid and find_real_or_ghost_entity_from_prototype(
     player.current_surface,
-    player.target_inserter_cache.prototype.name,
+    player.target_inserter_cache.prototype,
     player.target_inserter_position
   )
   if not inserter then
@@ -3399,8 +3417,8 @@ end
 local function snap_build_position(position, direction, cache)
   if cache.placeable_off_grid then return end
   local is_north_south = direction == defines.direction.north or direction == defines.direction.south
-  local width = is_north_south and cache.prototype.tile_width or cache.prototype.tile_height
-  local height = is_north_south and cache.prototype.tile_height or cache.prototype.tile_width
+  local width = is_north_south and cache.raw_tile_width or cache.raw_tile_height
+  local height = is_north_south and cache.raw_tile_height or cache.raw_tile_width
   position.x = (width % 2) == 0
     and math.floor(position.x + 0.5) -- even
     or math.floor(position.x) + 0.5 -- odd
@@ -3411,12 +3429,12 @@ end
 
 ---@param actual_player LuaPlayer
 ---@param args LuaPlayer.build_from_cursor_param
----@param cache InserterCacheQAI
+---@param inserter_name string
 ---@return LuaEntity? built_entity
-local function brute_force_it(actual_player, args, cache)
+local function brute_force_it(actual_player, args, inserter_name)
   return actual_player.surface.create_entity{
     name = "entity-ghost",
-    inner_name = cache.prototype.name,
+    inner_name = inserter_name,
     position = args.position,
     direction = args.direction,
     player = actual_player,
@@ -3448,9 +3466,9 @@ end
 
 ---@param actual_player LuaPlayer
 ---@param args LuaPlayer.build_from_cursor_param
----@param cache InserterCacheQAI
+---@param inserter_name string
 ---@return LuaEntity? built_entity @ Guaranteed to be valid (when not `nil` of course).
-local function build_from_cursor_ghost(actual_player, args, cache)
+local function build_from_cursor_ghost(actual_player, args, inserter_name)
   local item_prototype = actual_player.cursor_ghost--[[@as LuaItemPrototype]]
   local surface = actual_player.surface
 
@@ -3470,14 +3488,14 @@ local function build_from_cursor_ghost(actual_player, args, cache)
 
   -- This entire block is likely just as pointless.
   if not cursor or not cursor.valid_for_read or cursor.name ~= item_prototype.name then
-    local built_entity = brute_force_it(actual_player, args, cache)
+    local built_entity = brute_force_it(actual_player, args, inserter_name)
     try_reset_cursor(actual_player, item_prototype)
     return built_entity and built_entity.valid and built_entity or nil
   end
 
   -- Validation passed, build ghost from cursor.
   actual_player.build_from_cursor(args)
-  local built_entity = surface.valid and find_ghost_entity(surface, cache.prototype.name, args.position) or nil
+  local built_entity = surface.valid and find_ghost_entity(surface, inserter_name, args.position) or nil
   try_reset_cursor(actual_player, item_prototype)
   -- The built_entity valid check here is likely also pointless.
   return built_entity and built_entity.valid and built_entity or nil
@@ -3501,10 +3519,11 @@ end
 
 ---@param player PlayerDataQAI
 ---@param position MapPosition
+---@param inserter_name string @ Must be a valid LuaEntityPrototype name.
 ---@param cache InserterCacheQAI
 ---@param is_cursor_ghost boolean?
 ---@return LuaEntity? inserter @ The placed inserter if successful.
-local function try_place_held_inserter_and_adjust_it(player, position, cache, is_cursor_ghost)
+local function try_place_held_inserter_and_adjust_it(player, position, inserter_name, cache, is_cursor_ghost)
   if cache.disabled_because_of_tech_level then
     show_error(player, {"qai.cant-adjust-due-to-lack-of-tech"})
     return
@@ -3527,14 +3546,14 @@ local function try_place_held_inserter_and_adjust_it(player, position, cache, is
   local inserter
   if is_cursor_ghost then
     args.alt = true
-    inserter = build_from_cursor_ghost(actual_player, args, cache)
+    inserter = build_from_cursor_ghost(actual_player, args, inserter_name)
   else
     args.alt = is_within_build_range(player, position, cache)
     actual_player.build_from_cursor(args)
     if args.alt then
-      inserter = surface.valid and find_ghost_entity(surface, cache.prototype.name, position)
+      inserter = surface.valid and find_ghost_entity(surface, inserter_name, position)
     else
-      inserter = surface.valid and surface.find_entity(cache.prototype.name, position)
+      inserter = surface.valid and surface.find_entity(inserter_name, position)
     end
   end
 
@@ -4058,9 +4077,10 @@ script.on_event("qai-adjust", function(event)
   local place_result, is_cursor_ghost = get_cursor_item_place_result(player)
   if place_result and place_result.type == "inserter" then
     local force = get_or_init_force(player.player.force_index)
-    local cache = force and force.inserter_cache_lut[place_result.name]
+    local name = place_result.name
+    local cache = force and force.inserter_cache_lut[name]
     if cache then
-      try_place_held_inserter_and_adjust_it(player, event.cursor_position, cache, is_cursor_ghost)
+      try_place_held_inserter_and_adjust_it(player, event.cursor_position, name, cache, is_cursor_ghost)
       return
     end
   end
@@ -4408,9 +4428,10 @@ remote.add_interface("qai", {
     local place_result, is_cursor_ghost = get_cursor_item_place_result(player)
     if place_result and place_result.type == "inserter" then
       local force = get_or_init_force(player.player.force_index)
-      local cache = force and force.inserter_cache_lut[place_result.name]
+      local name = place_result.name
+      local cache = force and force.inserter_cache_lut[name]
       if cache then
-        return try_place_held_inserter_and_adjust_it(player, position, cache, is_cursor_ghost)
+        return try_place_held_inserter_and_adjust_it(player, position, name, cache, is_cursor_ghost)
       end
     end
   end,
