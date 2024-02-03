@@ -174,4 +174,4 @@
   - [ ] rerecord videos in which the settings window is visible, since settings have changed now
 - [x] snap pickup highlight to grid
 - [ ] handle pickup or drop vectors of length 0. Do not divide by length of vectors without checking if it is 0 first
-- [ ] fix that switching to idle and back after regenerating cache in on configuration changed errors trying to use invalidated cache.prototype
+- [x] fix that switching to idle and back after regenerating cache in on configuration changed errors trying to use invalidated cache.prototype

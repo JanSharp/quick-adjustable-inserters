@@ -8,6 +8,7 @@ Date: ????
     - Improved inserter throughput text size for high resolution displays with higher pixel density
   Bugfixes:
     - Fixed white drop highlight being drawn above green drop highlight
+    - Fixed error when loading save where an actively-being-adjusted-inserter's prototype was removed
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.3
 Date: 2024-02-01
