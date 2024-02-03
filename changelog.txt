@@ -2,7 +2,7 @@
 Version: 1.1.4
 Date: ????
   Features:
-    - Added long handed inserter range map setting. Overall useful and can help with renai transportation
+    - Added map setting defining how range affects long handed inserter
     - Added per player setting to always use default drop offset, even with Near inserters researched
   Changes:
     - Improved inserter throughput text size for high resolution displays with higher pixel density
