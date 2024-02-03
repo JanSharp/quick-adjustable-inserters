@@ -82,9 +82,14 @@
 - [x] ~~look into renai transportation and see if it needs special support just for fun~~ scope creep, and I sense that performance would be horrific with a large grid
   - [ ] alright, at least give it a look. Maybe it is possible
   - [x] maybe add technology or map setting to unlock the same behavior as si-range-adder "incremental"
+    - [ ] maybe remove this setting again, at least the "Extend only, without gaps" because it causes > 70 ms spikes when switching to drop with near inserters researched
+  - [ ] maybe add logic for differing base ranges for pickup and drop vectors
+  - [ ] probably add support for the range adjust-ability research from renai
+  - [ ] maybe somehow prevent throwers from flickering between being active and disabled by script. thing is that renai is using an on_nth_tick 3 handler for it, making this a bit of a challenge
 - [ ] maybe add support for kux slim inserters
 - [ ] wait, but why do we not get a selection changed event with selected being nil when we move the cursor off of a selectable entity from this mod and pressing the adjust key bind in the same tick, causing it to delete the previously selected entity?
 - [x] maybe look into smart inserters and see how hard compatibility with that mod would be. For things like tech unlocks maybe
+  - [ ] I don't believe mod load order actually matters for anything for support with smart inserters... but I didn't write down the initial reason for adding it so I need to figure that out
   - [x] update readme to include the smart inserters support oddities
     - [x] maybe, probably add a "does nothing" startup setting to inform players that settings have been hidden because smart inserters is enabled
   - [x] when smart inserters is enabled, hide all technology settings from qai, and do not create technologies in qai (fully rely on smart inserters)
@@ -168,3 +173,5 @@
   - [ ] add key bind which enabled being able to pick the drop offset just this once
   - [ ] rerecord videos in which the settings window is visible, since settings have changed now
 - [x] snap pickup highlight to grid
+- [ ] handle pickup or drop vectors of length 0. Do not divide by length of vectors without checking if it is 0 first
+- [ ] fix that switching to idle and back after regenerating cache in on configuration changed errors trying to use invalidated cache.prototype
