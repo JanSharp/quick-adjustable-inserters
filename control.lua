@@ -2720,6 +2720,43 @@ local function get_cache_for_inserter(player, inserter)
 end
 
 ---@param player PlayerDataQAI
+---@param entity LuaEntity
+---@return boolean
+local function can_reach_entity(player, entity)
+  return player.player.can_reach_entity(entity)
+end
+
+local function try_override_can_reach_entity()
+  -- HACK: All of this is over complicated in order to preemptively support a can_reach_entity function in the
+  -- RemoteConfiguration remote interface. Once that function actually exist, or once we've decided that that
+  -- function won't ever exist this should be cleaned up significantly.
+  local rc_interface = remote.interfaces["RemoteConfiguration"]
+  if not rc_interface or not rc_interface.can_reach_entity then
+    -- Since RemoteConfiguration.can_reach_entity isn't actually a thing yet, just always return true when
+    -- the actual RemoteConfiguration mod is enabled.
+    if script.active_mods["RemoteConfiguration"] then
+      can_reach_entity = function() return true end
+    end
+    return
+  end
+  ---@param player PlayerDataQAI
+  ---@param entity LuaEntity
+  ---@return boolean
+  can_reach_entity = function(player, entity)
+    local function func()
+      -- The function signature is unknown, this is just a guess. Therefore it gets pcall-ed.
+      return remote.call("RemoteConfiguration", "can_reach_entity", player.player, entity)
+    end
+    local success, result = pcall(func)
+    if success then
+      return result
+    else
+      return player.player.can_reach_entity(entity)
+    end
+  end
+end
+
+---@param player PlayerDataQAI
 ---@param target_inserter LuaEntity
 ---It should only perform reach checks when the player is selecting a new inserter. Any other state switching
 ---should not care about being out of reach. Going out of reach while adjusting an inserter is handled in the
@@ -2752,7 +2789,7 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach, 
 
   if do_check_reach
     and not carry_over_no_reach_checks
-    and not player.player.can_reach_entity(target_inserter)
+    and not can_reach_entity(player, target_inserter)
   then
     return show_error(player, {"cant-reach"})
   end
@@ -4165,7 +4202,7 @@ script.on_event(ev.on_player_changed_position, function(event)
   if player.state ~= "idle" then
     local inserter = player.target_inserter
     if not inserter.valid
-      or (not player.no_reach_checks and not player.player.can_reach_entity(inserter))
+      or (not player.no_reach_checks and not can_reach_entity(player, inserter))
     then
       switch_to_idle(player)
     end
@@ -4364,7 +4401,12 @@ script.on_event(ev.on_player_removed, function(event)
   remove_player(player)
 end)
 
+script.on_load(function()
+  try_override_can_reach_entity()
+end)
+
 script.on_init(function()
+  try_override_can_reach_entity()
   ---@type GlobalDataQAI
   global = {
     players = {},
