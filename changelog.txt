@@ -10,6 +10,7 @@ Date: ????
   Bugfixes:
     - Fixed white drop highlight being drawn above green drop highlight
     - Fixed error when loading save where an actively-being-adjusted-inserter's prototype was removed
+    - Fixed error with inserters with 0 length pickup or drop vectors
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.3
 Date: 2024-02-01

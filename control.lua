@@ -751,6 +751,11 @@ local function generate_pickup_and_drop_position_related_cache(cache, inserter)
 
   cache.diagonal_by_default = math.abs(pickup_x - pickup_y) < 1/16 and math.abs(drop_x - drop_y) < 1/16
 
+  if drop_x == 0 and drop_y == 0 then
+    cache.default_drop_offset_multiplier = 0
+    return
+  end
+
   -- Remember, drop_x and drop_y are absolute (so positive) values.
   local drop_vector = {
     x = drop_x,
@@ -770,6 +775,7 @@ local function generate_pickup_and_drop_position_related_cache(cache, inserter)
     = projected_offset < -0.1 and -1
       or projected_offset <= 0.1 and 0
       or 1
+  -- Do not add more code here, there's an early return further up.
 end
 
 ---@param cache InserterCacheQAI
@@ -2665,6 +2671,7 @@ end
 local function get_from_and_to_for_line_from_center(player, square_position, square_radius)
   local grid_center_position = get_current_grid_center_position(player)
   local vector_to_square = vec.sub(square_position, grid_center_position)
+  if vector_to_square.x == 0 and vector_to_square.y == 0 then return nil, nil, 0 end
   local distance_from_pickup = (3/32) + vec.get_length(vec.div_scalar(
     vec.copy(vector_to_square),
     math.max(math.abs(vector_to_square.x), math.abs(vector_to_square.y)) / square_radius
