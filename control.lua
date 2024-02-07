@@ -2664,22 +2664,22 @@ end
 ---@return number length
 local function get_from_and_to_for_line_from_center(player, square_position, square_radius)
   local grid_center_position = get_current_grid_center_position(player)
-  local pickup_vector = vec.sub(square_position, grid_center_position)
+  local vector_to_square = vec.sub(square_position, grid_center_position)
   local distance_from_pickup = (3/32) + vec.get_length(vec.div_scalar(
-    vec.copy(pickup_vector),
-    math.max(math.abs(pickup_vector.x), math.abs(pickup_vector.y)) / square_radius
+    vec.copy(vector_to_square),
+    math.max(math.abs(vector_to_square.x), math.abs(vector_to_square.y)) / square_radius
   ))
   local distance_from_center = (2/32) + player.target_inserter_cache.radius_for_circle_on_inserter
-  local length = vec.get_length(pickup_vector) - distance_from_pickup - distance_from_center
+  local length = vec.get_length(vector_to_square) - distance_from_pickup - distance_from_center
   if length <= 0 then return nil, nil, length end
 
   local from = vec.add(
     vec.copy(grid_center_position),
-    vec.set_length(pickup_vector, distance_from_center)
+    vec.set_length(vector_to_square, distance_from_center)
   )
   local to = vec.add(
     grid_center_position, -- No need to copy here too.
-    vec.set_length(pickup_vector, distance_from_center + length)
+    vec.set_length(vector_to_square, distance_from_center + length)
   )
   return from, to, length
 end
