@@ -6,6 +6,7 @@ Date: ????
     - Added per player setting to always use default drop offset, even with Near inserters researched
   Changes:
     - Improved inserter throughput text size for high resolution displays with higher pixel density
+    - Added hack to support Remote Configuration
   Bugfixes:
     - Fixed white drop highlight being drawn above green drop highlight
     - Fixed error when loading save where an actively-being-adjusted-inserter's prototype was removed
