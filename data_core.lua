@@ -66,13 +66,13 @@ local function modify_inserter(inserter)
   local even_height = (tile_height % 2) == 0
 
   local x, y
-  ---@param vector data.MapPosition
+  ---@param vector data.Vector
   local function figure_out_the_format(vector)
     x = vector.x and "x" or 1
     y = vector.y and "y" or 2
   end
 
-  ---@param vector data.MapPosition
+  ---@param vector data.Vector
   local function snap(vector)
     vector[x] = math.floor(vector[x] + (even_width and 0 or 0.5)) + (even_width and 0.5 or 0)
     vector[y] = math.floor(vector[y] + (even_height and 0 or 0.5)) + (even_height and 0.5 or 0)
@@ -83,7 +83,7 @@ local function modify_inserter(inserter)
   snap(pickup)
 
   local drop = inserter.insert_position
-  figure_out_the_format(pickup)
+  figure_out_the_format(drop)
   local old_x = drop[x]
   local old_y = drop[y]
   snap(drop)
