@@ -8,6 +8,7 @@ Date: ????
     - Improved inserter throughput text size for high resolution displays with higher pixel density
     - Added hack to support Remote Configuration
   Bugfixes:
+    - Fixed wrong inserter throughput estimate for inserters > 1 stack size when using place and adjust (#1)
     - Fixed white drop highlight being drawn above green drop highlight
     - Fixed error when loading save where an actively-being-adjusted-inserter's prototype was removed
     - Fixed error with inserters with 0 length pickup or drop vectors
