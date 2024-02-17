@@ -1,6 +1,6 @@
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.4
-Date: ????
+Date: 2024-02-17
   Changes:
     - Improved inserter throughput text size for high resolution displays with higher pixel density
     - Added hack to support Remote Configuration
