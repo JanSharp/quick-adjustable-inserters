@@ -19,7 +19,6 @@
       "scenarios/**/*",
       "videos/**/*",
       "**/*.xcf"
-    ],
-    "git_publish_branch": "v1.1.4"
+    ]
   }
 }
