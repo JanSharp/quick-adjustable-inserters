@@ -4,6 +4,8 @@ Date: ????
   Features:
     - Added map setting defining how range affects long handed inserter
     - Added per player setting to always use default drop offset, even with Near inserters researched
+  Bugfixes:
+    - Fixed error when pipetting flame thrower turrets with rotated muzzles
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.4
 Date: 2024-02-17
