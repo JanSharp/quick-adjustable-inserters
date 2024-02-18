@@ -457,6 +457,17 @@ local function handle_rotation(player, reverse)
   end
 end
 
+local direction_to_orientation_lut = {
+  [defines.direction.north] = 0,
+  [defines.direction.northeast] = 0.125,
+  [defines.direction.east] = 0.25,
+  [defines.direction.southeast] = 0.375,
+  [defines.direction.south] = 0.5,
+  [defines.direction.southwest] = 0.625,
+  [defines.direction.west] = 0.75,
+  [defines.direction.northwest] = 0.875,
+}
+
 ---@param player PlayerDataQAI
 ---@param pipetted_entity LuaEntity
 local function handle_pipette_direction(player, pipetted_entity)
@@ -474,7 +485,7 @@ local function handle_pipette_direction(player, pipetted_entity)
   if not pipetted_entity.supports_direction then return end
 
   if entity_type == "underground-belt" then
-    local orientation = pipetted_entity.orientation
+    local orientation = direction_to_orientation_lut[pipetted_entity.direction]
     if pipetted_entity.belt_to_ground_type == "output" then
       orientation = orientation + 0.5
     end
@@ -483,7 +494,7 @@ local function handle_pipette_direction(player, pipetted_entity)
   end
 
   if entity_type == "loader" or entity_type == "loader-1x1" then
-    local orientation = pipetted_entity.orientation
+    local orientation = direction_to_orientation_lut[pipetted_entity.direction]
     if pipetted_entity.loader_type == "input" then
       orientation = orientation + 0.5
     end
@@ -491,7 +502,7 @@ local function handle_pipette_direction(player, pipetted_entity)
     return
   end
 
-  set_cursor_orientation(player, pipetted_entity.orientation)
+  set_cursor_orientation(player, direction_to_orientation_lut[pipetted_entity.direction])
 end
 
 local snapping_entity_type_lut = {
@@ -511,7 +522,7 @@ local function handle_built_rail_connectable_or_offshore_pump(player, created_en
   entity_type = entity_type or inserter_throughput.get_real_or_ghost_entity_type(created_entity)
 
   if snapping_entity_type_lut[entity_type] then
-    set_cursor_orientation(player, created_entity.orientation)
+    set_cursor_orientation(player, direction_to_orientation_lut[created_entity.direction])
     return
   end
 
