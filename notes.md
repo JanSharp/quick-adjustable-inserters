@@ -175,3 +175,6 @@
 - [x] snap pickup highlight to grid
 - [ ] handle pickup or drop vectors of length 0. Do not divide by length of vectors without checking if it is 0 first
 - [x] fix that switching to idle and back after regenerating cache in on configuration changed errors trying to use invalidated cache.prototype
+- [ ] look into ultra cube to see why the techs are not showing up at all
+- [ ] when pasting to an inserter, restrict the pickup and drop positions to be within valid positions for the given target inserter. Basically when copying from a normal inserter to a long inserter without any range upgrades researched, do not apply the vectors. In fact, probably just do not change the current vectors of the target inserter at all
+  - [ ] if smart inserters is enabled, probably just do nothing and let it do its thing
