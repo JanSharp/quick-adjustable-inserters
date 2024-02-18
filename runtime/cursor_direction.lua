@@ -232,7 +232,7 @@ local cursor_direction = {
   handle_built_rail_connectable_or_offshore_pump = handle_built_rail_connectable_or_offshore_pump,
   get_cursor_direction_four_way = get_cursor_direction_four_way,
   get_cursor_direction_eight_way = get_cursor_direction_eight_way,
-  on_player_joined = on_player_joined, -- TODO: fix that this function is not actually used
+  on_player_joined = on_player_joined,
   init_player = init_player,
 }
 return cursor_direction

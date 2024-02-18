@@ -313,6 +313,12 @@ script.on_event(ev.on_forces_merged, function(event)
   force_data.remove_force_index(event.source_index)
 end)
 
+script.on_event(ev.on_player_joined_game, function(event)
+  local player = get_player(event)
+  if not player then return end
+  cursor_direction.on_player_joined(player)
+end)
+
 script.on_event(ev.on_player_left_game, function(event)
   local player = get_player(event)
   if not player then return end
