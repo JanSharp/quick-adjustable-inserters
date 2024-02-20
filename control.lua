@@ -2398,6 +2398,7 @@ local function estimate_inserter_speed(player, selected_position)
       rotation_speed = cache.rotation_speed,
       chases_belt_items = cache.chases_belt_items,
       stack_size = inserter_throughput.get_stack_size(target_inserter),
+      direction = target_inserter.direction,
       inserter_position_in_tile = inserter_throughput.get_position_in_tile(target_inserter_position),
     },
   }
