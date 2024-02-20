@@ -98,10 +98,23 @@ local function update_active_players()
   end
 end
 
+local function ensure_all_active_players_inserters_are_inactive()
+  local active_players = global.active_players
+  for i = 1, active_players.count do
+    local player = active_players[i]
+    local inserter = player.target_inserter
+    -- This function doesn't do any cleanup, that's update_active_player's job.
+    if inserter and inserter.valid then
+      states.deactivate_inserter(player, inserter)
+    end
+  end
+end
+
 ---@class PlayerActivityFileQAI
 local player_activity = {
   set_circular_references = set_circular_references,
   update_player_active_state = update_player_active_state,
   update_active_players = update_active_players,
+  ensure_all_active_players_inserters_are_inactive = ensure_all_active_players_inserters_are_inactive,
 }
 return player_activity

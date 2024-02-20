@@ -8,6 +8,7 @@
   "dependencies": [
     "(?)bobinserters",
     "(?)Smart_Inserters",
+    "(?)RenaiTransportation",
     "inserter-throughput-lib >= 1.1.0"
   ],
 

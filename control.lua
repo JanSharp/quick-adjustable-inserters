@@ -31,6 +31,17 @@ script.on_event(ev.on_tick, function(event)
   animations.update_animations()
 end)
 
+if script.active_mods["RenaiTransportation"] then
+  -- Throwers are managed and scripted using an on_nth_tick handler every 3 ticks. This logic also manages the
+  -- active states of the inserter, however while adjusting an inserter it should stay inactive. on_tick in
+  -- qai is already doing that, however on_nth_tick seems to run after on_tick, so the inserter ends up being
+  -- active for 1 tick and then inactive for 2 ticks. With the hidden optional dependency and also handling
+  -- on_nth_tick 3 in here this flashing no longer happens.
+  script.on_nth_tick(3, function(event)
+    player_activity.ensure_all_active_players_inserters_are_inactive()
+  end)
+end
+
 script.on_event("qai-adjust", function(event)
   local player = get_player(event)
   if not player then return end
