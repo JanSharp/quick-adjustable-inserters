@@ -31,7 +31,21 @@ inserter_for_screenshots.rotation_speed = 1024
 inserter_for_screenshots.extension_speed = 1024
 data:extend{inserter_for_screenshots}
 
+do -- This isn't for auto screenshots but for RenaiTransportation testing.
+  -- Renai throwers get created for inserters with electric energy sources. But for faster testing the logic
+  -- lower down changes all of them to be void, except for this inserter.
+  local inserter = util.copy(data.raw["inserter"]["inserter"])
+  local item = util.copy(data.raw["item"]["inserter"])
+  inserter.name = "qai-renai-testing-inserter"
+  inserter.minable = {mining_time = 0.1, result = "qai-renai-testing-inserter"}
+  item.name = "qai-renai-testing-inserter"
+  item.place_result = "qai-renai-testing-inserter"
+  data:extend{inserter, item}
+end
+
 -- This isn't for auto screenshots but for easier development.
 for _, inserter in pairs(data.raw["inserter"]) do
-  inserter.energy_source = {type = "void"}
+  if inserter.name ~= "qai-renai-testing-inserter"  then
+    inserter.energy_source = {type = "void"}
+  end
 end
