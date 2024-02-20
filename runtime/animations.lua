@@ -157,10 +157,10 @@ end
 local function destroy_grid_lines_and_background(player)
   if should_animate() then
     animate_lines_disappearing(player.line_ids)
-    animate_id_disappearing(player.background_polygon_id, consts.grid_background_opacity)
+    if player.background_polygon_id then animate_id_disappearing(player.background_polygon_id, consts.grid_background_opacity) end
   else
     destroy_and_clear_rendering_ids(player.line_ids)
-    rendering.destroy(player.background_polygon_id)
+    if player.background_polygon_id then rendering.destroy(player.background_polygon_id) end
   end
   player.background_polygon_id = nil
 end

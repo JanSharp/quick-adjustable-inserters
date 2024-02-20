@@ -191,7 +191,8 @@ global = {}
 ---Contains a rectangle id instead, when highlighting a single tile as the drop position.
 ---@field line_ids uint64[]
 ---@field direction_arrows_indicator_line_ids uint64[]
----`nil` when idle. Contains a rectangle id instead, when highlighting a single tile as the drop position.
+---Can be `nil` even when not idle. Contains a rectangle id instead, when highlighting a single tile as the
+---drop position.
 ---@field background_polygon_id uint64
 ---`nil` when idle. Can be `nil` when destroying all rendering objects due to being part of an animation.
 ---@field inserter_circle_id uint64
