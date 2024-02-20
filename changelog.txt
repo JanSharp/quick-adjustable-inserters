@@ -4,6 +4,8 @@ Date: ????
   Features:
     - Added map setting defining how range affects long handed inserter
     - Added per player setting to always use default drop offset, even with Near inserters researched
+  Bugfixes:
+    - Fixed another error with inserters with 0 length pickup or drop vectors
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.5
 Date: 2024-02-19
