@@ -139,12 +139,7 @@ global = {}
 ---@field diagonal boolean
 ---@field all_tiles boolean @ When true, `cardinal` and `diagonal` are implied to also be true.
 
----@alias PlayerStateQAI
----| "idle"
----| "selecting-pickup"
----| "selecting-drop"
-
----@class PlayerDataQAI
+---@class PlayerDataQAI : StateDataQAI, SelectablesDataQAI, RenderingDataQAI, HighlightsDataQAI, InserterSpeedDataQAI, PlayerSettingsDataQAI, PipetteDataQAI
 ---@field player LuaPlayer
 ---@field player_index uint
 ---If at any point a mod changes a player's force and some mod causes this mod here to use this force_index
@@ -155,13 +150,20 @@ global = {}
 ---Current internal direction of the cursor, represented as orientation for simplified computation. Performing
 ---math on direction values is bad practice because the values of defines is not part of the specification.
 ---@field current_cursor_orientation RealOrientation
+---@field index_in_active_players integer @ Non `nil` when non idle or has_active_inserter_speed_text.
+
+---@alias PlayerStateQAI
+---| "idle"
+---| "selecting-pickup"
+---| "selecting-drop"
+
+---@class StateDataQAI
 ---@field state PlayerStateQAI
 ---Always `nil` when not idle. Set to `true` when `keep_rendering` was set for `switch_to_idle`, because then
 ---the rendering objects are still alive even though the state is idle. This can then be used to ensure these
 ---objects get destroyed if another state switch happens before these objects were able to be reused. Which
 ---can only happen when mods do things in a raised event during our `switch_to_idle`.
 ---@field rendering_is_floating_while_idle boolean?
----@field index_in_active_players integer @ Non `nil` when non idle or has_active_inserter_speed_text.
 ---`nil` when idle. Must be stored, because we can switch to idle _after_ an entity has been invalidated.
 ---@field target_inserter_id EntityIDQAI
 ---@field target_inserter LuaEntity @ `nil` when idle.
@@ -180,32 +182,38 @@ global = {}
 ---@field is_rotatable boolean @ `nil` when idle.
 ---@field current_surface_index uint @ `nil` when idle.
 ---@field current_surface LuaSurface @ `nil` when idle.
----Can be `nil` even when not idle. Used to redirect interaction to the inserter itself when selecting drop
----within a single tile. Allows for quick double tap to finish adjustment when using only_allow_mirrored for
----example.
----@field dummy_pickup_square LuaEntity?
----@field dummy_pickup_square_unit_number uint32? @ Can be `nil` even when not idle.
----@field used_squares uint[]
----@field used_ninths uint[]
----@field used_rects uint[]
----Contains a rectangle id instead, when highlighting a single tile as the drop position.
----@field line_ids uint64[]
----@field direction_arrows_indicator_line_ids uint64[]
----Can be `nil` even when not idle. Contains a rectangle id instead, when highlighting a single tile as the
----drop position.
----@field background_polygon_id uint64
----`nil` when idle. Can be `nil` when destroying all rendering objects due to being part of an animation.
----@field inserter_circle_id uint64
----@field direction_arrow_id uint64? @ Can be `nil` even when not idle. It only exists when `is_rotatable`.
----@field pickup_highlight_id uint64 @ `nil` when idle.
----@field drop_highlight_id uint64 @ `nil` when idle.
----Can be `nil` even when not idle. Can even be `nil` when `pickup_highlight_id` is not `nil`.
----@field line_to_pickup_highlight_id uint64?
----@field default_drop_highlight LuaEntity? @ Can be `nil` even when not idle.
----@field mirrored_highlight LuaEntity? @ Can be `nil` even when not idle. Only used with only_allow_mirrored.
 ---`nil` when idle. Ghosts don't need reach checks, and when going from ghost to real, it still shouldn't do
 ---reach checks, because that'd be annoying. Imagine bots kicking you out of adjustment.
 ---@field no_reach_checks boolean?
+---@field pipette_when_done boolean?
+---@field reactivate_inserter_when_done boolean?
+
+---@class SelectablesDataQAI
+---Used to redirect interaction to the inserter itself when selecting drop within a single tile. Allows for
+---quick double tap to finish adjustment when using only_allow_mirrored for example.
+---@field dummy_pickup_square LuaEntity?
+---@field dummy_pickup_square_unit_number uint32?
+---@field used_squares uint[]
+---@field used_ninths uint[]
+---@field used_rects uint[]
+
+---@class RenderingDataQAI
+---Contains a rectangle id instead, when highlighting a single tile as the drop position.
+---@field line_ids uint64[]
+---@field direction_arrows_indicator_line_ids uint64[]
+---Contains a rectangle id instead, when highlighting a single tile as the drop position.
+---@field background_polygon_id uint64?
+---@field inserter_circle_id uint64?
+---@field direction_arrow_id uint64? @ Only exists when `is_rotatable`.
+---@field pickup_highlight_id uint64?
+---@field drop_highlight_id uint64?
+---@field line_to_pickup_highlight_id uint64? @ Can even be `nil` when `pickup_highlight_id` is not `nil`.
+
+---@class HighlightsDataQAI
+---@field default_drop_highlight LuaEntity?
+---@field mirrored_highlight LuaEntity? @ Only used with only_allow_mirrored.
+
+---@class InserterSpeedDataQAI
 ---@field has_active_inserter_speed_text boolean? @ Value is entirely unrelated to `state`.
 ---@field inserter_speed_reference_inserter LuaEntity @ `nil` when not has_active_inserter_speed_text.
 ---@field inserter_speed_stack_size integer @ `nil` when not has_active_inserter_speed_text.
@@ -213,6 +221,8 @@ global = {}
 ---@field inserter_speed_drop_position MapPosition @ `nil` when not has_active_inserter_speed_text.
 ---@field inserter_speed_text_id uint64? @ Only `nil` initially, once it exists, it's never destroyed (by this mod).
 ---@field inserter_speed_text_surface_index uint32? @ Only `nil` initially, once it exists, it exists.
+
+---@class PlayerSettingsDataQAI
 ---@field show_throughput_on_drop boolean
 ---@field show_throughput_on_pickup boolean
 ---@field show_throughput_on_inserter boolean
@@ -220,8 +230,8 @@ global = {}
 ---@field always_use_default_drop_offset boolean
 ---@field pipette_after_place_and_adjust boolean
 ---@field pipette_copies_vectors boolean
----@field pipette_when_done boolean?
----@field reactivate_inserter_when_done boolean?
+
+---@class PipetteDataQAI
 ---@field pipetted_inserter_name string?
 ---@field pipetted_pickup_vector MapPosition @ `nil` when `pipetted_inserter_name` is `nil`.
 ---@field pipetted_drop_vector MapPosition @ `nil` when `pipetted_inserter_name` is `nil`.
