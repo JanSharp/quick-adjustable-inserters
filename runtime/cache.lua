@@ -25,8 +25,8 @@ local generate_range_cache_lut = {
 }
 
 ---@param cache InserterCacheQAI
----@param inserter LuaEntityPrototype
-local function generate_pickup_and_drop_position_related_cache(cache, inserter)
+local function generate_pickup_and_drop_position_related_cache(cache)
+  local inserter = cache.prototype
   local tile_width = cache.tile_width
   local tile_height = cache.tile_height
   local pickup_position = inserter.inserter_pickup_position ---@cast pickup_position -nil
@@ -437,8 +437,8 @@ local function normalize_box(box)
 end
 
 ---@param cache InserterCacheQAI
----@param inserter LuaEntityPrototype
-local function generate_collision_box_related_cache(cache, inserter)
+local function generate_collision_box_related_cache(cache)
+  local inserter = cache.prototype
   local collision_box = inserter.collision_box
   local selection_box = inserter.selection_box
   local relevant_box = {
@@ -543,7 +543,7 @@ local function generate_cache_for_inserter(inserter, tech_level)
 
   ---@type InserterCacheQAI
   local cache = {
-    name = inserter.name,
+    prototype = inserter,
     raw_tile_width = inserter.tile_width,
     raw_tile_height = inserter.tile_height,
     tech_level = tech_level,
@@ -568,8 +568,8 @@ local function generate_cache_for_inserter(inserter, tech_level)
     chases_belt_items = inserter.inserter_chases_belt_items,
   }
 
-  generate_collision_box_related_cache(cache, inserter)
-  generate_pickup_and_drop_position_related_cache(cache, inserter)
+  generate_collision_box_related_cache(cache)
+  generate_pickup_and_drop_position_related_cache(cache)
   generate_left_top_offset_and_grid_center_cache(cache)
   if not only_drop_offset then
     generate_tiles_cache(cache)
