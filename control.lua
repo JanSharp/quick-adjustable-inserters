@@ -17,7 +17,7 @@ local vec = require("__inserter-throughput-lib__.vector")
 ---@alias EntityIDQAI uint32|EntityGhostIDQAI
 
 ---@class GlobalDataQAI
----@field data_structure_version 2 @ `nil` is version `1`. Use `(global.data_structure_version or 1)`.
+---@field data_structure_version 3 @ `nil` is version `1`. Use `(global.data_structure_version or 1)`.
 ---@field players table<int, PlayerDataQAI>
 ---@field forces table<uint8, ForceDataQAI>
 ---@field inserters_in_use table<EntityIDQAI, PlayerDataQAI>
@@ -334,7 +334,7 @@ do -- Start of cursor_direction "file"
 -- Second of all there are logically different units/parts of code in this file that are basically asking for
 -- separation into separate files. Animation code, general util functions for interacting with the api, like
 -- real/ghost helper functions, cursor helper functions, all the rendering in general, the constants, the type
--- annotations. So I suppose it isn't the fact that this file is too long, it's the fact that too many 
+-- annotations. So I suppose it isn't the fact that this file is too long, it's the fact that too many
 -- different things got thrown into a single file.
 -- To do a bit more recapping, I've successfully written mostly small functions in this file and kept logic
 -- duplication to a minimum, which made adding the mirrored inserters only feature as well as handling of many
@@ -730,8 +730,8 @@ local function generate_range_cache(cache)
 end
 
 ---@param cache InserterCacheQAI
----@param inserter LuaEntityPrototype
-local function generate_pickup_and_drop_position_related_cache(cache, inserter)
+local function generate_pickup_and_drop_position_related_cache(cache)
+  local inserter = cache.prototype
   local tile_width = cache.tile_width
   local tile_height = cache.tile_height
   local pickup_position = inserter.inserter_pickup_position ---@cast pickup_position -nil
@@ -1142,8 +1142,8 @@ local function normalize_box(box)
 end
 
 ---@param cache InserterCacheQAI
----@param inserter LuaEntityPrototype
-local function generate_collision_box_related_cache(cache, inserter)
+local function generate_collision_box_related_cache(cache)
+  local inserter = cache.prototype
   local collision_box = inserter.collision_box
   local selection_box = inserter.selection_box
   local relevant_box = {
@@ -1248,7 +1248,7 @@ function generate_cache_for_inserter(inserter, tech_level)
 
   ---@type InserterCacheQAI
   local cache = {
-    name = inserter.name,
+    prototype = inserter,
     raw_tile_width = inserter.tile_width,
     raw_tile_height = inserter.tile_height,
     tech_level = tech_level,
@@ -1273,8 +1273,8 @@ function generate_cache_for_inserter(inserter, tech_level)
     chases_belt_items = inserter.inserter_chases_belt_items,
   }
 
-  generate_collision_box_related_cache(cache, inserter)
-  generate_pickup_and_drop_position_related_cache(cache, inserter)
+  generate_collision_box_related_cache(cache)
+  generate_pickup_and_drop_position_related_cache(cache)
   generate_left_top_offset_and_grid_center_cache(cache)
   if not only_drop_offset then
     generate_tiles_cache(cache)
@@ -4429,7 +4429,7 @@ script.on_init(function()
   try_override_can_reach_entity()
   ---@type GlobalDataQAI
   global = {
-    data_structure_version = 2,
+    data_structure_version = 3,
     players = {},
     forces = {},
     inserters_in_use = {},

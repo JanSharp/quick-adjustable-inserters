@@ -2,6 +2,7 @@
 Version: 1.1.6
 Date: ????
   Bugfixes:
+    - Fixed error when currently adjusted inserter gets removed through some means, for example the cut tool
     - Fixed another error with inserters with 0 length pickup or drop vectors
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.5
