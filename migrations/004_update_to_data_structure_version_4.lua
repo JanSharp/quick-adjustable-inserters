@@ -1,6 +1,6 @@
 
 -- Migrations also run after `on_init`, do not touch `global` in that case.
-if (global.data_structure_version or 1) >= 3 then return end
+if (global.data_structure_version or 1) >= 4 then return end
 
 -- This is just a dummy value to prevent an any errors which would expect this value to exist.
 -- it is overwritten to the correct value in on_configuration_changed.
@@ -17,4 +17,4 @@ for _, player in pairs(global.players) do
   ::continue::
 end
 
-global.data_structure_version = 3
+global.data_structure_version = 4

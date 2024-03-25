@@ -14,7 +14,7 @@
 ---@alias EntityIDQAI uint32|EntityGhostIDQAI
 
 ---@class GlobalDataQAI
----@field data_structure_version 3 @ `nil` is version `1`. Use `(global.data_structure_version or 1)`.
+---@field data_structure_version 4 @ `nil` is version `1`. Use `(global.data_structure_version or 1)`.
 ---@field players table<int, PlayerDataQAI>
 ---@field forces table<uint8, ForceDataQAI>
 ---@field inserters_in_use table<EntityIDQAI, PlayerDataQAI>

@@ -357,7 +357,7 @@ script.on_init(function()
   utils.try_override_can_reach_entity()
   ---@type GlobalDataQAI
   global = {
-    data_structure_version = 3,
+    data_structure_version = 4,
     players = {},
     forces = {},
     inserters_in_use = {},
