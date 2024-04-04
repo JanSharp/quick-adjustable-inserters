@@ -1,6 +1,8 @@
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.7
 Date: ????
+  Changes:
+    - Added suggested alt+space or middle mouse button as alternate key binds in the readme
   Bugfixes:
     - Fixed error when a currently being adjusted ghost inserter gets revived with mirrored inserters only
 ---------------------------------------------------------------------------------------------------
