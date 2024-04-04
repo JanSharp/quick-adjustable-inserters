@@ -178,3 +178,15 @@
 - [ ] look into ultra cube to see why the techs are not showing up at all
 - [ ] when pasting to an inserter, restrict the pickup and drop positions to be within valid positions for the given target inserter. Basically when copying from a normal inserter to a long inserter without any range upgrades researched, do not apply the vectors. In fact, probably just do not change the current vectors of the target inserter at all
   - [ ] if smart inserters is enabled, probably just do nothing and let it do its thing
+- [ ] key binds to only select pickup or only select drop
+- [ ] drop offset type setting
+  - [ ] always give the option to select it
+  - [ ] never
+  - [ ] only when the drop target is ground or belt
+- [ ] some setting to automatically pick the fastest estimated drop offset when drop offset selection gets skipped through any means
+- [ ] setting to change when direction adjustment selectables show up.
+  - [ ] always
+  - [ ] never
+  - [ ] using a different key bind
+- [ ] try and see if copy pasting with a ghost being the source and or destination is possible to add
+- [ ] read through this one more time to make sure nothing got missed: https://mods.factorio.com/mod/quick-adjustable-inserters/discussion/6605c28e23f6dcb547a75e56
