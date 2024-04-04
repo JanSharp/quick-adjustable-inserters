@@ -351,7 +351,7 @@ end
 ---@param target_inserter LuaEntity
 ---@param do_check_reach boolean?
 local function advance_to_selecting_drop(player, target_inserter, do_check_reach)
-  if utils.should_skip_selecting_drop(player) then
+  if utils.should_skip_selecting_drop(player, target_inserter) then
     if player.state == "idle" then return end -- Cannot player finish animation on idle player.
     animations.play_finish_animation(player) -- Before switching to idle because some rendering objects get reused.
     switch_to_idle(player)
@@ -365,7 +365,7 @@ end
 ---@param do_check_reach boolean?
 local function advance_to_selecting_pickup(player, target_inserter, do_check_reach)
   if utils.should_skip_selecting_pickup(player, target_inserter) then
-    if utils.should_skip_selecting_drop(player) then
+    if utils.should_skip_selecting_drop(player, target_inserter) then
       error("There should never be a case where both selecting pickup and selecting drop would be skipped.")
     end
     switch_to_selecting_drop(player, target_inserter, do_check_reach)

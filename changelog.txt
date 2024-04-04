@@ -1,9 +1,16 @@
 ---------------------------------------------------------------------------------------------------
-Version: 1.1.7
+Version: 1.1.8
 Date: ????
   Features:
     - Added map setting defining how range affects long handed inserter
     - Added per player setting to always use default drop offset, even with Near inserters researched
+---------------------------------------------------------------------------------------------------
+Version: 1.1.7
+Date: 2024-04-04
+  Changes:
+    - Added suggested alt+space or middle mouse button as alternate key binds in the readme
+  Bugfixes:
+    - Fixed error when a currently being adjusted ghost inserter gets revived with mirrored inserters only
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.6
 Date: 2024-03-25

@@ -414,10 +414,12 @@ local function get_single_drop_tile(player)
 end
 
 ---@param player PlayerDataQAI
+---@param target_inserter LuaEntity? @ Must be provided if the player state is (or can be) "idle".
 ---@return boolean
-local function should_use_auto_drop_offset(player)
+local function should_use_auto_drop_offset(player, target_inserter)
+  local cache = player.target_inserter_cache or get_cache_for_inserter(player, target_inserter--[[@as LuaEntity]])
   return player.always_use_default_drop_offset
-    or not player.target_inserter_cache.tech_level.drop_offset
+    or (cache and cache.tech_level.drop_offset)
 end
 
 ---@param player PlayerDataQAI
@@ -429,9 +431,10 @@ local function should_skip_selecting_pickup(player, target_inserter)
 end
 
 ---@param player PlayerDataQAI
+---@param target_inserter LuaEntity? @ Must be provided if the player state is (or can be) "idle".
 ---@return boolean
-local function should_skip_selecting_drop(player)
-  return global.only_allow_mirrored and should_use_auto_drop_offset(player)
+local function should_skip_selecting_drop(player, target_inserter)
+  return global.only_allow_mirrored and should_use_auto_drop_offset(player, target_inserter)
 end
 
 ---@param player PlayerDataQAI

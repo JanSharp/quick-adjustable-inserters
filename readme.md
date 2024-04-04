@@ -10,6 +10,8 @@ Quickly adjust inserter pickup and drop positions in world using a single key bi
 
 Stop adjusting an inserter by pressing `SHIFT + F` anywhere else, or instantly switch to adjusting a different inserter.
 
+(If you are using `SHIFT + F` for another mod already, the community suggested `ALT + SPACE` or `middle mouse button` - maybe with a modifier - if you have it free.)
+
 <video src="videos/quick-adjustable-inserters.mp4" controls title="quick-adjustable-inserters.mp4"></video>
 
 ## Place and Adjust
