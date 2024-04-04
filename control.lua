@@ -2916,7 +2916,7 @@ end
 ---@return boolean
 local function should_use_auto_drop_offset(player, target_inserter)
   local cache = player.target_inserter_cache or get_cache_for_inserter(player, target_inserter--[[@as LuaEntity]])
-  return cache and cache.tech_level.drop_offset
+  return cache and not cache.tech_level.drop_offset
 end
 
 ---Similar to switch_to_idle, this function can raise an event, so make sure to expect the world and the mod
