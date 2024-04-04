@@ -2912,9 +2912,11 @@ local function get_single_drop_tile(player)
 end
 
 ---@param player PlayerDataQAI
+---@param target_inserter LuaEntity? @ Must be provided if the player state is (or can be) "idle".
 ---@return boolean
-local function should_use_auto_drop_offset(player)
-  return not player.target_inserter_cache.tech_level.drop_offset
+local function should_use_auto_drop_offset(player, target_inserter)
+  local cache = player.target_inserter_cache or get_cache_for_inserter(player, target_inserter--[[@as LuaEntity]])
+  return cache and cache.tech_level.drop_offset
 end
 
 ---Similar to switch_to_idle, this function can raise an event, so make sure to expect the world and the mod
@@ -2956,9 +2958,10 @@ local function should_skip_selecting_pickup(player, target_inserter)
 end
 
 ---@param player PlayerDataQAI
+---@param target_inserter LuaEntity? @ Must be provided if the player state is (or can be) "idle".
 ---@return boolean
-function should_skip_selecting_drop(player)
-  return global.only_allow_mirrored and should_use_auto_drop_offset(player)
+function should_skip_selecting_drop(player, target_inserter)
+  return global.only_allow_mirrored and should_use_auto_drop_offset(player, target_inserter)
 end
 
 local play_finish_animation
@@ -2967,7 +2970,7 @@ local play_finish_animation
 ---@param target_inserter LuaEntity
 ---@param do_check_reach boolean?
 local function advance_to_selecting_drop(player, target_inserter, do_check_reach)
-  if should_skip_selecting_drop(player) then
+  if should_skip_selecting_drop(player, target_inserter) then
     if player.state == "idle" then return end -- Cannot player finish animation on idle player.
     play_finish_animation(player) -- Before switching to idle because some rendering objects get reused.
     switch_to_idle(player)
@@ -2981,7 +2984,7 @@ end
 ---@param do_check_reach boolean?
 local function advance_to_selecting_pickup(player, target_inserter, do_check_reach)
   if should_skip_selecting_pickup(player, target_inserter) then
-    if should_skip_selecting_drop(player) then
+    if should_skip_selecting_drop(player, target_inserter) then
       error("There should never be a case where both selecting pickup and selecting drop would be skipped.")
     end
     switch_to_selecting_drop(player, target_inserter, do_check_reach)

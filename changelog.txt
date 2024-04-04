@@ -1,7 +1,8 @@
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.7
 Date: ????
-  Changes:
+  Bugfixes:
+    - Fixed error when a currently being adjusted ghost inserter gets revived with mirrored inserters only
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.6
 Date: 2024-03-25
