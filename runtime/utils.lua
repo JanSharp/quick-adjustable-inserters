@@ -419,7 +419,7 @@ end
 local function should_use_auto_drop_offset(player, target_inserter)
   local cache = player.target_inserter_cache or get_cache_for_inserter(player, target_inserter--[[@as LuaEntity]])
   return player.always_use_default_drop_offset
-    or (cache and cache.tech_level.drop_offset)
+    or (cache and not cache.tech_level.drop_offset)
 end
 
 ---@param player PlayerDataQAI
