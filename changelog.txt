@@ -1,6 +1,6 @@
 ---------------------------------------------------------------------------------------------------
 Version: 1.1.7
-Date: ????
+Date: 2024-04-04
   Changes:
     - Added suggested alt+space or middle mouse button as alternate key binds in the readme
   Bugfixes:
