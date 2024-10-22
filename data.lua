@@ -27,15 +27,15 @@ local function make_selectable(params)
     tile_width = params.tile_width,
     tile_height = params.tile_height,
     collision_box = {{0, 0}, {0, 0}}, -- Technically that's already the default, but whatever.
-    collision_mask = {},
+    collision_mask = {layers = {}},
     selection_priority = 201,
+    hidden = true,
     flags = {
       "placeable-neutral",
       "placeable-off-grid",
       "not-on-map",
       "not-blueprintable",
       "not-deconstructable",
-      "hidden",
       "not-flammable",
       "no-copy-paste",
       "not-upgradable",

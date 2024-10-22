@@ -7,8 +7,7 @@ data:extend{
     name = "qai-transparent",
     localised_name = "Transparent",
     map_color = {0, 0, 0},
-    collision_mask = {},
-    pollution_absorption_per_second = 0,
+    collision_mask = {layers = {}},
     layer = 0,
     variants = {
       empty_transitions = true,
