@@ -1,7 +1,7 @@
 {
   "name": "quick-adjustable-inserters",
-  "version": "1.1.9",
-  "factorio_version": "1.1",
+  "version": "2.0.1",
+  "factorio_version": "2.0",
   "title": "Quick Adjustable Inserters",
   "author": "JanSharp",
   "description": "Adjust inserter pickup and drop positions in world, without GUI.",
