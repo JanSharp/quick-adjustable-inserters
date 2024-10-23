@@ -149,7 +149,7 @@ else
       localised_name = {"technology-name.qai-near-inserters"},
       localised_description = {"technology-description.qai-near-inserters"},
       icon = "__quick-adjustable-inserters__/graphics/technology/near-inserters.png",
-      icon_size = 256, icon_mipmaps = 1,
+      icon_size = 256,
       prerequisites = {"logistics"},
       effects = {},
       unit = {
@@ -172,7 +172,7 @@ else
       localised_name = {"technology-name.qai-long-inserters-1"},
       localised_description = {"technology-description.qai-long-inserters-1"},
       icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-1.png",
-      icon_size = 256, icon_mipmaps = 1,
+      icon_size = 256,
       prerequisites = {"logistics"},
       effects = {},
       unit = {
@@ -197,7 +197,7 @@ else
       localised_name = {"technology-name.qai-long-inserters-2"},
       localised_description = {"technology-description.qai-long-inserters-2"},
       icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-2.png",
-      icon_size = 256, icon_mipmaps = 1,
+      icon_size = 256,
       prerequisites = {"long-inserters-1", "chemical-science-pack"},
       effects = {},
       unit = {
@@ -230,12 +230,11 @@ else
       icons = {
         {
           icon = fast_inserter_icon,
-          icon_size = 256, icon_mipmaps = 4,
+          icon_size = 256,
         },
         {
           icon = "__quick-adjustable-inserters__/graphics/technology/constant-more-inserters-1.png",
           icon_size = 128,
-          icon_mipmaps = 3,
           shift = {100, 100},
         }
       },
@@ -268,12 +267,11 @@ else
       icons = {
         {
           icon = fast_inserter_icon,
-          icon_size = 256, icon_mipmaps = 4,
+          icon_size = 256,
         },
         {
           icon = "__quick-adjustable-inserters__/graphics/technology/constant-more-inserters-2.png",
           icon_size = 128,
-          icon_mipmaps = 3,
           shift = {100, 100},
         }
       },
