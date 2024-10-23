@@ -52,13 +52,13 @@ end
 ---@param range integer
 local function place_inserter(surface, player, range)
   local position = get_inserter_position(range)
-  global.inserter = surface.create_entity{
+  storage.inserter = surface.create_entity{
     name = "qai-inserter-for-screenshots",
     position = position,
     direction = defines.direction.south,
     force = "player",
   }
-  remote.call("qai", "adjust", player.index, global.inserter)
+  remote.call("qai", "adjust", player.index, storage.inserter)
 end
 
 ---@param surface LuaSurface
@@ -74,11 +74,11 @@ local function adjust_at(surface, player, range, relative_position)
   remote.call("qai", "adjust", player.index, entity)
 end
 
----@param id integer @ `id` of a polygon.
-local function delete_direction_arrow(id)
-  local vertices = rendering.get_vertices(id) ---@cast vertices -nil
+---@param obj LuaRenderObject @ A polygon.
+local function delete_direction_arrow(obj)
+  local vertices = obj.vertices
   if vertices[3] and not vertices[4] then
-    rendering.destroy(id)
+    obj.destroy()
   end
 end
 
@@ -87,75 +87,75 @@ local function is_grey_scale(color)
   return color.r == color.g and color.r == color.b
 end
 
----@param id integer @ `id` of a line.
-local function delete_direction_arrow_outline(id)
-  local color = rendering.get_color(id) ---@cast color -nil
+---@param obj LuaRenderObject @ A line.
+local function delete_direction_arrow_outline(obj)
+  local color = obj.color
   if not is_grey_scale(color) then return end
-  local from = rendering.get_from(id).position--[[@as MapPosition]]
-  local to = rendering.get_to(id).position--[[@as MapPosition]]
+  local from = obj.from.position--[[@as MapPosition]]
+  local to = obj.to.position--[[@as MapPosition]]
   if vec.get_length(vec.sub(from, to)) > 0.75 then return end
-  rendering.destroy(id)
+  obj.destroy()
 end
 
 local function delete_unwanted_rendering_objects()
-  for _, id in pairs(rendering.get_all_ids()) do
-    local obj_type = rendering.get_type(id)
+  for _, obj in pairs(rendering.get_all_objects()) do
+    local obj_type = obj.type
     if obj_type == "polygon" then
-      delete_direction_arrow(id)
+      delete_direction_arrow(obj)
     elseif obj_type == "line" then
-      delete_direction_arrow_outline(id)
+      delete_direction_arrow_outline(obj)
     end
   end
 end
 
 local function make_grid_dark()
-  for _, id in pairs(rendering.get_all_ids()) do
-    local color = rendering.get_color(id) ---@cast color -nil
+  for _, obj in pairs(rendering.get_all_objects()) do
+    local color = obj.color
     if not is_grey_scale(color) then goto continue end
     color.r = color.r * 0.4
     color.g = color.g * 0.4
     color.b = color.b * 0.4
-    rendering.set_color(id, color)
+    obj.color = color
     ::continue::
   end
 end
 
 local function un_pre_multiply_colors()
-  for _, id in pairs(rendering.get_all_ids()) do
-    local color = rendering.get_color(id) ---@cast color -nil
+  for _, obj in pairs(rendering.get_all_objects()) do
+    local color = obj.color
     color.r = color.r / color.a
     color.g = color.g / color.a
     color.b = color.b / color.a
-    rendering.set_color(id, color)
+    obj.color = color
   end
 end
 
 local function make_lines_thicker()
-  for _, id in pairs(rendering.get_all_ids()) do
-    local obj_type = rendering.get_type(id)
+  for _, obj in pairs(rendering.get_all_objects()) do
+    local obj_type = obj.type
     if obj_type == "line" or obj_type == "rectangle" then
-      rendering.set_width(id, rendering.get_width(id) + 1.99)
+      obj.width = obj.width + 1.99
     end
   end
 end
 
 local function make_background_more_opaque()
-  for _, id in pairs(rendering.get_all_ids()) do
-    local color = rendering.get_color(id) ---@cast color -nil
+  for _, obj in pairs(rendering.get_all_objects()) do
+    local color = obj.color
     if color.a == 1 then goto continue end
     color.a = 0.4
-    rendering.set_color(id, color)
+    obj.color = color
     ::continue::
   end
 end
 
 local function turn_green_into_yellow()
-  for _, id in pairs(rendering.get_all_ids()) do
-    local color = rendering.get_color(id) ---@cast color -nil
+  for _, obj in pairs(rendering.get_all_objects()) do
+    local color = obj.color
     if is_grey_scale(color) then goto continue end
-    rendering.set_color(id, util.color("#222222"))
-    -- rendering.set_color(id, util.color("#FFFF00"))
-    -- rendering.set_color(id, util.color("#F59501"))
+    obj.color = util.color("#222222")
+    -- obj.color = util.color("#FFFF00")
+    -- obj.color = util.color("#F59501")
     ::continue::
   end
 end
@@ -206,7 +206,7 @@ end
 ---@param name string
 local function run_delayed_action(name)
   game.tick_paused = true
-  global.player.request_translation{"", name}
+  storage.player.request_translation{"", name}
 end
 
 add_delayed_action("unpause", function()
@@ -214,16 +214,16 @@ add_delayed_action("unpause", function()
 end)
 
 add_action(function()
-  fill_chunk_with_tile(global.surface, "lab-dark-2")
-  set_tech_level(global.force, {
+  fill_chunk_with_tile(storage.surface, "lab-dark-2")
+  set_tech_level(storage.force, {
     range = 3,
     drop_offset = false,
     cardinal = true,
     diagonal = true,
     all_tiles = false,
   })
-  place_inserter(global.surface, global.player, 3)
-  adjust_at(global.surface, global.player, 3, {x = 0, y = 2})
+  place_inserter(storage.surface, storage.player, 3)
+  adjust_at(storage.surface, storage.player, 3, {x = 0, y = 2})
 end)
 wait_ticks(30)
 add_action(function()
@@ -231,16 +231,16 @@ add_action(function()
 end)
 delayed_actions["thumbnail"] = function()
   game.tick_paused = false
-  adjust_at(global.surface, global.player, 3, {x = 2, y = -2})
+  adjust_at(storage.surface, storage.player, 3, {x = 2, y = -2})
   delete_unwanted_rendering_objects()
   make_lines_thicker()
-  take_screenshot(global.surface, 3, "thumbnail.png", 144, 19, true)
+  take_screenshot(storage.surface, 3, "thumbnail.png", 144, 19, true)
   -- NOTE: The current thumbnail has been edited in gimp afterwards to clean up some of the green lines.
   run_delayed_action("unpause")
 end
 wait_ticks(1)
 add_action(function()
-  global.inserter.destroy()
+  storage.inserter.destroy()
 end)
 wait_ticks(29)
 
@@ -250,10 +250,10 @@ wait_ticks(29)
 ---@param tech_level TechnologyLevelQAI
 local function add_actions_for_tech_icon_screenshot(name, pickup_tile, drop_tile, tech_level)
   add_action(function()
-    fill_chunk_with_tile(global.surface, "qai-transparent")
-    set_tech_level(global.force, tech_level)
-    place_inserter(global.surface, global.player, 2)
-    adjust_at(global.surface, global.player, 3, pickup_tile)
+    fill_chunk_with_tile(storage.surface, "qai-transparent")
+    set_tech_level(storage.force, tech_level)
+    place_inserter(storage.surface, storage.player, 2)
+    adjust_at(storage.surface, storage.player, 3, pickup_tile)
   end)
   wait_ticks(30)
   add_action(function()
@@ -261,15 +261,15 @@ local function add_actions_for_tech_icon_screenshot(name, pickup_tile, drop_tile
   end)
   delayed_actions[name] = function()
     game.tick_paused = false
-    adjust_at(global.surface, global.player, 3, drop_tile)
+    adjust_at(storage.surface, storage.player, 3, drop_tile)
     delete_unwanted_rendering_objects()
-    global.inserter.destroy()
+    storage.inserter.destroy()
     make_grid_dark()
     make_lines_thicker()
     turn_green_into_yellow()
     un_pre_multiply_colors()
     make_background_more_opaque()
-    take_screenshot(global.surface, 2, name..".png")
+    take_screenshot(storage.surface, 2, name..".png")
     run_delayed_action("unpause")
   end
   wait_ticks(30)
@@ -344,14 +344,14 @@ script.on_event(ev.on_player_created, function(event)
   local player = game.get_player(event.player_index) ---@cast player -nil
   player.toggle_map_editor()
   game.tick_paused = false
-  global.player = player
+  storage.player = player
 end)
 
 script.on_event(ev.on_tick, function(event)
-  local relative_tick = event.tick - global.start_tick
+  local relative_tick = event.tick - storage.start_tick
   local action = actions[relative_tick]
-  if action and not global.ran_actions[relative_tick] then
-    global.ran_actions[relative_tick] = true
+  if action and not storage.ran_actions[relative_tick] then
+    storage.ran_actions[relative_tick] = true
     action()
   end
 end)
@@ -364,8 +364,8 @@ script.on_event(ev.on_string_translated, function(event)
 end)
 
 script.on_init(function()
-  global.start_tick = game.tick + 1
-  global.surface = game.surfaces["nauvis"]
-  global.force = game.forces["player"]
-  global.ran_actions = {}
+  storage.start_tick = game.tick + 1
+  storage.surface = game.surfaces["nauvis"]
+  storage.force = game.forces["player"]
+  storage.ran_actions = {}
 end)

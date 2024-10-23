@@ -108,6 +108,7 @@ local function try_place_held_inserter_and_adjust_it(player, position, inserter_
     args.alt = true
     inserter = build_from_cursor_ghost(actual_player, args, inserter_name)
   else
+    -- TODO: build_from_cursor_param.alt was used to make it place a ghost... but that's not a thing anymore?
     args.alt = utils.is_within_build_range(player, position, cache)
     actual_player.build_from_cursor(args)
     if args.alt then

@@ -17,7 +17,7 @@ local init_force
 
 ---@param force_index uint32 @ Does not necessarily even need to exist.
 local function remove_force_index(force_index)
-  global.forces[force_index] = nil
+  storage.forces[force_index] = nil
 end
 
 ---@param force ForceDataQAI
@@ -36,7 +36,7 @@ end
 ---@param force_index uint32
 ---@return ForceDataQAI?
 local function get_force(force_index)
-  return validate_force(global.forces[force_index])
+  return validate_force(storage.forces[force_index])
 end
 
 ---Can be called even if the given `force_index` actually does not exist at this point in time.
@@ -52,7 +52,7 @@ end
 ---@param force ForceDataQAI
 local function update_inserter_cache(force)
   force.inserter_cache_lut = {}
-  for _, inserter in pairs(game.get_filtered_entity_prototypes{{filter = "type", type = "inserter"}}) do
+  for _, inserter in pairs(prototypes.get_entity_filtered{{filter = "type", type = "inserter"}}) do
     -- No matter what other flags the inserter has set (in other words no matter what crazy things other mods
     -- might be doing), generate cache for it if it has `allow_custom_vectors` set, allowing this mod to
     -- adjust it. Even if it isn't selectable or if it is rotatable 8 way, both of which make little sense for
@@ -62,7 +62,7 @@ local function update_inserter_cache(force)
     end
   end
   for _, actual_player in ipairs(force.force.players) do
-    local player = global.players[actual_player.index]
+    local player = storage.players[actual_player.index]
     if player then
       states.switch_to_idle_and_back(player)
     end
@@ -154,7 +154,7 @@ do
 end
 
 local function update_tech_level_for_all_forces()
-  for _, force in utils.safer_pairs(global.forces) do
+  for _, force in utils.safer_pairs(storage.forces) do
     if validate_force(force) then
       update_tech_level_for_force(force)
     end
@@ -172,14 +172,14 @@ function init_force(actual_force)
     tech_level = {},
     inserter_cache_lut = (nil)--[[@as any]], -- Set in `update_inserter_cache`.
   }
-  global.forces[force_index] = force
+  storage.forces[force_index] = force
   update_tech_level_for_force(force)
   return force
 end
 
 local function update_only_allow_mirrored_setting()
-  global.only_allow_mirrored = settings.global["qai-mirrored-inserters-only"].value--[[@as boolean]]
-  for _, player in utils.safer_pairs(global.players) do
+  storage.only_allow_mirrored = settings.global["qai-mirrored-inserters-only"].value--[[@as boolean]]
+  for _, player in utils.safer_pairs(storage.players) do
     if player_data.validate_player(player) then
       states.switch_to_idle_and_back(player)
     end
@@ -200,22 +200,22 @@ do
   local function update_using_smart_inserters_setting()
     local range_adder_type = get_range_adder_setting_value()
     if range_adder_type == "incremental" then
-      global.range_for_long_inserters = long_inserter_range_type.extend_only_without_gap
+      storage.range_for_long_inserters = long_inserter_range_type.extend_only_without_gap
     elseif range_adder_type == "inserter" then
-      global.range_for_long_inserters = long_inserter_range_type.retract_only
+      storage.range_for_long_inserters = long_inserter_range_type.retract_only
     else -- not elseif, because this is a setting from another mod so we cannot trust its values.
-      global.range_for_long_inserters = long_inserter_range_type.retract_then_extend
+      storage.range_for_long_inserters = long_inserter_range_type.retract_then_extend
     end
   end
 
   local function update_using_qai_setting()
     local value = settings.global["qai-range-for-long-inserters"].value--[[@as string]]
     if value == "retract-then-extend" then
-      global.range_for_long_inserters = long_inserter_range_type.retract_then_extend
+      storage.range_for_long_inserters = long_inserter_range_type.retract_then_extend
     elseif value == "extend-only" then
-      global.range_for_long_inserters = long_inserter_range_type.extend_only
+      storage.range_for_long_inserters = long_inserter_range_type.extend_only
     elseif value == "extend-only-without-gap" then
-      global.range_for_long_inserters = long_inserter_range_type.extend_only_without_gap
+      storage.range_for_long_inserters = long_inserter_range_type.extend_only_without_gap
     end
   end
 

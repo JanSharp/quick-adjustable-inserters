@@ -170,8 +170,9 @@
   - [ ] handle key binds which change drop offset while not idle and selecting a selectable differently
   - [ ] record a new video showcasing just all of the key bind interactions at once
 - [x] probably add a setting to disable drop offset selection per player, especially with the addition of a "toggle near/far" offset key bind
-  - [ ] add key bind which enabled being able to pick the drop offset just this once
+  - [ ] add key bind to adjust the drop offset (and nothing else)
   - [ ] rerecord videos in which the settings window is visible, since settings have changed now
+  - [ ] add an option to this setting for a smart mode which shows the drop offset only when targeting ground or belts
 - [x] snap pickup highlight to grid
 - [ ] handle pickup or drop vectors of length 0. Do not divide by length of vectors without checking if it is 0 first
 - [x] fix that switching to idle and back after regenerating cache in on configuration changed errors trying to use invalidated cache.prototype
@@ -179,10 +180,6 @@
 - [ ] when pasting to an inserter, restrict the pickup and drop positions to be within valid positions for the given target inserter. Basically when copying from a normal inserter to a long inserter without any range upgrades researched, do not apply the vectors. In fact, probably just do not change the current vectors of the target inserter at all
   - [ ] if smart inserters is enabled, probably just do nothing and let it do its thing
 - [ ] key binds to only select pickup or only select drop
-- [ ] drop offset type setting
-  - [ ] always give the option to select it
-  - [ ] never
-  - [ ] only when the drop target is ground or belt
 - [ ] some setting to automatically pick the fastest estimated drop offset when drop offset selection gets skipped through any means
 - [ ] setting to change when direction adjustment selectables show up.
   - [ ] always
@@ -190,3 +187,7 @@
   - [ ] using a different key bind
 - [ ] try and see if copy pasting with a ghost being the source and or destination is possible to add
 - [ ] read through this one more time to make sure nothing got missed: https://mods.factorio.com/mod/quick-adjustable-inserters/discussion/6605c28e23f6dcb547a75e56
+- [ ] try hiding other player's UIs and changing the player's selected entity whenever they hover an invisible selectable entity that's part of another player's adjustment UI
+- [ ] tech icons do not look right
+- [x] add migration from 1.1 to 2.0
+- [ ] handle quality inserters

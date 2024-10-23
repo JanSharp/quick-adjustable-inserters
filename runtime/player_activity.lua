@@ -17,7 +17,7 @@ local update_player_active_state
 do
   ---@param player PlayerDataQAI
   local function add_active_player(player)
-    local active_players = global.active_players
+    local active_players = storage.active_players
     active_players.count = active_players.count + 1
     active_players[active_players.count] = player
     player.index_in_active_players = active_players.count
@@ -25,7 +25,7 @@ do
 
   ---@param player PlayerDataQAI
   local function remove_active_player(player)
-    local active_players = global.active_players
+    local active_players = storage.active_players
     local count = active_players.count
     local index = player.index_in_active_players
     active_players[index] = active_players[count]
@@ -87,7 +87,7 @@ local function update_active_player(player)
 end
 
 local function update_active_players()
-  local active_players = global.active_players
+  local active_players = storage.active_players
   local next_index = active_players.next_index
   local player = active_players[next_index]
   if player then
@@ -99,7 +99,7 @@ local function update_active_players()
 end
 
 local function ensure_all_active_players_inserters_are_inactive()
-  local active_players = global.active_players
+  local active_players = storage.active_players
   for i = 1, active_players.count do
     local player = active_players[i]
     local inserter = player.target_inserter

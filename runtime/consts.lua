@@ -74,6 +74,7 @@ else
   consts.range_technology_format = "long-inserters-%d"
 end
 
+-- TODO: this probably needs to include all 16 directions now
 ---Inserters can have any of the 8 directions, even with the "not-rotatable" flag when set through script.
 ---This mod only works with 4 directions for inserters however.
 ---"simple-entity-with-owner" only have 4 directions, it appears to be impossible to set their direction to

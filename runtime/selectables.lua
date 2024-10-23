@@ -5,8 +5,8 @@ local utils = require("__quick-adjustable-inserters__.runtime.utils")
 
 ---@param entities uint32[]
 local function destroy_entities(entities)
-  local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
-  local selectable_entities_by_unit_number = global.selectable_entities_by_unit_number
+  local selectable_entities_to_player_lut = storage.selectable_entities_to_player_lut
+  local selectable_entities_by_unit_number = storage.selectable_entities_by_unit_number
   for i = #entities, 1, -1 do
     local unit_number = entities[i]
     entities[i] = nil
@@ -23,7 +23,7 @@ end
 local function destroy_dummy_pickup_square(player)
   local entity = player.dummy_pickup_square
   if not entity then return end
-  global.selectable_dummy_redirects[player.dummy_pickup_square_unit_number] = nil
+  storage.selectable_dummy_redirects[player.dummy_pickup_square_unit_number] = nil
   player.dummy_pickup_square = nil
   player.dummy_pickup_square_unit_number = nil
   utils.destroy_entity_safe(entity)
@@ -45,7 +45,7 @@ local function place_dummy_square_at_pickup(player, single_drop_tile)
   end
   player.dummy_pickup_square = entity
   player.dummy_pickup_square_unit_number = entity.unit_number
-  global.selectable_dummy_redirects[player.dummy_pickup_square_unit_number] = player.target_inserter
+  storage.selectable_dummy_redirects[player.dummy_pickup_square_unit_number] = player.target_inserter
 end
 
 ---@param player PlayerDataQAI
@@ -53,8 +53,8 @@ end
 local function place_squares(player, specific_tiles)
   local left_top = utils.get_current_grid_left_top(player)
   local left, top = left_top.x, left_top.y -- Micro optimization.
-  local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
-  local selectable_entities_by_unit_number = global.selectable_entities_by_unit_number
+  local selectable_entities_to_player_lut = storage.selectable_entities_to_player_lut
+  local selectable_entities_by_unit_number = storage.selectable_entities_by_unit_number
   local position = {}
   ---@type LuaSurface.create_entity_param
   local arg = {
@@ -82,8 +82,8 @@ end
 local function place_ninths(player, specific_tiles)
   local left_top = utils.get_current_grid_left_top(player)
   local left, top = left_top.x, left_top.y -- Micro optimization.
-  local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
-  local selectable_entities_by_unit_number = global.selectable_entities_by_unit_number
+  local selectable_entities_to_player_lut = storage.selectable_entities_to_player_lut
+  local selectable_entities_by_unit_number = storage.selectable_entities_by_unit_number
   local position = {}
   ---@type LuaSurface.create_entity_param
   local arg = {
@@ -118,8 +118,8 @@ local function place_rects(player)
   local cache = player.target_inserter_cache
   local inserter_position = player.target_inserter_position
   local offset_from_inserter = cache.offset_from_inserter
-  local selectable_entities_to_player_lut = global.selectable_entities_to_player_lut
-  local selectable_entities_by_unit_number = global.selectable_entities_by_unit_number
+  local selectable_entities_to_player_lut = storage.selectable_entities_to_player_lut
+  local selectable_entities_by_unit_number = storage.selectable_entities_by_unit_number
   local position = {}
   ---@type LuaSurface.create_entity_param
   local arg = {

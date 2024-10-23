@@ -42,7 +42,7 @@ local function generate_pickup_and_drop_position_related_cache(cache)
     drop_x - (tile_width / 2),
     drop_y - (tile_height / 2)
   ))
-  local generate_range_cache = generate_range_cache_lut[global.range_for_long_inserters]
+  local generate_range_cache = generate_range_cache_lut[storage.range_for_long_inserters]
   generate_range_cache(cache)
 
   cache.diagonal_by_default = math.abs(pickup_x - pickup_y) < 1/16 and math.abs(drop_x - drop_y) < 1/16
@@ -198,8 +198,8 @@ local function generate_tiles_background_cache(cache)
   local vertices_flipped = cache.tiles_background_vertices_flipped
   local function add(x, y)
     count = count + 1
-    vertices[count] = {target = {x = x, y = y}}
-    vertices_flipped[count] = {target = {x = y, y = x}}
+    vertices[count] = {x = x, y = y}
+    vertices_flipped[count] = {x = y, y = x}
   end
 
   ---@type table<uint32, true>
@@ -418,9 +418,9 @@ local function generate_direction_arrow_cache(cache)
   -- The y values are positive, so pointing south, because an inserter with direction north moves items south.
   -- This is a consistent convention in base and mods.
   cache.direction_arrow_vertices = {
-    {target = {x = -1.3, y = max_range + tile_height / 2 + 0.35}},
-    {target = {x = 0, y = max_range + tile_height / 2 + 0.35 + 1.3}},
-    {target = {x = 1.3, y = max_range + tile_height / 2 + 0.35}},
+    {x = -1.3, y = max_range + tile_height / 2 + 0.35},
+    {x = 0, y = max_range + tile_height / 2 + 0.35 + 1.3},
+    {x = 1.3, y = max_range + tile_height / 2 + 0.35},
   }
 end
 
@@ -563,8 +563,6 @@ local function generate_cache_for_inserter(inserter, tech_level)
     direction_arrows = not not_rotatable and {} or nil,
     direction_arrow_vertices = not not_rotatable and {} or nil,
     ---@diagnostic enable: assign-type-mismatch
-    extension_speed = inserter.inserter_extension_speed,
-    rotation_speed = inserter.inserter_rotation_speed,
     chases_belt_items = inserter.inserter_chases_belt_items,
   }
 

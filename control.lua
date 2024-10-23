@@ -111,7 +111,7 @@ script.on_event(ev.on_entity_settings_pasted, function(event)
   end
   local destination = event.destination
   if destination.type ~= "inserter" then return end
-  player = player_data.validate_player(global.inserters_in_use[utils.get_id(destination)])
+  player = player_data.validate_player(storage.inserters_in_use[utils.get_id(destination)])
   if not player then return end
   states.switch_to_idle_and_back(player)
   inserter_speed.update_inserter_speed_text(player)
@@ -161,7 +161,7 @@ do
       -- them. Making it update for them is not worth the performance cost or complexity.
       inserter_speed.update_inserter_speed_text(player)
     end
-    player = player_data.validate_player(global.inserters_in_use[utils.get_id(event.entity)])
+    player = player_data.validate_player(storage.inserters_in_use[utils.get_id(event.entity)])
     if player then
       states.switch_to_idle_and_back(player, do_check_reach)
     end
@@ -176,7 +176,7 @@ for _, destroy_event in ipairs{
 do
   ---@param event EventData.on_robot_mined_entity|EventData.on_player_mined_entity|EventData.script_raised_destroy
   script.on_event(destroy_event, function(event)
-    local player = player_data.validate_player(global.inserters_in_use[utils.get_id(event.entity)])
+    local player = player_data.validate_player(storage.inserters_in_use[utils.get_id(event.entity)])
     if not player then return end
     states.switch_to_idle(player)
   end, {
@@ -188,7 +188,7 @@ end
 script.on_event(ev.on_post_entity_died, function(event)
   local ghost = event.ghost
   if not ghost then return end
-  local player = player_data.validate_player(global.inserters_in_use[event.unit_number])
+  local player = player_data.validate_player(storage.inserters_in_use[event.unit_number])
   if not player then return end
   states.switch_to_idle_and_back(player, false, ghost)
 end, {{filter = "type", type = "inserter"}})
@@ -197,7 +197,7 @@ end, {{filter = "type", type = "inserter"}})
 ---@return boolean
 local function potential_revive(entity)
   local player = player_data.validate_player(
-    global.inserters_in_use[entity.unit_number] or global.inserters_in_use[utils.get_ghost_id(entity)]
+    storage.inserters_in_use[entity.unit_number] or storage.inserters_in_use[utils.get_ghost_id(entity)]
   )
   if not player then return false end
   states.switch_to_idle_and_back(player, false, entity)
@@ -209,11 +209,11 @@ script.on_event(ev.script_raised_revive, function(event)
 end, {{filter = "type", type = "inserter"}})
 
 script.on_event(ev.on_robot_built_entity, function(event)
-  potential_revive(event.created_entity)
+  potential_revive(event.entity)
 end, {{filter = "type", type = "inserter"}})
 
 script.on_event(ev.on_built_entity, function(event)
-  local entity = event.created_entity
+  local entity = event.entity
   local entity_type = inserter_throughput.get_real_or_ghost_entity_type(entity)
   if entity_type ~= "inserter" then
     local player = get_player(event)
@@ -222,7 +222,7 @@ script.on_event(ev.on_built_entity, function(event)
     return
   end
 
-  if not utils.is_ghost[entity] and potential_revive(event.created_entity) then return end
+  if not utils.is_ghost[entity] and potential_revive(entity) then return end
   local player = get_player(event)
   if not player then return end
   player_data.validate_cursor_stack_associated_data(player)
@@ -248,6 +248,7 @@ end, { -- Is this even worth it at this point? I have no idea. Maybe.
   {mode = "or", filter = "ghost_type", type = "train-stop"},
 })
 
+---@param event EventData.on_research_finished|EventData.on_research_reversed
 script.on_event({ev.on_research_finished, ev.on_research_reversed}, function(event)
   local research = event.research
   if not utils.do_we_care_about_this_technology(research.name) then return end
@@ -302,8 +303,8 @@ script.on_configuration_changed(function(event)
   force_data.update_range_for_long_inserters_setting(true)
 
   -- Do this before updating forces, because updating forces potentially involves changing player states.
-  for _, player in utils.safer_pairs(global.players) do
-    if player_data.validate_player(player)then
+  for _, player in utils.safer_pairs(storage.players) do
+    if player_data.validate_player(player) then
       player.pipette_when_done = nil
       player_data.clear_pipetted_inserter_data(player)
     end
@@ -344,7 +345,7 @@ script.on_event(ev.on_player_removed, function(event)
   -- It might legitimately already have been removed through another mod raising an event which causes this
   -- mod to call get_player, which checks player validity and then removes the player. Said other mod would
   -- have to do so in its on_player_removed handler and come before this mod in mod load order.
-  local player = global.players[event.player_index]
+  local player = storage.players[event.player_index]
   if not player then return end
   player_data.remove_player(player)
 end)
@@ -355,9 +356,9 @@ end)
 
 script.on_init(function()
   utils.try_override_can_reach_entity()
-  ---@type GlobalDataQAI
-  global = {
-    data_structure_version = 4,
+  ---@type StorageDataQAI
+  storage = {
+    data_structure_version = 5,
     players = {},
     forces = {},
     inserters_in_use = {},

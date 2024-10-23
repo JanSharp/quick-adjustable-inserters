@@ -2,6 +2,8 @@
 local inserter_throughput = require("__inserter-throughput-lib__.inserter_throughput")
 local utils = require("__quick-adjustable-inserters__.runtime.utils")
 
+-- TODO: this entire file most likely needs to handle all 16 directions.
+
 --[[
 
 rotation rules while holding item in cursor

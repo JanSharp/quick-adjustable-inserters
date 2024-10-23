@@ -80,7 +80,7 @@ local function restore_after_adjustment(player, target_inserter, surface, insert
     -- not have any items to build that inserter anymore. That is how it is.
     local cursor = player.player.cursor_stack
     if cursor and not cursor.valid_for_read and not player.player.cursor_ghost then
-      local items = (game.entity_prototypes[name]--[[@as LuaEntityPrototype]]).items_to_place_this
+      local items = prototypes.entity[name].items_to_place_this
       local item = items and items[1]
       player.player.cursor_ghost = item and item.name
     end
@@ -120,14 +120,14 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   destroy_default_drop_highlight(player)
   destroy_mirrored_highlight(player)
   player.rendering_is_floating_while_idle = keep_rendering
-  if not keep_rendering or global.only_allow_mirrored then
+  if not keep_rendering or storage.only_allow_mirrored then
     animations.destroy_grid_lines_and_background(player)
   end
   if not keep_rendering then
     animations.destroy_everything_but_grid_lines_and_background(player)
   end
   utils.remove_id(player.target_inserter_id)
-  global.inserters_in_use[player.target_inserter_id] = nil
+  storage.inserters_in_use[player.target_inserter_id] = nil
   player_activity.update_player_active_state(player, false)
   player.target_inserter_id = nil
   player.target_inserter = nil
@@ -157,7 +157,7 @@ end
 
 ---@param player PlayerDataQAI
 local function update_direction_arrow(player)
-  rendering.set_orientation(player.direction_arrow_id, player.target_inserter.orientation)
+  player.direction_arrow_obj.orientation = player.target_inserter.orientation
 end
 
 ---@param player PlayerDataQAI
@@ -236,11 +236,11 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach, 
   end
 
   local id = utils.get_or_create_id(target_inserter)
-  if player_data.validate_player(global.inserters_in_use[id]) then
+  if player_data.validate_player(storage.inserters_in_use[id]) then
     return utils.show_error(player, {"qai.only-one-player-can-adjust"})
   end
 
-  global.inserters_in_use[id] = player
+  storage.inserters_in_use[id] = player
   player_activity.update_player_active_state(player, true)
   player.target_inserter_id = id
   player.target_inserter = target_inserter
@@ -471,7 +471,7 @@ do
     local selected = player.player.selected
     if selected
       and (selected.name == consts.ninth_entity_name or selected.name == consts.square_entity_name)
-      and global.selectable_entities_to_player_lut[selected.unit_number] == player
+      and storage.selectable_entities_to_player_lut[selected.unit_number] == player
     then
       return selected
     end
@@ -532,7 +532,7 @@ do
 
   ---@param player PlayerDataQAI
   function update_mirrored_highlight(player)
-    if not global.only_allow_mirrored then return end
+    if not storage.only_allow_mirrored then return end
     if player.state ~= "selecting-pickup" then return end
 
     local selected = get_and_validate_selected(player)
@@ -553,7 +553,7 @@ end
 ---@param position MapPosition @ Gets modified if `only_allow_mirrored` is true.
 local function set_pickup_position(player, position)
   player.target_inserter.pickup_position = position
-  if not global.only_allow_mirrored then return end
+  if not storage.only_allow_mirrored then return end
   utils.mirror_position(player, position)
   player.target_inserter.drop_position = utils.calculate_actual_drop_position(player, position, true)
 end

@@ -3,7 +3,7 @@
 
 ---Unique table for a ghost in the world. So multiple LuaEntity instances can evaluate to the same id.
 ---Specifically when they are actually a reference to the same ghost entity in the world.\
----Must store information purely to be able to remove the id from the `global.ghosts_id` table again, because
+---Must store information purely to be able to remove the id from the `storage.ghosts_id` table again, because
 ---the entity may be destroyed before the id gets removed.
 ---@class EntityGhostIDQAI
 ---@field surface_index uint32
@@ -13,8 +13,8 @@
 ---`unit_number` or a unique table for ghosts which don't have a `ghost_unit_number`.
 ---@alias EntityIDQAI uint32|EntityGhostIDQAI
 
----@class GlobalDataQAI
----@field data_structure_version 4 @ `nil` is version `1`. Use `(global.data_structure_version or 1)`.
+---@class StorageDataQAI
+---@field data_structure_version 5 @ `nil` is version `1`. Use `(storage.data_structure_version or 1)`.
 ---@field players table<int, PlayerDataQAI>
 ---@field forces table<uint8, ForceDataQAI>
 ---@field inserters_in_use table<EntityIDQAI, PlayerDataQAI>
@@ -29,7 +29,7 @@
 ---@field ghost_ids table<uint32, table<double, table<double, EntityGhostIDQAI>>>
 ---@field only_allow_mirrored boolean
 ---@field range_for_long_inserters LongInserterRangeTypeQAI
-global = {}
+storage = {}
 
 ---@alias AnimationQAI
 ---| AnimatedCircleQAI
@@ -39,7 +39,7 @@ global = {}
 
 ---@class AnimationBaseQAI
 ---@field type AnimationTypeQAI
----@field id uint64
+---@field obj LuaRenderObject
 ---@field remaining_updates integer @ Stays alive when going to 0, finishes the next update.
 ---@field destroy_on_finish boolean?
 
@@ -117,8 +117,8 @@ global = {}
 ---@field only_drop_offset boolean
 ---@field tiles MapPosition[] @ `nil` when only_drop_offset.
 ---@field tiles_flipped MapPosition[] @ `nil` when only_drop_offset.
----@field tiles_background_vertices ScriptRenderVertexTarget[] @ `nil` when only_drop_offset.
----@field tiles_background_vertices_flipped ScriptRenderVertexTarget[] @ `nil` when only_drop_offset.
+---@field tiles_background_vertices ScriptRenderTarget[] @ `nil` when only_drop_offset.
+---@field tiles_background_vertices_flipped ScriptRenderTarget[] @ `nil` when only_drop_offset.
 ---@field lines LineDefinitionQAI[] @ `nil` when only_drop_offset.
 ---@field lines_flipped LineDefinitionQAI[] @ `nil` when only_drop_offset.
 ---@field not_rotatable boolean
@@ -127,9 +127,7 @@ global = {}
 ---`nil` when not_rotatable. 4 when square, otherwise 2 (north and south).
 ---@field direction_arrows DirectionArrowDefinitionQAI[]
 ---@field direction_arrow_position MapPosition @ `nil` when not_rotatable.
----@field direction_arrow_vertices ScriptRenderVertexTarget[] @ `nil` when not_rotatable.
----@field extension_speed number
----@field rotation_speed number
+---@field direction_arrow_vertices ScriptRenderTarget[] @ `nil` when not_rotatable.
 ---@field chases_belt_items boolean
 
 ---@class TechnologyLevelQAI
@@ -199,15 +197,15 @@ global = {}
 
 ---@class RenderingDataQAI
 ---Contains a rectangle id instead, when highlighting a single tile as the drop position.
----@field line_ids uint64[]
----@field direction_arrows_indicator_line_ids uint64[]
+---@field line_objs LuaRenderObject[]
+---@field direction_arrows_indicator_line_objs LuaRenderObject[]
 ---Contains a rectangle id instead, when highlighting a single tile as the drop position.
----@field background_polygon_id uint64?
----@field inserter_circle_id uint64?
----@field direction_arrow_id uint64? @ Only exists when `is_rotatable`.
----@field pickup_highlight_id uint64?
----@field drop_highlight_id uint64?
----@field line_to_pickup_highlight_id uint64? @ Can even be `nil` when `pickup_highlight_id` is not `nil`.
+---@field background_polygon_obj LuaRenderObject?
+---@field inserter_circle_obj LuaRenderObject?
+---@field direction_arrow_obj LuaRenderObject? @ Only exists when `is_rotatable`.
+---@field pickup_highlight_obj LuaRenderObject?
+---@field drop_highlight_obj LuaRenderObject?
+---@field line_to_pickup_highlight_obj LuaRenderObject? @ Can even be `nil` when `pickup_highlight_obj` is not `nil`.
 
 ---@class HighlightsDataQAI
 ---@field default_drop_highlight LuaEntity?
@@ -219,7 +217,7 @@ global = {}
 ---@field inserter_speed_stack_size integer @ `nil` when not has_active_inserter_speed_text.
 ---@field inserter_speed_pickup_position MapPosition @ `nil` when not has_active_inserter_speed_text.
 ---@field inserter_speed_drop_position MapPosition @ `nil` when not has_active_inserter_speed_text.
----@field inserter_speed_text_id uint64? @ Only `nil` initially, once it exists, it's never destroyed (by this mod).
+---@field inserter_speed_text_obj LuaRenderObject? @ Only `nil` initially, once it exists, it's never destroyed (by this mod).
 ---@field inserter_speed_text_surface_index uint32? @ Only `nil` initially, once it exists, it exists.
 
 ---@class PlayerSettingsDataQAI

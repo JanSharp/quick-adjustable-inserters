@@ -25,7 +25,7 @@ end
 ---@param player_index uint32
 ---@return PlayerDataQAI?
 local function get_player_raw(player_index)
-  return validate_player(global.players[player_index])
+  return validate_player(storage.players[player_index])
 end
 
 ---@param event EventData|{player_index: uint32}
@@ -42,8 +42,8 @@ local function save_pipetted_vectors(player, inserter_name, inserter)
   local direction = inserter.direction
   local position = inserter.position
   player.pipetted_inserter_name = inserter_name
-  player.pipetted_pickup_vector = vec.rotate_by_direction(vec.sub(inserter.pickup_position, position), -direction)
-  player.pipetted_drop_vector = vec.rotate_by_direction(vec.sub(inserter.drop_position, position), -direction)
+  player.pipetted_pickup_vector = vec.rotate_by_direction(vec.sub(inserter.pickup_position, position), (-direction)--[[@as defines.direction]])
+  player.pipetted_drop_vector = vec.rotate_by_direction(vec.sub(inserter.drop_position, position), (-direction)--[[@as defines.direction]])
 end
 
 ---@param player PlayerDataQAI
@@ -138,8 +138,8 @@ local function init_player(actual_player)
     used_squares = {},
     used_ninths = {},
     used_rects = {},
-    line_ids = {},
-    direction_arrows_indicator_line_ids = {},
+    line_objs = {},
+    direction_arrows_indicator_line_objs = {},
     show_throughput_on_inserter = player_settings["qai-show-throughput-on-inserter"].value--[[@as boolean]],
     show_throughput_on_pickup = player_settings["qai-show-throughput-on-pickup"].value--[[@as boolean]],
     show_throughput_on_drop = player_settings["qai-show-throughput-on-drop"].value--[[@as boolean]],
@@ -149,14 +149,14 @@ local function init_player(actual_player)
     pipette_copies_vectors = player_settings["qai-pipette-copies-vectors"].value--[[@as boolean]],
   }
   cursor_direction.init_player(player)
-  global.players[player.player_index] = player
+  storage.players[player.player_index] = player
   return player
 end
 
 ---@param player PlayerDataQAI
 function remove_player(player)
   states.switch_to_idle(player)
-  global.players[player.player_index] = nil
+  storage.players[player.player_index] = nil
 end
 
 ---Can be called if the given `player_index` actually no longer exists at this point in time.

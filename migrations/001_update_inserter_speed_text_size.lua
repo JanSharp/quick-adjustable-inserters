@@ -1,7 +1,4 @@
 
-for _, player in pairs(global.players) do
-  local id = player.inserter_speed_text_id
-  if id then
-    rendering.destroy(id)
-  end
+for _, player in pairs(storage.players) do
+  if player.inserter_speed_text_obj then player.inserter_speed_text_obj.destroy() end
 end

@@ -17,9 +17,9 @@ end
 
 ---@param player PlayerDataQAI
 local function hide_inserter_speed_text(player)
-  local id = player.inserter_speed_text_id
-  if id and rendering.is_valid(id) then
-    rendering.set_visible(id, false)
+  local obj = player.inserter_speed_text_obj
+  if obj and obj.valid then
+    obj.visible = false
   end
   player.has_active_inserter_speed_text = false
   player.inserter_speed_reference_inserter = nil
@@ -31,9 +31,9 @@ end
 
 ---@param player PlayerDataQAI
 local function destroy_inserter_speed_text(player)
-  if player.inserter_speed_text_id then
-    rendering.destroy(player.inserter_speed_text_id)
-    player.inserter_speed_text_id = nil
+  if player.inserter_speed_text_obj then
+    player.inserter_speed_text_obj.destroy()
+    player.inserter_speed_text_obj = nil
     player.inserter_speed_text_surface_index = nil
   end
 end
@@ -64,12 +64,12 @@ local function set_inserter_speed_text(player, position, items_per_second, is_es
   player.inserter_speed_drop_position = reference_inserter.drop_position
   player_activity.update_player_active_state(player)
 
-  local id = player.inserter_speed_text_id
+  local obj = player.inserter_speed_text_obj
   local surface_index = reference_inserter.surface_index
-  if not id or not rendering.is_valid(id) or player.inserter_speed_text_surface_index ~= surface_index then
-    if id then rendering.destroy(id) end -- Was on a different surface.
+  if not obj or not obj.valid or player.inserter_speed_text_surface_index ~= surface_index then
+    if obj then obj.destroy() end -- Was on a different surface.
     player.inserter_speed_text_surface_index = surface_index
-    player.inserter_speed_text_id = rendering.draw_text{
+    player.inserter_speed_text_obj = rendering.draw_text{
       -- Can't use `player.current_surface_index` because that's nil when idle.
       surface = surface_index,
       players = {player.player_index},
@@ -82,17 +82,17 @@ local function set_inserter_speed_text(player, position, items_per_second, is_es
     }
     return
   end
-  rendering.set_text(id, format_inserter_speed(items_per_second, is_estimate))
-  rendering.set_target(id, position)
-  rendering.set_visible(id, true)
-  rendering.bring_to_front(id)
+  obj.text = format_inserter_speed(items_per_second, is_estimate)
+  obj.target = position
+  obj.visible = true
+  obj.bring_to_front()
 end
 
 ---@param player PlayerDataQAI
 local function update_inserter_speed_text_scale(player)
-  local id = player.inserter_speed_text_id
-  if not id or not rendering.is_valid(id) then return end
-  rendering.set_scale(id, get_scale_for_inserter_speed_text(player))
+  local obj = player.inserter_speed_text_obj
+  if not obj or not obj.valid then return end
+  obj.scale = get_scale_for_inserter_speed_text(player)
 end
 
 ---@param player PlayerDataQAI
@@ -103,11 +103,12 @@ local function estimate_inserter_speed(player, selected_position)
   local cache = player.target_inserter_cache
   local target_inserter = player.target_inserter
   local target_inserter_position = player.target_inserter_position
+  local quality = target_inserter.quality
   ---@type InserterThroughputDefinition
   local def = {
     inserter = {
-      extension_speed = cache.extension_speed,
-      rotation_speed = cache.rotation_speed,
+      extension_speed = cache.prototype.get_inserter_extension_speed(quality)--[[@as number]],
+      rotation_speed = cache.prototype.get_inserter_rotation_speed(quality)--[[@as number]],
       chases_belt_items = cache.chases_belt_items,
       stack_size = inserter_throughput.get_stack_size(target_inserter),
       direction = target_inserter.direction,
@@ -123,7 +124,7 @@ local function estimate_inserter_speed(player, selected_position)
       target_inserter,
       target_inserter_position
     )
-    if not global.only_allow_mirrored then
+    if not storage.only_allow_mirrored then
       inserter_throughput.drop_to_drop_target_of_inserter_and_set_drop_vector(def, target_inserter)
     else
       local drop_position = vec.copy(selected_position)
@@ -229,7 +230,7 @@ local function update_inserter_speed_text(player)
 
   local name = selected.name
   if not (name == consts.square_entity_name or name == consts.ninth_entity_name) ---@cast selected -nil
-    or global.selectable_entities_to_player_lut[selected.unit_number] ~= player
+    or storage.selectable_entities_to_player_lut[selected.unit_number] ~= player
   then
     hide_inserter_speed_text(player)
     return

@@ -47,7 +47,7 @@ end
 ---of `entity.is_ghost`.
 ---
 ---It is also abusing the fact that the type of an entity is static, allowing this table to cache whether an
----entity is a ghost or not, without actually storing the data in `global`. But why? In order to prematurely
+---entity is a ghost or not, without actually storing the data in `storage`. But why? In order to prematurely
 ---optimize the code by reducing the amount of api calls and (interned) string creations there are, because an
 ---entity gets checked for being a ghost multiple times throughout several code paths. And I mean hey, the
 ---difference between `is_ghost(entity)` and `is_ghost[entity]` is pretty minor, it's just the implementation
@@ -111,12 +111,12 @@ local function find_real_or_ghost_entity_from_prototype(surface, prototype, posi
   return find_real_or_ghost_entity(surface, prototype.name, position)
 end
 
----@param inserter LuaEntity @ Can actually be a real or a ghost entity, but it always uses `global.ghost_ids`.
+---@param inserter LuaEntity @ Can actually be a real or a ghost entity, but it always uses `storage.ghost_ids`.
 ---@return EntityIDQAI?
 local function get_ghost_id(inserter)
   -- The following code is just the annoying way of writing:
-  -- return global.ghost_ids[inserter.surface_index]?[inserter.position.x]?[inserter.position.y]
-  local x_lut = global.ghost_ids[inserter.surface_index]
+  -- return storage.ghost_ids[inserter.surface_index]?[inserter.position.x]?[inserter.position.y]
+  local x_lut = storage.ghost_ids[inserter.surface_index]
   if not x_lut then return end
   local position = inserter.position
   local y_lut = x_lut[position.x]
@@ -155,7 +155,7 @@ local function get_or_create_id(inserter)
   local x = position.x
   local y = position.y
   local f = get_or_create_table -- This is so dumb, but it somehow actually makes it more readable. What?
-  local id = f(f(f(global.ghost_ids, surface_index), x), y)
+  local id = f(f(f(storage.ghost_ids, surface_index), x), y)
   if not id.surface_index then
     id.surface_index = surface_index
     id.x = x
@@ -167,12 +167,12 @@ end
 ---@param id EntityIDQAI
 local function remove_id(id)
   if type(id) == "number" then return end
-  local x_lut = global.ghost_ids[id.surface_index]
+  local x_lut = storage.ghost_ids[id.surface_index]
   local y_lut = x_lut[id.x]
   y_lut[id.y] = nil
   if next(y_lut) then return end
   x_lut[id.x] = nil
-  -- Do not remove the table from global.ghost_ids, because its keys are just the surface index, so those will
+  -- Do not remove the table from storage.ghost_ids, because its keys are just the surface index, so those will
   -- get reused quite frequently. x and y positions will be different 99% of the time however.
 end
 
@@ -267,7 +267,7 @@ local function get_direction_arrows_indicator_lines(player)
 end
 
 ---@param player PlayerDataQAI
----@return ScriptRenderVertexTarget[]
+---@return ScriptRenderTarget[]
 local function get_tiles_background_vertices(player)
   local cache = player.target_inserter_cache
   return player.should_flip
@@ -310,7 +310,7 @@ end
 local function get_redirected_selected_entity(selected)
   if not selected then return end
   if selected.name == consts.square_entity_name then
-    local inserter = global.selectable_dummy_redirects[selected.unit_number]
+    local inserter = storage.selectable_dummy_redirects[selected.unit_number]
     if inserter then
       -- It is a dummy entity, so it should never be return itself. If the redirection target inserter is
       -- invalid then just return `nil`, not `selected`.
@@ -329,13 +329,13 @@ local function get_pickup_box(player)
     {x = pickup_pos.x + 0.5, y = pickup_pos.y + 0.5}
 end
 
----@param id uint64
+---@param obj LuaRenderObject
 ---@param left_top MapPosition
 ---@param right_bottom MapPosition
 ---@return boolean
-local function rectangle_positions_equal(id, left_top, right_bottom)
-  return vec.vec_equals(left_top, rendering.get_left_top(id).position)
-    and vec.vec_equals(right_bottom, rendering.get_right_bottom(id).position)
+local function rectangle_positions_equal(obj, left_top, right_bottom)
+  return vec.vec_equals(left_top, obj.left_top.position)
+    and vec.vec_equals(right_bottom, obj.right_bottom.position)
 end
 
 ---@param player PlayerDataQAI
@@ -402,7 +402,7 @@ end
 
 ---@param player PlayerDataQAI
 local function can_only_select_single_drop_tile(player)
-  return global.only_allow_mirrored or player.target_inserter_cache.only_drop_offset
+  return storage.only_allow_mirrored or player.target_inserter_cache.only_drop_offset
 end
 
 ---@param player PlayerDataQAI
@@ -434,7 +434,7 @@ end
 ---@param target_inserter LuaEntity? @ Must be provided if the player state is (or can be) "idle".
 ---@return boolean
 local function should_skip_selecting_drop(player, target_inserter)
-  return global.only_allow_mirrored and should_use_auto_drop_offset(player, target_inserter)
+  return storage.only_allow_mirrored and should_use_auto_drop_offset(player, target_inserter)
 end
 
 ---@param player PlayerDataQAI
@@ -554,7 +554,7 @@ end
 ---@return boolean
 local function is_selectable_for_player(entity, selectable_name, player)
   return entity.name == selectable_name
-    and global.selectable_entities_to_player_lut[entity.unit_number] == player
+    and storage.selectable_entities_to_player_lut[entity.unit_number] == player
 end
 
 ---@class UtilsFileQAI
