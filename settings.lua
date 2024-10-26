@@ -34,6 +34,9 @@ data:extend({
     order = "e",
     setting_type = "runtime-per-user",
     default_value = false,
+    -- TODO: Most likely change this to a dropdown with 3 options, and then of course remove these 2:
+    hidden = true,
+    forced_value = false,
   },
   {
     type = "bool-setting",
@@ -108,6 +111,8 @@ data:extend({
       "extend-only",
       "extend-only-without-gap",
     },
+    -- TODO: Hidden because this feature is not fully thought out and implemented.
+    hidden = true,
   },
 })
 

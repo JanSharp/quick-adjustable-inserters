@@ -191,3 +191,4 @@
 - [ ] tech icons do not look right
 - [x] add migration from 1.1 to 2.0
 - [ ] handle quality inserters
+- [ ] setting to force inserters to be restricted to what qai considers to be valid pickup or drop positions, regardless of what other mods are doing
