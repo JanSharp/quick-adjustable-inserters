@@ -14,6 +14,12 @@ Stop adjusting an inserter by pressing `SHIFT + F` anywhere else, or instantly s
 
 <video src="videos/quick-adjustable-inserters.mp4" controls title="quick-adjustable-inserters.mp4"></video>
 
+## No Belt Stacking Support
+
+Due to my lack of time to properly understand and implement belt stacking support (because my house/home got flooded), this library cannot estimate throughput when belt stacking is involved in any way.
+
+(This sentence is copy pasted from [Inserter Throughput Library](https://mods.factorio.com/mod/inserter-throughput-lib), since is maintained by me and QAI uses it.)
+
 ## Place and Adjust
 
 While having an inserter in hand/cursor, place it and instantly adjust it by pressing `SHIFT + F` instead of the usual left click.
