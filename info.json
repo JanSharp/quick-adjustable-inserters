@@ -20,7 +20,6 @@
       "scenarios/**/*",
       "videos/**/*",
       "**/*.xcf"
-    ],
-    "git_publish_branch": "bugfixes"
+    ]
   }
 }
