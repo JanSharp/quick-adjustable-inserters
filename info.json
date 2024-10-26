@@ -9,7 +9,7 @@
     "(?)bobinserters",
     "(?)Smart_Inserters",
     "(?)RenaiTransportation",
-    "inserter-throughput-lib >= 1.1.0"
+    "inserter-throughput-lib >= 2.0.0"
   ],
 
   "package": {
