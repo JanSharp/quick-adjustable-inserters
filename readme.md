@@ -18,7 +18,7 @@ Stop adjusting an inserter by pressing `SHIFT + F` anywhere else, or instantly s
 
 Due to my lack of time to properly understand and implement belt stacking support (because my house/home got flooded), this library cannot estimate throughput when belt stacking is involved in any way.
 
-(This sentence is copy pasted from [Inserter Throughput Library](https://mods.factorio.com/mod/inserter-throughput-lib), since is maintained by me and QAI uses it.)
+(This sentence is copy pasted from [Inserter Throughput Library](https://mods.factorio.com/mod/inserter-throughput-lib), since it is maintained by me and QAI uses it.)
 
 ## Place and Adjust
 
