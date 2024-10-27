@@ -88,11 +88,12 @@ The technologies this mod uses are the same as [Bob's Adjustable Inserters](http
 
 [Smart Inserters](https://mods.factorio.com/mod/Smart_Inserters) has notably different settings, technologies and behavior. If it is enabled there are a few things to note:
 
+(Note that this list may be out of date due to updates to SI which I've not had the time to look at.)
+
 - Smart Inserters will be the primary mod while Quick Adjustable Inserters will just be an addon. The technologies and related settings from QAI will be hidden and disabled, SI taking the lead
 - QAI handles long inserters differently than SI. For example with vanilla long handed inserters and a current range of 1, QAI allows you to pick positions 1 tile away from the inserter, while SI allows you to pick tiles directly adjacent to the inserter. I much prefer QAI's handling of this, so I'm not changing it
 - (note: once QAI has more key binds then...) The 2 mods have a very similar set of key binds, however the exact behavior may vary, especially in the more unusual setups. There's a notable difference in drop offset handling as well
 - SI does not allow having an inserter pick up from and drop to the same tile while QAI does. This may have been added as quality of life or to reduce UI complexity (both in code and to the user) or because of a different design decision, however for QAI it would be an increase in complexity in UI and code, and I see little gain from it
-- QAI does not have any way to adjust the pickup offset while SI does. Functionally there's little difference with non-center pickup offsets aside from small speed gains when picking up from inventories. Therefore I do not consider it to be worth the increased user interface complexity to add this to QAI
 - SI does not have a "Mirrored Inserters only" feature, so enabling it in QAI may be a bit awkward
 - Aside from those differences you can expect QAI to behave very similarly to SI in terms of which features are unlocked and when
 
