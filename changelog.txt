@@ -1,6 +1,6 @@
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.1
-Date: ????
+Date: 2024-10-27
   Minor Features:
     - Add get_cursor_direction_sixteen_way to the qai remote interface
   Bugfixes:
