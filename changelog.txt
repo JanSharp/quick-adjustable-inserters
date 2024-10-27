@@ -1,7 +1,10 @@
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.1
 Date: ????
-  Changes:
+  Minor Features:
+    - Add get_cursor_direction_sixteen_way to the qai remote interface
+  Bugfixes:
+    - Fix error when interacting with new half diagonal rail signals
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.0
 Date: 2024-10-26

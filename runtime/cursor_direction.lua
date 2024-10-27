@@ -2,7 +2,8 @@
 local inserter_throughput = require("__inserter-throughput-lib__.inserter_throughput")
 local utils = require("__quick-adjustable-inserters__.runtime.utils")
 
--- TODO: this entire file most likely needs to handle all 16 directions.
+-- TODO: Check and add new prototypes from 2.0 and Space Age.
+-- TODO: Check existing logic if it still behaves the same way in 2.0.
 
 --[[
 
@@ -51,9 +52,9 @@ direction.
 
 ---@param orientation RealOrientation
 local function validate_orientation(orientation)
-  if ((orientation * 8) % 1) ~= 0 then
+  if ((orientation * 16) % 1) ~= 0 then
     error("The cursor rotation, while it is represented using an orientation, is only allowed to have \z
-      steps in 1/8 (0.125) increments. Invalid rotation value: "..orientation.."."
+      steps in 1/16 (0.0625) increments. Invalid rotation value: "..orientation.."."
     )
   end
 end
@@ -89,14 +90,15 @@ local function handle_rotation_for_entity_place_result(player, reverse, entity)
     rotate_cursor(player, reverse, 0.5)
     return
   end
+  local is_sixteen_way = entity.has_flag("building-direction-16-way")
   local is_eight_way = entity.has_flag("building-direction-8-way")
-  rotate_cursor(player, reverse, is_eight_way and 0.125 or 0.25)
+  rotate_cursor(player, reverse, is_sixteen_way and (1 / 16) or is_eight_way and (1 / 8) or (1 / 4))
 end
 
 ---@param player PlayerDataQAI
 ---@param reverse boolean
 local function handle_rotation_for_tile_place_result(player, reverse)
-  rotate_cursor(player, reverse, 0.25)
+  rotate_cursor(player, reverse, 1 / 4)
 end
 
 ---@param player PlayerDataQAI
@@ -117,14 +119,22 @@ local function handle_rotation(player, reverse)
 end
 
 local direction_to_orientation_lut = {
-  [defines.direction.north] = 0,
-  [defines.direction.northeast] = 0.125,
-  [defines.direction.east] = 0.25,
-  [defines.direction.southeast] = 0.375,
-  [defines.direction.south] = 0.5,
-  [defines.direction.southwest] = 0.625,
-  [defines.direction.west] = 0.75,
-  [defines.direction.northwest] = 0.875,
+  [defines.direction.north] = 0 / 16,
+  [defines.direction.northnortheast] = 1 / 16,
+  [defines.direction.northeast] = 2 / 16,
+  [defines.direction.eastnortheast] = 3 / 16,
+  [defines.direction.east] = 4 / 16,
+  [defines.direction.eastsoutheast] = 5 / 16,
+  [defines.direction.southeast] = 6 / 16,
+  [defines.direction.southsoutheast] = 7 / 16,
+  [defines.direction.south] = 8 / 16,
+  [defines.direction.southsouthwest] = 9 / 16,
+  [defines.direction.southwest] = 10 / 16,
+  [defines.direction.westsouthwest] = 11 / 16,
+  [defines.direction.west] = 12 / 16,
+  [defines.direction.westnorthwest] = 13 / 16,
+  [defines.direction.northwest] = 14 / 16,
+  [defines.direction.northnorthwest] = 15 / 16,
 }
 
 ---@param player PlayerDataQAI
@@ -192,38 +202,79 @@ local function handle_built_rail_connectable_or_offshore_pump(player, created_en
   -- still be diagonal (if it was diagonal previously).
 end
 
-local eight_way_orientation_to_four_directions_lut = {
-  [0] = defines.direction.north,
-  [0.125] = defines.direction.north,
-  [0.25] = defines.direction.east,
-  [0.375] = defines.direction.east,
-  [0.5] = defines.direction.south,
-  [0.625] = defines.direction.south,
-  [0.75] = defines.direction.west,
-  [0.875] = defines.direction.west,
+local sixteen_way_orientation_to_four_directions_lut = {
+  [0 / 16] = defines.direction.north,
+  [1 / 16] = defines.direction.north,
+  [2 / 16] = defines.direction.north,
+  [3 / 16] = defines.direction.north,
+  [4 / 16] = defines.direction.east,
+  [5 / 16] = defines.direction.east,
+  [6 / 16] = defines.direction.east,
+  [7 / 16] = defines.direction.east,
+  [8 / 16] = defines.direction.south,
+  [9 / 16] = defines.direction.south,
+  [10 / 16] = defines.direction.south,
+  [11 / 16] = defines.direction.south,
+  [12 / 16] = defines.direction.west,
+  [13 / 16] = defines.direction.west,
+  [14 / 16] = defines.direction.west,
+  [15 / 16] = defines.direction.west,
 }
 
 ---@param player PlayerDataQAI
 ---@return defines.direction
 local function get_cursor_direction_four_way(player)
-  return eight_way_orientation_to_four_directions_lut[player.current_cursor_orientation]
+  return sixteen_way_orientation_to_four_directions_lut[player.current_cursor_orientation]
 end
 
-local eight_way_orientation_to_eight_directions_lut = {
-  [0] = defines.direction.north,
-  [0.125] = defines.direction.northeast,
-  [0.25] = defines.direction.east,
-  [0.375] = defines.direction.southeast,
-  [0.5] = defines.direction.south,
-  [0.625] = defines.direction.southwest,
-  [0.75] = defines.direction.west,
-  [0.875] = defines.direction.northwest,
+local sixteen_way_orientation_to_eight_directions_lut = {
+  [0 / 16] = defines.direction.north,
+  [1 / 16] = defines.direction.north,
+  [2 / 16] = defines.direction.northeast,
+  [3 / 16] = defines.direction.northeast,
+  [4 / 16] = defines.direction.east,
+  [5 / 16] = defines.direction.east,
+  [6 / 16] = defines.direction.southeast,
+  [7 / 16] = defines.direction.southeast,
+  [8 / 16] = defines.direction.south,
+  [9 / 16] = defines.direction.south,
+  [10 / 16] = defines.direction.southwest,
+  [11 / 16] = defines.direction.southwest,
+  [12 / 16] = defines.direction.west,
+  [13 / 16] = defines.direction.west,
+  [14 / 16] = defines.direction.northwest,
+  [15 / 16] = defines.direction.northwest,
 }
 
 ---@param player PlayerDataQAI
 ---@return defines.direction
 local function get_cursor_direction_eight_way(player)
-  return eight_way_orientation_to_eight_directions_lut[player.current_cursor_orientation]
+  return sixteen_way_orientation_to_eight_directions_lut[player.current_cursor_orientation]
+end
+
+local sixteen_way_orientation_to_sixteen_directions_lut = {
+  [0 / 16] = defines.direction.north,
+  [1 / 16] = defines.direction.northnortheast,
+  [2 / 16] = defines.direction.northeast,
+  [3 / 16] = defines.direction.eastnortheast,
+  [4 / 16] = defines.direction.east,
+  [5 / 16] = defines.direction.eastsoutheast,
+  [6 / 16] = defines.direction.southeast,
+  [7 / 16] = defines.direction.southsoutheast,
+  [8 / 16] = defines.direction.south,
+  [9 / 16] = defines.direction.southsouthwest,
+  [10 / 16] = defines.direction.southwest,
+  [11 / 16] = defines.direction.westsouthwest,
+  [12 / 16] = defines.direction.west,
+  [13 / 16] = defines.direction.westnorthwest,
+  [14 / 16] = defines.direction.northwest,
+  [15 / 16] = defines.direction.northnorthwest,
+}
+
+---@param player PlayerDataQAI
+---@return defines.direction
+local function get_cursor_direction_sixteen_way(player)
+  return sixteen_way_orientation_to_sixteen_directions_lut[player.current_cursor_orientation]
 end
 
 ---Because it isn't part of the game state, it'll reset to north on game load. Cannot detect that in single
@@ -245,6 +296,7 @@ local cursor_direction = {
   handle_built_rail_connectable_or_offshore_pump = handle_built_rail_connectable_or_offshore_pump,
   get_cursor_direction_four_way = get_cursor_direction_four_way,
   get_cursor_direction_eight_way = get_cursor_direction_eight_way,
+  get_cursor_direction_sixteen_way = get_cursor_direction_sixteen_way,
   on_player_joined = on_player_joined,
   init_player = init_player,
 }

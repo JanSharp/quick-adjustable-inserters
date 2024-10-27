@@ -442,10 +442,20 @@ remote.add_interface("qai", {
   ---This being in quick-adjustable-inserter's remote interface makes little sense, but the rotation state
   ---tracking exists in the mod, so might as well expose it.
   ---@param player_index integer
-  ---@return defines.direction @ Any of the 8 possible directions.
+  ---@return defines.direction @ north, northeast, east, southeast, south, southwest, west or northwest.
   get_cursor_direction_eight_way = function(player_index)
     local player = get_or_init_player(player_index)
     if not player then return defines.direction.north end
     return cursor_direction.get_cursor_direction_eight_way(player)
+  end,
+  ---Get the current best guess for what the given player's cursor/hand direction might be.\
+  ---This being in quick-adjustable-inserter's remote interface makes little sense, but the rotation state
+  ---tracking exists in the mod, so might as well expose it.
+  ---@param player_index integer
+  ---@return defines.direction @ Any of the 16 possible directions.
+  get_cursor_direction_sixteen_way = function(player_index)
+    local player = get_or_init_player(player_index)
+    if not player then return defines.direction.north end
+    return cursor_direction.get_cursor_direction_sixteen_way(player)
   end,
 })

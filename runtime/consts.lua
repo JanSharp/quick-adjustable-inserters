@@ -74,20 +74,28 @@ else
   consts.range_technology_format = "long-inserters-%d"
 end
 
--- TODO: this probably needs to include all 16 directions now
+---TODO: Check if 2.0 actually behaves this way.
 ---Inserters can have any of the 8 directions, even with the "not-rotatable" flag when set through script.
 ---This mod only works with 4 directions for inserters however.
 ---"simple-entity-with-owner" only have 4 directions, it appears to be impossible to set their direction to
 ---any of the diagonals. Don't have to worry about those.
 consts.collapse_direction_lut = {
   [defines.direction.north] = defines.direction.north,
+  [defines.direction.northnortheast] = defines.direction.north,
   [defines.direction.northeast] = defines.direction.north,
+  [defines.direction.eastnortheast] = defines.direction.north,
   [defines.direction.east] = defines.direction.east,
+  [defines.direction.eastsoutheast] = defines.direction.east,
   [defines.direction.southeast] = defines.direction.east,
+  [defines.direction.southsoutheast] = defines.direction.east,
   [defines.direction.south] = defines.direction.south,
+  [defines.direction.southsouthwest] = defines.direction.south,
   [defines.direction.southwest] = defines.direction.south,
+  [defines.direction.westsouthwest] = defines.direction.south,
   [defines.direction.west] = defines.direction.west,
+  [defines.direction.westnorthwest] = defines.direction.west,
   [defines.direction.northwest] = defines.direction.west,
+  [defines.direction.northnorthwest] = defines.direction.west,
 }
 
 consts.inverse_direction_lut = {
