@@ -4,7 +4,7 @@ if (storage.data_structure_version or 1) >= 5 then return end
 
 rendering.clear("quick-adjustable-inserters")
 
-for _, animation in pairs(storage.active_animations) do
+for _, animation in ipairs(storage.active_animations) do
   animation.id = nil ---@diagnostic disable-line: inject-field
   animation.obj = {valid = false}
 end
