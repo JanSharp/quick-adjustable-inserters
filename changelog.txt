@@ -1,7 +1,8 @@
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.3
 Date: ????
-  Changes:
+  Features:
+    - Add zh-CN (Chinese - China) locale thanks to plexpt - https://mods.factorio.com/mod/quick-adjustable-inserters/discussion/673c5dffd2e7eab6fda8e467
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.2
 Date: 2024-11-09
