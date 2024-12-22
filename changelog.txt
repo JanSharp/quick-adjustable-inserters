@@ -2,6 +2,7 @@
 Version: 2.0.4
 Date: ????
   Changes:
+    - Make the adjust key bind consuming to enable using left click with a modifier without also building entities
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.3
 Date: 2024-11-19

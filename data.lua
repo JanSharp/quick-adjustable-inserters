@@ -51,6 +51,7 @@ data:extend{
     name = "qai-adjust",
     action = "lua",
     key_sequence = "SHIFT + F",
+    consuming = "game-only",
   },
   {
     type = "custom-input",
