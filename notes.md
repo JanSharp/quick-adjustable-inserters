@@ -192,3 +192,4 @@
 - [x] add migration from 1.1 to 2.0
 - [ ] handle quality inserters
 - [ ] setting to force inserters to be restricted to what qai considers to be valid pickup or drop positions, regardless of what other mods are doing
+- [ ] key bind or setting to automatically pick the fastest estimated combination of pickup and drop positions
