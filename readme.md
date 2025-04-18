@@ -128,6 +128,39 @@ The mod automatically detects more range technologies, they simply have to follo
 
 Note that higher technologies should either not be created or be hidden and or disabled if one of the lower levels has been disabled through the settings `bobmods-inserters-long1` and or `bobmods-inserters-long2`.
 
+### Data API
+
+In prototype stage the `"__quick-adjustable-inserters__.data_api"` can be used to control which inserters should be included and excluded from being adjustable. It has these functions:
+
+- `include(name_pattern)`
+- `exclude(name_pattern)`
+- `to_plain_pattern(plain_name)`
+- `is_ignored(inserter_prototype)`
+
+Either look at the source code (the functions are in the `data_core.lua` file) or use `sumneko.lua` in order to read the more detailed documentation for each of these functions.
+
+**Important:** Any inserter which has `allow_custom_vectors` set to `true`, regardless of it being excluded using these functions, is going to be able to be adjusted by QAI.
+
+Here's a basic example:
+
+```lua
+local qai = require("__quick-adjustable-inserters__.data_api")
+
+-- These excludes and includes get applied in order.
+-- Allows for creating any mixture of white and blacklists as desired.
+
+qai.exclude("") -- Exclude every inserter.
+qai.include(qai.to_plain_pattern("inserter")) -- Include specifically just the vanilla yellow inserter.
+-- Be mindful of the fact that `-` is a special character in Lua patterns.
+-- `to_plain_pattern` escapes the `-`s but when writing patterns use `%-` to matcha against literal `-`.
+qai.include("long") -- Include all inserters which contain the word "long" - case sensitive!
+
+-- If case insensitivity is desired, one could do this:
+qai.include("[Ll][Oo][Nn][Gg]")
+-- though at that point it likely makes sense to write a function that takes a string and generate the case
+-- insensitive version of it.
+```
+
 ### Remote
 
 The mod provides a stupidly tiny remote interface called `"qai"`. It's documentation is done through annotations so take a look at the end of the `control.lua` file, or unpack the mod and use intellisense if you're using LuaLS and FMTK.
