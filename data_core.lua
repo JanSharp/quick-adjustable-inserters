@@ -35,7 +35,10 @@ local function should_ignore(inserter)
   local flags = inserter.flags
   if not flags then return false end
   for _, flag in pairs(flags) do
-    if flag == "building-direction-8-way" or flag == "not-selectable-in-game" then
+    if flag == "building-direction-8-way"
+      or flag == "building-direction-16-way"
+      or flag == "not-selectable-in-game"
+    then
       return true
     end
   end
