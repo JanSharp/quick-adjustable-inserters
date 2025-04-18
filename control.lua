@@ -42,6 +42,7 @@ if script.active_mods["RenaiTransportation"] then
   end)
 end
 
+---@param event EventData.CustomInputEvent
 script.on_event("qai-adjust", function(event)
   local player = get_player(event)
   if not player then return end
@@ -59,12 +60,14 @@ script.on_event("qai-adjust", function(event)
   states.adjust(player, utils.get_redirected_selected_entity(player.player.selected))
 end)
 
+---@param event EventData.CustomInputEvent
 script.on_event("qai-rotate", function(event)
   local player = get_player(event)
   if not player then return end
   cursor_direction.handle_rotation(player, false)
 end)
 
+---@param event EventData.CustomInputEvent
 script.on_event("qai-reverse-rotate", function(event)
   local player = get_player(event)
   if not player then return end
