@@ -120,24 +120,99 @@ As well as some startup settings ...
 - to choose which technologies should even be available (if [Bob's Adjustable Inserters](https://mods.factorio.com/mod/bobinserters) is present it will use its settings, but this mod adds 2 more settings so they'll unfortunately be split between the 2 mods in the settings list)
 - to normalize default inserter vectors, to make modded inserters more consistent
 
-## API
+# API
 
-### More range
+## More range
 
 The mod automatically detects more range technologies, they simply have to follow the naming pattern `"long-inserters-"..number` where `number` does not have any leading zeros. Technology hidden and enabled state and dependencies along side handling the settings for `long-inserters-1` and `long-inserters-2` would be 100% up to other mods.
 
 Note that higher technologies should either not be created or be hidden and or disabled if one of the lower levels has been disabled through the settings `bobmods-inserters-long1` and or `bobmods-inserters-long2`.
 
-### Data API
+## Data API
 
 In prototype stage the `"__quick-adjustable-inserters__.data_api"` can be used to control which inserters should be included and excluded from being adjustable. It has these functions:
 
-- `include(name_pattern)`
-- `exclude(name_pattern)`
-- `to_plain_pattern(plain_name)`
-- `is_ignored(inserter_prototype)`
+- [`include(name_pattern, match_against_all_lower)`](#includename_pattern-match_against_all_lower)
+- [`exclude(name_pattern, match_against_all_lower)`](#excludename_pattern-match_against_all_lower)
+- [`to_plain_pattern(plain_name)`](#to_plain_patternplain_name)
+- [`is_ignored(inserter_prototype)`](#is_ignoredinserter_prototype)
+- [Example](#example)
 
-Either look at the source code (the functions are in the `data_core.lua` file) or use `sumneko.lua` in order to read the more detailed documentation for each of these functions.
+### `include(name_pattern, match_against_all_lower)`
+
+**Important:** Any inserter which has `allow_custom_vectors` set to `true`, regardless of it being excluded using the `exclude` function, is going to be able to be adjusted by QAI.
+
+Tell QAI to mark all inserters where their prototype name matches the given Lua Pattern as allowed for adjustments. Inserters with names not matching the pattern keep their previous included or excluded state.
+
+Included inserters get `allow_custom_vectors` set to `true`, as well as having their pickup and drop vectors normalized, if the `"qai-normalize-default-vectors"` mod setting is enabled. By default all inserters which are not `hidden` nor have the flags `"building-direction-8-way"`, `"building-direction-16-way"` or `"not-selectable-in-game"` are included.
+
+The `include` and `exclude` patterns get applied in sequence. For example to exclude all inserters, except those containing the word "long":
+
+```lua
+qai.exclude("") -- Excludes every inserter, as the pattern matches any and all strings
+qai.include("long", true) -- Effectively case insensitive
+```
+
+**Parameters:**
+
+- `name_pattern` `string`
+  - Use the `to_plain_pattern` api function in order convert literal/plain prototype names into a Lua pattern which matches against exactly that name, nothing else.
+- `match_against_all_lower` `boolean?`
+  - When `true` QAI matches the given pattern against a version of the prototype name which has been converted to all lowercase.
+
+### `exclude(name_pattern, match_against_all_lower)`
+
+**Important:** Any inserter which has `allow_custom_vectors` set to `true`, regardless of it being excluded using the `exclude` function, is going to be able to be adjusted by QAI.
+
+Tell QAI to mark all inserters where their prototype name matches the given Lua Pattern as disallowed for adjustments. Inserters with names not matching the pattern keep their previous included or excluded state.
+
+Included inserters get `allow_custom_vectors` set to `true`, as well as having their pickup and drop vectors normalized, if the `"qai-normalize-default-vectors"` mod setting is enabled. By default all inserters which are not `hidden` nor have the flags `"building-direction-8-way"`, `"building-direction-16-way"` or `"not-selectable-in-game"` are included.
+
+The `include` and `exclude` patterns get applied in sequence. For example to exclude all inserters, except those containing the word "long":
+
+```lua
+qai.exclude("") -- Excludes every inserter, as the pattern matches any and all strings
+qai.include("long", true) -- Effectively case insensitive
+```
+
+**Parameters:**
+
+- `name_pattern` `string`:
+  - Use the `to_plain_pattern` api function in order convert literal/plain prototype names into a Lua pattern which matches against exactly that name, nothing else.
+- `match_against_all_lower` `boolean?`
+  - When `true` QAI matches the given pattern against a version of the prototype name which has been converted to all lowercase.
+
+### `to_plain_pattern(plain_name)`
+
+Convert literal/plain prototype names, or just strings in general, into a Lua pattern which matches against exactly that name, nothing else.
+
+In other words converting the given string into a fully escaped Lua pattern, as well as adding `^` and `$` anchors at the beginning and end respectively.
+
+For example `"long-handed-inserter"` would get converted into `"^long%-handed%-inserter$"`.
+
+**Parameters:**
+
+- `plain_name` `string`
+
+**Returns:**
+
+- `escaped_pattern` `string`
+
+### `is_ignored(inserter_prototype)`
+
+Checks if the given prototype is ignored/excluded by QAI's adjustments. Aka cannot be adjusted.
+
+**Important:** Any inserter which has `allow_custom_vectors` set to `true`, regardless of it being excluded using `exclude` function, is going to be able to be adjusted by QAI. Therefore this function returns `true` in this case, regardless of previous `include`/`exclude` calls.
+
+**Parameters:**
+
+- `inserter_prototype` `data.InserterPrototype`
+
+**Returns:**
+
+- `boolean`
+
+### Example
 
 **Important:** Any inserter which has `allow_custom_vectors` set to `true`, regardless of it being excluded using these functions, is going to be able to be adjusted by QAI.
 
@@ -150,17 +225,18 @@ local qai = require("__quick-adjustable-inserters__.data_api")
 -- Allows for creating any mixture of white and blacklists as desired.
 
 qai.exclude("") -- Exclude every inserter.
-qai.include(qai.to_plain_pattern("inserter")) -- Include specifically just the vanilla yellow inserter.
--- Be mindful of the fact that `-` is a special character in Lua patterns.
--- `to_plain_pattern` escapes the `-`s but when writing patterns use `%-` to matcha against literal `-`.
-qai.include("long") -- Include all inserters which contain the word "long" - case sensitive!
 
--- If case insensitivity is desired, one could do this:
-qai.include("[Ll][Oo][Nn][Gg]")
--- though at that point it likely makes sense to write a function that takes a string and generate the case
--- insensitive version of it.
+-- Include specifically just the vanilla yellow inserter.
+-- Be mindful of the fact that `-` is a special character in Lua patterns.
+-- `to_plain_pattern` escapes the `-`s but when writing patterns manually,
+-- use `%-` to matcha against literal `-`.
+qai.include(qai.to_plain_pattern("inserter"))
+
+-- Include all inserters which contain the word "long", case insensitive
+-- due to the `true`, and "long" being all lower case itself.
+qai.include("long", true)
 ```
 
-### Remote
+## Remote
 
 The mod provides a stupidly tiny remote interface called `"qai"`. It's documentation is done through annotations so take a look at the end of the `control.lua` file, or unpack the mod and use intellisense if you're using LuaLS and FMTK.

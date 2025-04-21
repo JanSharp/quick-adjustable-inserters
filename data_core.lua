@@ -3,45 +3,76 @@ local util = require("__core__.lualib.util")
 
 qai_data = qai_data or {
   touched_inserters = {}--[[@as table<string, {did_allow_custom_vectors: boolean?, prev_drop: data.Vector, prev_pickup: data.Vector}>]],
-  patterns = {}--[=[@as {is_include: boolean, pattern: string}[]]=],
+  patterns = {}--[=[@as {is_include: boolean, pattern: string, match_against_all_lower: boolean}[]]=],
   final_fixes_did_run = false,
 }
 
+local modify_existing_inserter
 local modify_existing_inserters
 
+---**Important:** Any inserter which has `allow_custom_vectors` set to `true`, regardless of it being excluded
+---using the `exclude` function, is going to be able to be adjusted by QAI.
+---
 ---Tell QAI to mark all inserters where their prototype name matches the given Lua Pattern as allowed for
----adjustments.
----This causes QAI to set `allow_custom_vectors` to `true` for those prototypes, as well as normalizing pickup
----and drop vectors, if the `"qai-normalize-default-vectors"` mod setting is enabled.
+---adjustments. Inserters with names not matching the pattern keep their previous included or excluded state.
+---
+---Included inserters get `allow_custom_vectors` set to `true`, as well as having their pickup and drop
+---vectors normalized, if the `"qai-normalize-default-vectors"` mod setting is enabled.
 ---By default all inserters which are not `hidden` nor have the flags `"building-direction-8-way"`,
 ---`"building-direction-16-way"` or `"not-selectable-in-game"` are included.
----The `include` and `exclude` patterns get applied in sequence.
 ---
----**Important:** Any inserter which has `allow_custom_vectors` set to `true`, regardless of it being excluded
----using these functions here, is going to be able to be adjusted by QAI.
----@param name_pattern string @ Use the `to_plain_pattern` api function in order convert literal/plain
----prototype names into a Lua pattern which matches against exactly that name, nothing else.
-local function include(name_pattern)
-  qai_data.patterns[#qai_data.patterns+1] = {is_include = true, pattern = name_pattern}
+---The `include` and `exclude` patterns get applied in sequence.
+---For example to exclude all inserters, except those containing the word "long":
+---```
+---qai.exclude("") -- Excludes every inserter, as the pattern matches any and all strings
+---qai.include("long", true) -- Effectively case insensitive
+---```
+---@param name_pattern string @
+---Use the `to_plain_pattern` api function in order convert literal/plain prototype names into a Lua pattern
+---which matches against exactly that name, nothing else.
+---@param match_against_all_lower boolean? @
+---When `true` QAI matches the given pattern against a version of the prototype name which has been converted
+---to all lowercase.
+local function include(name_pattern, match_against_all_lower)
+  qai_data.patterns[#qai_data.patterns+1] = {
+    is_include = true,
+    pattern = name_pattern,
+    match_against_all_lower = not not match_against_all_lower,
+  }
   if qai_data.final_fixes_did_run then
     modify_existing_inserters()
   end
 end
 
+---**Important:** Any inserter which has `allow_custom_vectors` set to `true`, regardless of it being excluded
+---using the `exclude` function, is going to be able to be adjusted by QAI.
+---
 ---Tell QAI to mark all inserters where their prototype name matches the given Lua Pattern as disallowed for
----adjustments.
----This causes QAI to set `allow_custom_vectors` to `true` for those prototypes, as well as normalizing pickup
----and drop vectors, if the `"qai-normalize-default-vectors"` mod setting is enabled.
+---adjustments. Inserters with names not matching the pattern keep their previous included or excluded state.
+---
+---Included inserters get `allow_custom_vectors` set to `true`, as well as having their pickup and drop
+---vectors normalized, if the `"qai-normalize-default-vectors"` mod setting is enabled.
 ---By default all inserters which are not `hidden` nor have the flags `"building-direction-8-way"`,
 ---`"building-direction-16-way"` or `"not-selectable-in-game"` are included.
----The `include` and `exclude` patterns get applied in sequence.
 ---
----**Important:** Any inserter which has `allow_custom_vectors` set to `true`, regardless of it being excluded
----using these functions here, is going to be able to be adjusted by QAI.
----@param name_pattern string @ Use the `to_plain_pattern` api function in order convert literal/plain
----prototype names into a Lua pattern which matches against exactly that name, nothing else.
-local function exclude(name_pattern)
-  qai_data.patterns[#qai_data.patterns+1] = {is_include = false, pattern = name_pattern}
+---The `include` and `exclude` patterns get applied in sequence.
+---For example to exclude all inserters, except those containing the word "long":
+---```
+---qai.exclude("") -- Excludes every inserter, as the pattern matches any and all strings
+---qai.include("long", true) -- Effectively case insensitive
+---```
+---@param name_pattern string @
+---Use the `to_plain_pattern` api function in order convert literal/plain prototype names into a Lua pattern
+---which matches against exactly that name, nothing else.
+---@param match_against_all_lower boolean? @
+---When `true` QAI matches the given pattern against a version of the prototype name which has been converted
+---to all lowercase.
+local function exclude(name_pattern, match_against_all_lower)
+  qai_data.patterns[#qai_data.patterns+1] = {
+    is_include = false,
+    pattern = name_pattern,
+    match_against_all_lower = not not match_against_all_lower,
+  }
   if qai_data.final_fixes_did_run then
     modify_existing_inserters()
   end
@@ -49,12 +80,27 @@ end
 
 ---Convert literal/plain prototype names, or just strings in general, into a Lua pattern which matches against
 ---exactly that name, nothing else.
+---
 ---In other words converting the given string into a fully escaped Lua pattern, as well as adding `^` and `$`
 ---anchors at the beginning and end respectively.
+---
+---For example `"long-handed-inserter"` would get converted into `"^long%-handed%-inserter$"`.
 ---@param plain_name string
 ---@return string escaped_pattern
 local function to_plain_pattern(plain_name)
   return "^"..plain_name:gsub("[%^$()%%.%[%]*+%-?]", "%%%0").."$"
+end
+
+---Checks if the given prototype is ignored/excluded by QAI's adjustments. Aka cannot be adjusted.
+---
+---**Important:** Any inserter which has `allow_custom_vectors` set to `true`, regardless of it being excluded
+---using `exclude` function, is going to be able to be adjusted by QAI. Therefore this function returns `true`
+---in this case, regardless of previous `include`/`exclude` calls.
+---@param inserter_prototype data.InserterPrototype
+---@return boolean
+local function is_ignored(inserter_prototype)
+  modify_existing_inserter(inserter_prototype)
+  return not inserter_prototype.allow_custom_vectors
 end
 
 ---@param name string @ Name of a bool setting.
@@ -80,13 +126,7 @@ local function check_tech_setting(name, default_if_non_existent)
   return setting.value--[[@as boolean]]
 end
 
----Checks if the given prototype is ignored/excluded by QAI's adjustments. Aka cannot be adjusted.
----
----**Important:** Any inserter which has `allow_custom_vectors` set to `true`, regardless of it being excluded
----using these functions here, is going to be able to be adjusted by QAI.
----@param inserter_prototype data.InserterPrototype
----@return boolean
-local function is_ignored(inserter_prototype)
+local function should_ignored(inserter_prototype)
   if inserter_prototype.hidden then return true end
   local flags = inserter_prototype.flags
   if not flags then return false end
@@ -100,8 +140,10 @@ local function is_ignored(inserter_prototype)
   end
 
   local is_included = true
+  local name = inserter_prototype.name
+  local lower_name = string.lower(name)
   for _, pattern in ipairs(qai_data.patterns) do
-    if string.match(inserter_prototype.name, pattern.pattern) then
+    if string.match(pattern.match_against_all_lower and lower_name or name, pattern.pattern) then
       is_included = pattern.is_include
     end
   end
@@ -201,14 +243,19 @@ local function undo_modification(inserter)
   overwrite_table(inserter.insert_position, backup.prev_drop)
 end
 
+---@param inserter data.InserterPrototype
+function modify_existing_inserter(inserter)
+  if should_ignored(inserter) then
+    undo_modification(inserter)
+  else
+    modify_inserter(inserter)
+  end
+end
+
 ---@param is_final_fixes boolean?
 function modify_existing_inserters(is_final_fixes)
   for _, inserter in pairs(data.raw["inserter"]) do
-    if is_ignored(inserter) then
-      undo_modification(inserter)
-    else
-      modify_inserter(inserter)
-    end
+    modify_inserter(inserter)
   end
   qai_data.final_fixes_did_run = not not is_final_fixes
 end
