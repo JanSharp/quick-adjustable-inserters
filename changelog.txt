@@ -1,6 +1,6 @@
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.5
-Date: ????
+Date: 2025-04-26
   Minor Features:
     - Add data_api.lua for other mods to control which inserters should be adjustable
   Bugfixes:
