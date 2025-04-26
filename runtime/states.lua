@@ -573,6 +573,10 @@ local on_adjust_handler_lut = {
 
   ["selecting-pickup"] = function(player, selected)
     if not validate_target_inserter(player) then return end
+    if not selected.valid then -- Could be invalidated by validate_target_inserter due to raised events.
+      switch_to_idle(player)
+      return
+    end
     if utils.is_real_or_ghost_inserter(selected) then
       if selected == player.target_inserter then
         advance_to_selecting_drop(player, player.target_inserter)
@@ -595,6 +599,10 @@ local on_adjust_handler_lut = {
 
   ["selecting-drop"] = function(player, selected)
     if not validate_target_inserter(player) then return end
+    if not selected.valid then -- Could be invalidated by validate_target_inserter due to raised events.
+      switch_to_idle(player)
+      return
+    end
     if utils.is_real_or_ghost_inserter(selected) then
       if selected == player.target_inserter then
         animations.play_finish_animation(player) -- Before switching to idle because some rendering objects get reused.
