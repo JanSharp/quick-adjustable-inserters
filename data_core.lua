@@ -126,7 +126,7 @@ local function check_tech_setting(name, default_if_non_existent)
   return setting.value--[[@as boolean]]
 end
 
-local function should_ignored(inserter_prototype)
+local function should_be_ignored(inserter_prototype)
   if inserter_prototype.hidden then return true end
   local flags = inserter_prototype.flags
   if not flags then return false end
@@ -245,7 +245,7 @@ end
 
 ---@param inserter data.InserterPrototype
 function modify_existing_inserter(inserter)
-  if should_ignored(inserter) then
+  if should_be_ignored(inserter) then
     undo_modification(inserter)
   else
     modify_inserter(inserter)
@@ -255,7 +255,7 @@ end
 ---@param is_final_fixes boolean?
 function modify_existing_inserters(is_final_fixes)
   for _, inserter in pairs(data.raw["inserter"]) do
-    modify_inserter(inserter)
+    modify_existing_inserter(inserter)
   end
   qai_data.final_fixes_did_run = not not is_final_fixes
 end
