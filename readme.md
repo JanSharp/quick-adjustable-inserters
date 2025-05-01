@@ -241,9 +241,9 @@ qai.include("long", true)
 
 There are 3 custom events to listen to at runtime:
 
-- [on_qai_inserter_direction_changed](#on_qai_inserter_direction_changed)
-- [on_qai_inserter_vectors_changed](#on_qai_inserter_vectors_changed)
-- [on_qai_inserter_adjustment_finished](#on_qai_inserter_adjustment_finished)
+- [`on_qai_inserter_direction_changed`](#on_qai_inserter_direction_changed)
+- [`on_qai_inserter_vectors_changed`](#on_qai_inserter_vectors_changed)
+- [`on_qai_inserter_adjustment_finished`](#on_qai_inserter_adjustment_finished)
 
 There is EmmyLoa definitions for these events, so if one has the mod extracted and has FMTK and LuaLS setup, intellisense can be used.
 
