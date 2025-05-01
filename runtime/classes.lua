@@ -1,6 +1,8 @@
 
 ---cSpell:ignore IDQAI
 
+do return end -- To make it clear that this file is never run.
+
 ---Unique table for a ghost in the world. So multiple LuaEntity instances can evaluate to the same id.
 ---Specifically when they are actually a reference to the same ghost entity in the world.\
 ---Must store information purely to be able to remove the id from the `storage.ghosts_id` table again, because
@@ -233,3 +235,44 @@ storage = {}
 ---@field pipetted_inserter_name string?
 ---@field pipetted_pickup_vector MapPosition @ `nil` when `pipetted_inserter_name` is `nil`.
 ---@field pipetted_drop_vector MapPosition @ `nil` when `pipetted_inserter_name` is `nil`.
+
+---@diagnostic disable-next-line: duplicate-doc-alias
+---@enum defines.events
+defines.events = {
+  on_qai_inserter_direction_changed = #{}--[[@as defines.events.on_qai_inserter_direction_changed]],
+  on_qai_inserter_vectors_changed = #{}--[[@as defines.events.on_qai_inserter_vectors_changed]],
+  on_qai_inserter_adjustment_finished = #{}--[[@as defines.events.on_qai_inserter_adjustment_finished]],
+}
+
+---Called when QAI changed the direction of an inserter through the selectables on the outside of the
+---adjustment UI, with the large arrow. QAI makes the inserter keep the pickup and drop positions even though
+---the direction did change.
+---@class (exact) EventData.on_qai_inserter_direction_changed : EventData
+---The inserter which direction has been changed.
+---@field entity LuaEntity
+---The previous direction. Technically possible to be unchanged if another mod changed the direction inside
+---of its event handler for this same event.
+---@field previous_direction defines.direction
+
+---Called when QAI changed the pickup and or drop position of an inserter due to a player adjusting it through
+---QAI's UI.
+---@class (exact) EventData.on_qai_inserter_vectors_changed : EventData
+---The index of the player which performed an adjustment.
+---@field player_index uint
+---The inserter which has been adjusted.
+---@field inserter LuaEntity
+---The previous `pickup_position`. May be unchanged.
+---@field previous_pickup_position MapPosition
+---The previous `drop_position`. May be unchanged.
+---@field previous_drop_position MapPosition
+
+---Called when QAI finished adjusting an inserter, aka the UI begins disappearing.\
+---Called regardless of if anything changed.
+---@class (exact) EventData.on_qai_inserter_adjustment_finished : EventData
+---The index of the player which was adjusting an inserter. A player for this index may no longer exist if
+---adjustment was finished due to player having been removed, see
+---[remove_offline_players](https://lua-api.factorio.com/latest/classes/LuaGameScript.html#remove_offline_players).
+---@field player_index uint
+---The inserter which was being adjusted. May be nil, in which case QAI is finishing adjustment due to the
+---inserter having been destroyed.
+---@field inserter LuaEntity?

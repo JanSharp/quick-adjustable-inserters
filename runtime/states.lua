@@ -1,6 +1,7 @@
 
 local animations = require("__quick-adjustable-inserters__.runtime.animations")
 local consts = require("__quick-adjustable-inserters__.runtime.consts")
+local cursor_direction = require("__quick-adjustable-inserters__.runtime.cursor_direction")
 local force_data = require("__quick-adjustable-inserters__.runtime.force_data")
 local inserter_speed = require("__quick-adjustable-inserters__.runtime.inserter_speed")
 local player_activity = require("__quick-adjustable-inserters__.runtime.player_activity")
@@ -99,13 +100,24 @@ local function restore_after_adjustment(player, target_inserter, surface, insert
   ::leave_pipette::
 end
 
+---@param player PlayerDataQAI
+---@param inserter LuaEntity
+local function raise_on_qai_inserter_adjustment_finished(player, inserter)
+  script.raise_event(defines.events.on_qai_inserter_adjustment_finished, {
+    -- Intentional nil when invalid, we do what the event to get raised regardless of inserter validity.
+    inserter = inserter.valid and inserter or nil,
+    player_index = player.player_index,
+  })
+end
+
 ---This function can raise an event, so make sure to expect the world to be in any state after calling it.
 ---This includes the state of this mod. Calling switch_to_idle does not mean that the player's state will
 ---actually be idle afterwards.
 ---@param player PlayerDataQAI
 ---@param keep_rendering boolean? @ When true, no rendering objects will get destroyed.
 ---@param do_not_restore boolean? @ When true, do not script enable the inserter and do not pipette it.
-local function switch_to_idle(player, keep_rendering, do_not_restore)
+---@param do_not_raise_finished_event boolean? @ When true, do not raise on_qai_inserter_adjustment_finished.
+local function switch_to_idle(player, keep_rendering, do_not_restore, do_not_raise_finished_event)
   if player.state == "idle" then return end
   local target_inserter = player.target_inserter
   local surface = player.current_surface
@@ -145,6 +157,9 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   local actual_player = player.player
   if not actual_player.valid then -- Only happens when coming from `remove_player()`.
     player_data.extra_clean_up_for_removed_player(player, target_inserter)
+    if not do_not_raise_finished_event then
+      raise_on_qai_inserter_adjustment_finished(player, target_inserter)
+    end
     return
   end
 
@@ -153,13 +168,20 @@ local function switch_to_idle(player, keep_rendering, do_not_restore)
   if not do_not_restore then
     restore_after_adjustment(player, target_inserter, surface, position)
   end
+
+  if not do_not_raise_finished_event then
+    raise_on_qai_inserter_adjustment_finished(player, target_inserter)
+  end
 end
 
 ---@param player PlayerDataQAI
-local function update_direction_arrow(player)
-  player.direction_arrow_obj.orientation = player.target_inserter.orientation
+---@param new_direction defines.direction
+local function update_direction_arrow(player, new_direction)
+  local direction = consts.inverse_direction_lut[new_direction] -- See comments in and for `set_direction`.
+  player.direction_arrow_obj.orientation = cursor_direction.direction_to_orientation(direction)
 end
 
+---Potentially raises `on_qai_inserter_direction_changed`.
 ---@param player PlayerDataQAI
 ---@param new_direction defines.direction @
 ---If you look at the feet of the inserter, the forwards pointing feet should be the direction this variable
@@ -171,14 +193,21 @@ local function set_direction(player, new_direction)
   -- However, the actual internal direction of inserters appears to be the direction they are picking up from.
   -- This confuses me, so I'm pretending it's the other way around and only flipping it when writing/reading.
   local actual_direction = consts.inverse_direction_lut[new_direction]
+  local previous_direction = inserter.direction
+  if actual_direction == previous_direction then return end
   inserter.direction = actual_direction
   inserter.pickup_position = pickup_position
   inserter.drop_position = drop_position
   player.target_inserter_direction = actual_direction
+  script.raise_event(defines.events.on_qai_inserter_direction_changed, {
+    entity = inserter, -- Using `entity` instead of `inserter` just to match on_player_rotated_entity.
+    previous_direction = previous_direction,
+  })
 end
 
 local switch_to_idle_and_back
 
+---Potentially raises `on_qai_inserter_direction_changed`.
 ---@param player PlayerDataQAI
 ---@param new_direction defines.direction @
 ---If you look at the feet of the inserter, the forwards pointing feet should be the direction this variable
@@ -191,8 +220,9 @@ local function set_direction_and_update_arrow(player, new_direction)
     switch_to_idle_and_back(player)
     return
   end
+  update_direction_arrow(player, new_direction)
   set_direction(player, new_direction)
-  update_direction_arrow(player)
+  -- Nothing else must happen here due to raised events potentially having changed or invalidated everything.
 end
 
 local validate_target_inserter
@@ -277,7 +307,7 @@ local function ensure_is_idle_and_try_set_target_inserter(player, target_inserte
     if not is_same_inserter then
       forget_about_restoring(player, prev_target_inserter)
     end
-    switch_to_idle(player, is_same_inserter, true)
+    switch_to_idle(player, is_same_inserter, true, true)
     if not target_inserter.valid or player.state ~= "idle" then return false end
   end
   if not try_set_target_inserter(player, target_inserter, do_check_reach, carry_over_no_reach_checks) then
@@ -390,7 +420,7 @@ function switch_to_idle_and_back(player, do_check_reach, new_target_inserter)
   local carry_over_no_reach_checks = player.no_reach_checks
   do_check_reach = do_check_reach and not carry_over_no_reach_checks
 
-  switch_to_idle(player, false, true)
+  switch_to_idle(player, false, true, true)
   if player.state ~= "idle" then
     forget_about_restoring(player, target_inserter)
     return
@@ -549,19 +579,50 @@ do
   end
 end
 
+---Potentially raises `on_qai_inserter_vectors_changed`.
 ---@param player PlayerDataQAI
 ---@param position MapPosition @ Gets modified if `only_allow_mirrored` is true.
 local function set_pickup_position(player, position)
+  local previous_pickup_position = player.target_inserter.pickup_position
+  local previous_drop_position = player.target_inserter.drop_position
   player.target_inserter.pickup_position = position
-  if not storage.only_allow_mirrored then return end
-  utils.mirror_position(player, position)
-  player.target_inserter.drop_position = utils.calculate_actual_drop_position(player, position, true)
+  local drop_did_change = false
+  if storage.only_allow_mirrored then
+    utils.mirror_position(player, position)
+    local new_drop_position = utils.calculate_actual_drop_position(player, position, true)
+    if new_drop_position.x ~= previous_drop_position.x or new_drop_position.y ~= previous_drop_position.y then
+      player.target_inserter.drop_position = new_drop_position
+      drop_did_change = true
+    end
+  end
+  if position.x == previous_pickup_position.x
+    and position.y == previous_pickup_position.y
+    and not drop_did_change
+  then
+    return
+  end
+  script.raise_event(defines.events.on_qai_inserter_vectors_changed, {
+    player_index = player.player_index,
+    inserter = player.target_inserter,
+    previous_pickup_position = previous_pickup_position,
+    previous_drop_position = previous_drop_position,
+  })
 end
 
+---Potentially raises `on_qai_inserter_vectors_changed`.
 ---@param player PlayerDataQAI
 ---@param position MapPosition
 local function set_drop_position(player, position)
-  player.target_inserter.drop_position = utils.calculate_actual_drop_position(player, position)
+  local previous_drop_position = player.target_inserter.drop_position
+  local new_position = utils.calculate_actual_drop_position(player, position)
+  if new_position.x == previous_drop_position.x and new_position.y == previous_drop_position.y then return end
+  player.target_inserter.drop_position = new_position
+  script.raise_event(defines.events.on_qai_inserter_vectors_changed, {
+    player_index = player.player_index,
+    inserter = player.target_inserter,
+    previous_pickup_position = player.target_inserter.pickup_position,
+    previous_drop_position = previous_drop_position,
+  })
 end
 
 ---@type table<string, fun(player: PlayerDataQAI, selected: LuaEntity)>
@@ -586,12 +647,15 @@ local on_adjust_handler_lut = {
       return
     end
     if utils.is_selectable_for_player(selected, consts.square_entity_name, player) then
+      local target_inserter = player.target_inserter
       set_pickup_position(player, selected.position)
-      advance_to_selecting_drop(player, player.target_inserter)
+      if player.state ~= "selecting-pickup" or player.target_inserter ~= target_inserter then return end
+      advance_to_selecting_drop(player, target_inserter)
       return
     end
     if utils.is_selectable_for_player(selected, consts.rect_entity_name, player) then
       set_direction_and_update_arrow(player, selected.direction)
+      -- Nothing else must happen here due to raised events potentially having changed or invalidated everything.
       return
     end
     switch_to_idle(player)
@@ -615,13 +679,16 @@ local on_adjust_handler_lut = {
     if utils.is_selectable_for_player(selected, consts.square_entity_name, player)
       or utils.is_selectable_for_player(selected, consts.ninth_entity_name, player)
     then
+      local target_inserter = player.target_inserter
       set_drop_position(player, selected.position)
+      if player.state ~= "selecting-drop" or player.target_inserter ~= target_inserter then return end
       animations.play_finish_animation(player) -- Before switching to idle because some rendering objects get reused.
       switch_to_idle(player)
       return
     end
     if utils.is_selectable_for_player(selected, consts.rect_entity_name, player) then
       set_direction_and_update_arrow(player, selected.direction)
+      -- Nothing else must happen here due to raised events potentially having changed or invalidated everything.
       return
     end
     switch_to_idle(player)

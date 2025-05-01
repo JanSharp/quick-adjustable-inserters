@@ -155,9 +155,9 @@ qai.include("long", true) -- Effectively case insensitive
 
 **Parameters:**
 
-- `name_pattern` `string`
+- `name_pattern` :: `string`
   - Use the `to_plain_pattern` api function in order convert literal/plain prototype names into a Lua pattern which matches against exactly that name, nothing else.
-- `match_against_all_lower` `boolean?`
+- `match_against_all_lower` :: `boolean?`
   - When `true` QAI matches the given pattern against a version of the prototype name which has been converted to all lowercase.
 
 ### `exclude(name_pattern, match_against_all_lower)`
@@ -177,9 +177,9 @@ qai.include("long", true) -- Effectively case insensitive
 
 **Parameters:**
 
-- `name_pattern` `string`:
+- `name_pattern` :: `string`
   - Use the `to_plain_pattern` api function in order convert literal/plain prototype names into a Lua pattern which matches against exactly that name, nothing else.
-- `match_against_all_lower` `boolean?`
+- `match_against_all_lower` :: `boolean?`
   - When `true` QAI matches the given pattern against a version of the prototype name which has been converted to all lowercase.
 
 ### `to_plain_pattern(plain_name)`
@@ -192,11 +192,11 @@ For example `"long-handed-inserter"` would get converted into `"^long%-handed%-i
 
 **Parameters:**
 
-- `plain_name` `string`
+- `plain_name` :: `string`
 
 **Returns:**
 
-- `escaped_pattern` `string`
+- `escaped_pattern` :: `string`
 
 ### `is_ignored(inserter_prototype)`
 
@@ -206,7 +206,7 @@ Checks if the given prototype is ignored/excluded by QAI's adjustments. Aka cann
 
 **Parameters:**
 
-- `inserter_prototype` `data.InserterPrototype`
+- `inserter_prototype` :: `data.InserterPrototype`
 
 **Returns:**
 
@@ -236,6 +236,64 @@ qai.include(qai.to_plain_pattern("inserter"))
 -- due to the `true`, and "long" being all lower case itself.
 qai.include("long", true)
 ```
+
+## Events
+
+There are 3 custom events to listen to at runtime:
+
+- [on_qai_inserter_direction_changed](#on_qai_inserter_direction_changed)
+- [on_qai_inserter_vectors_changed](#on_qai_inserter_vectors_changed)
+- [on_qai_inserter_adjustment_finished](#on_qai_inserter_adjustment_finished)
+
+There is EmmyLoa definitions for these events, so if one has the mod extracted and has FMTK and LuaLS setup, intellisense can be used.
+
+To listen to them one can use these approaches (`---@param` is optional of course and depends on the statement above):
+
+```lua
+---@param event EventData.on_qai_inserter_adjustment_finished
+script.on_event(defines.events.on_qai_inserter_adjustment_finished, function(event)
+  if not event.inserter then return end
+  game.print("Finished adjustment for "..event.inserter.name)
+end)
+
+---@param event EventData.on_qai_inserter_adjustment_finished
+script.on_event("on_qai_inserter_adjustment_finished", function(event)
+  if not event.inserter then return end
+  game.print("Finished adjustment for "..event.inserter.name)
+end)
+```
+
+### `on_qai_inserter_direction_changed`
+
+Called when QAI changed the direction of an inserter through the selectables on the outside of the adjustment UI, with the large arrow. QAI makes the inserter keep the pickup and drop positions even though the direction did change.
+
+- `entity` :: `LuaEntity`
+  - The inserter which direction has been changed.
+- `previous_direction` :: `defines.direction`
+  - The previous direction. Technically possible to be unchanged if another mod changed the direction inside of its event handler for this same event.
+
+### `on_qai_inserter_vectors_changed`
+
+Called when QAI changed the pickup and or drop position of an inserter due to a player adjusting it through QAI's UI.
+
+- `player_index` :: `uint`
+  - The index of the player which performed an adjustment.
+- `inserter` :: `LuaEntity`
+  - The inserter which has been adjusted.
+- `previous_pickup_position` :: `MapPosition`
+  - The previous `pickup_position`. May be unchanged.
+- `previous_drop_position` :: `MapPosition`
+  - The previous `drop_position`. May be unchanged.
+
+### `on_qai_inserter_adjustment_finished`
+
+Called when QAI finished adjusting an inserter, aka the UI begins disappearing.
+Called regardless of if anything changed.
+
+- `player_index` :: `uint`
+  - The index of the player which was adjusting an inserter. A player for this index may no longer exist if adjustment was finished due to player having been removed, see [remove_offline_players](https://lua-api.factorio.com/latest/classes/LuaGameScript.html#remove_offline_players).
+- `inserter` :: `LuaEntity?`
+  - The inserter which was being adjusted. May be nil, in which case QAI is finishing adjustment due to the inserter having been destroyed.
 
 ## Remote
 

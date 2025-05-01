@@ -58,6 +58,7 @@ script.on_event("qai-adjust", function(event)
   end
 
   states.adjust(player, utils.get_redirected_selected_entity(player.player.selected))
+  -- Nothing else must happen here due to raised events potentially having changed or invalidated everything.
 end)
 
 ---@param event EventData.CustomInputEvent
@@ -409,6 +410,7 @@ remote.add_interface("qai", {
     local player = get_or_init_player(player_index)
     if not player then return end
     states.adjust(player, selected_entity)
+    -- Nothing else must happen here due to raised events potentially having changed or invalidated everything.
   end,
   ---Tries to use the inserter in the `player.cursor_stack` to place and adjust it at a given position.\
   ---Finishing adjusting will restore the cursor, unless the cursor changed in the meantime.

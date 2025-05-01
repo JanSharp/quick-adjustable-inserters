@@ -1,7 +1,10 @@
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.7
 Date: ????
-  Changes:
+  Minor Features:
+    - Add on_qai_inserter_direction_changed event for other mods to listen to
+    - Add on_qai_inserter_vectors_changed event for other mods to listen to
+    - Add on_qai_inserter_adjustment_finished event for other mods to listen to
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.6
 Date: 2025-04-26

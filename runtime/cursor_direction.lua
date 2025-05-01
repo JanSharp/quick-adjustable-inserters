@@ -137,6 +137,12 @@ local direction_to_orientation_lut = {
   [defines.direction.northnorthwest] = 15 / 16,
 }
 
+---@param direction defines.direction
+---@return number
+local function direction_to_orientation(direction)
+  return direction_to_orientation_lut[direction]
+end
+
 ---@param player PlayerDataQAI
 ---@param pipetted_entity LuaEntity
 local function handle_pipette_direction(player, pipetted_entity)
@@ -291,6 +297,7 @@ end
 
 ---@class CursorDirectionFileQAI
 local cursor_direction = {
+  direction_to_orientation = direction_to_orientation,
   handle_rotation = handle_rotation,
   handle_pipette_direction = handle_pipette_direction,
   handle_built_rail_connectable_or_offshore_pump = handle_built_rail_connectable_or_offshore_pump,

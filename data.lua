@@ -67,6 +67,18 @@ data:extend{
     key_sequence = "",
     linked_game_control = "reverse-rotate",
   },
+  {
+    type = "custom-event",
+    name = "on_qai_inserter_direction_changed",
+  },
+  {
+    type = "custom-event",
+    name = "on_qai_inserter_vectors_changed",
+  },
+  {
+    type = "custom-event",
+    name = "on_qai_inserter_adjustment_finished",
+  },
   make_selectable{
     name = "qai-selectable-square",
     selection_box = {{-0.5, -0.5}, {0.5, 0.5}},
