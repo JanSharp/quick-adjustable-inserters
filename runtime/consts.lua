@@ -69,8 +69,8 @@ else
   consts.near_inserters_name = "bob-near-inserters"
   consts.more_inserters_1_name = "bob-more-inserters-1"
   consts.more_inserters_2_name = "bob-more-inserters-2"
-  consts.range_technology_pattern = "^long%-inserters%-([1-9]%d*)$" -- Does not accept leading zeros.
-  consts.range_technology_format = "long-inserters-%d"
+  consts.range_technology_pattern = "^bob%-long%-inserters%-([1-9]%d*)$" -- Does not accept leading zeros.
+  consts.range_technology_format = "bob-long-inserters-%d"
 end
 
 ---TODO: Check if 2.0 actually behaves this way.
