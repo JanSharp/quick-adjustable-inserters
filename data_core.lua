@@ -61,6 +61,10 @@ end
 ---qai.exclude("") -- Excludes every inserter, as the pattern matches any and all strings
 ---qai.include("long", true) -- Effectively case insensitive
 ---```
+---
+---The pattern `"^hps__ml%-"` is excluded by default in order to ignore all inserters from
+---https://mods.factorio.com/mod/miniloader-redux . Those inherently have `allow_custom_vectors` set to
+---`true`, so the exclusion happens in hardcoded control stage logic.
 ---@param name_pattern string @
 ---Use the `to_plain_pattern` api function in order convert literal/plain prototype names into a Lua pattern
 ---which matches against exactly that name, nothing else.
@@ -77,6 +81,8 @@ local function exclude(name_pattern, match_against_all_lower)
     modify_existing_inserters()
   end
 end
+
+exclude("^hps__ml%-") -- They are excluded in control stage no matter what but this keeps data stage cleaner.
 
 ---Convert literal/plain prototype names, or just strings in general, into a Lua pattern which matches against
 ---exactly that name, nothing else.

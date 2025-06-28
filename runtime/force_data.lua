@@ -56,7 +56,9 @@ local function update_inserter_cache(force)
     -- might be doing), generate cache for it if it has `allow_custom_vectors` set, allowing this mod to
     -- adjust it. Even if it isn't selectable or if it is rotatable 8 way, both of which make little sense for
     -- this mod, the remote interface exists, and the 8 directions won't break this mod.
-    if inserter.allow_custom_vectors then
+    if inserter.allow_custom_vectors
+      and not inserter.name:match("^hps__ml%-") -- See 'exclude' annotations in 'data_core.lua'.
+    then
       force.inserter_cache_lut[inserter.name] = generate_cache_for_inserter(inserter, force.tech_level)
     end
   end

@@ -3,6 +3,7 @@ Version: 2.0.8
 Date: ????
   Changes:
     - Add 'bob-' prefix to internal technology names to prevent creating duplicate technologies when bobs inserters is also enabled
+    - Exclude all inserters from https://mods.factorio.com/mod/miniloader-redux using the pattern "^hps__ml%-"
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.7
 Date: 2025-05-01

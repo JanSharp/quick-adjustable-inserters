@@ -175,6 +175,8 @@ qai.exclude("") -- Excludes every inserter, as the pattern matches any and all s
 qai.include("long", true) -- Effectively case insensitive
 ```
 
+The pattern `"^hps__ml%-"` is excluded by default in order to ignore all inserters from https://mods.factorio.com/mod/miniloader-redux . Those inherently have `allow_custom_vectors` set to `true`, so the exclusion happens in hardcoded control stage logic.
+
 **Parameters:**
 
 - `name_pattern` :: `string`
