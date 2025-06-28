@@ -153,12 +153,12 @@ local function hide_technology_if_it_exists(name)
 end
 
 if not data_core.check_tech_setting("bobmods-near-inserters", true) then
-  hide_technology_if_it_exists("near-inserters")
+  hide_technology_if_it_exists("bob-near-inserters")
 else
-  add_if_it_does_not_exist("technology", "near-inserters", function()
+  add_if_it_does_not_exist("technology", "bob-near-inserters", function()
     return {
       type = "technology",
-      name = "near-inserters",
+      name = "bob-near-inserters",
       localised_name = {"technology-name.qai-near-inserters"},
       localised_description = {"technology-description.qai-near-inserters"},
       icon = "__quick-adjustable-inserters__/graphics/technology/near-inserters.png",
@@ -176,12 +176,12 @@ else
 end
 
 if not data_core.check_tech_setting("bobmods-inserters-long1", true) then
-  hide_technology_if_it_exists("long-inserters-1")
+  hide_technology_if_it_exists("bob-long-inserters-1")
 else
-  add_if_it_does_not_exist("technology", "long-inserters-1", function()
+  add_if_it_does_not_exist("technology", "bob-long-inserters-1", function()
     return {
       type = "technology",
-      name = "long-inserters-1",
+      name = "bob-long-inserters-1",
       localised_name = {"technology-name.qai-long-inserters-1"},
       localised_description = {"technology-description.qai-long-inserters-1"},
       icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-1.png",
@@ -201,17 +201,17 @@ end
 if not data_core.check_tech_setting("bobmods-inserters-long1", true)
   or not data_core.check_tech_setting("bobmods-inserters-long2", true)
 then
-  hide_technology_if_it_exists("long-inserters-2")
+  hide_technology_if_it_exists("bob-long-inserters-2")
 else
-  add_if_it_does_not_exist("technology", "long-inserters-2", function()
+  add_if_it_does_not_exist("technology", "bob-long-inserters-2", function()
     return {
       type = "technology",
-      name = "long-inserters-2",
+      name = "bob-long-inserters-2",
       localised_name = {"technology-name.qai-long-inserters-2"},
       localised_description = {"technology-description.qai-long-inserters-2"},
       icon = "__quick-adjustable-inserters__/graphics/technology/long-inserters-2.png",
       icon_size = 256,
-      prerequisites = {"long-inserters-1", "chemical-science-pack"},
+      prerequisites = {"bob-long-inserters-1", "chemical-science-pack"},
       effects = {},
       unit = {
         count = 50,
@@ -232,12 +232,12 @@ local fast_inserter_icon = mods["base"]
   or "__quick-adjustable-inserters__/graphics/technology/fast-inserter.png"
 
 if not data_core.check_tech_setting("bobmods-inserters-more1", true) then
-  hide_technology_if_it_exists("more-inserters-1")
+  hide_technology_if_it_exists("bob-more-inserters-1")
 else
-  add_if_it_does_not_exist("technology", "more-inserters-1", function()
+  add_if_it_does_not_exist("technology", "bob-more-inserters-1", function()
     return {
       type = "technology",
-      name = "more-inserters-1",
+      name = "bob-more-inserters-1",
       localised_name = {"technology-name.qai-more-inserters-1"},
       localised_description = {"technology-description.qai-more-inserters-1"},
       icons = {
@@ -269,12 +269,12 @@ end
 if not data_core.check_tech_setting("bobmods-inserters-more1", true)
   or not data_core.check_tech_setting("bobmods-inserters-more2", true)
 then
-  hide_technology_if_it_exists("more-inserters-2")
+  hide_technology_if_it_exists("bob-more-inserters-2")
 else
-  add_if_it_does_not_exist("technology", "more-inserters-2", function()
+  add_if_it_does_not_exist("technology", "bob-more-inserters-2", function()
     return {
       type = "technology",
-      name = "more-inserters-2",
+      name = "bob-more-inserters-2",
       localised_name = {"technology-name.qai-more-inserters-2"},
       localised_description = {"technology-description.qai-more-inserters-2"},
       icons = {
@@ -288,7 +288,7 @@ else
           shift = {100, 100},
         }
       },
-      prerequisites = {"more-inserters-1", "logistics-3"},
+      prerequisites = {"bob-more-inserters-1", "logistics-3"},
       effects = {},
       unit = {
         count = 50,

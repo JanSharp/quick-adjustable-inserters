@@ -1,4 +1,3 @@
-
 local util = require("__core__.lualib.util")
 local vec = require("__inserter-throughput-lib__.vector")
 
@@ -11,25 +10,25 @@ local function fill_chunk_with_tile(surface, tile_name)
   local tiles = {}
   for y = 0, 31 do
     for x = 0, 31 do
-      tiles[#tiles+1] = {
+      tiles[#tiles + 1] = {
         name = tile_name,
-        position = {x = x, y = y},
+        position = { x = x, y = y },
       }
     end
   end
   surface.set_tiles(tiles)
-  surface.set_chunk_generated_status({x = 0, y = 0}, defines.chunk_generated_status.entities)
+  surface.set_chunk_generated_status({ x = 0, y = 0 }, defines.chunk_generated_status.entities)
 end
 
 ---@param force LuaForce
 ---@param tech_level TechnologyLevelQAI
 local function set_tech_level(force, tech_level)
   local techs = force.technologies
-  techs["long-inserters-1"].researched = tech_level.range >= 2
-  techs["long-inserters-2"].researched = tech_level.range >= 3
-  techs["near-inserters"].researched = tech_level.drop_offset
-  techs["more-inserters-1"].researched = tech_level.diagonal
-  techs["more-inserters-2"].researched = tech_level.all_tiles
+  techs["bob-long-inserters-1"].researched = tech_level.range >= 2
+  techs["bob-long-inserters-2"].researched = tech_level.range >= 3
+  techs["bob-near-inserters"].researched = tech_level.drop_offset
+  techs["bob-more-inserters-1"].researched = tech_level.diagonal
+  techs["bob-more-inserters-2"].researched = tech_level.all_tiles
 end
 
 ---@param range integer
@@ -52,7 +51,7 @@ end
 ---@param range integer
 local function place_inserter(surface, player, range)
   local position = get_inserter_position(range)
-  storage.inserter = surface.create_entity{
+  storage.inserter = surface.create_entity {
     name = "qai-inserter-for-screenshots",
     position = position,
     direction = defines.direction.south,
@@ -67,7 +66,7 @@ end
 ---@param relative_position MapPosition
 local function adjust_at(surface, player, range, relative_position)
   local position = vec.add(get_inserter_position(range), relative_position)
-  local entities = surface.find_entities_filtered{position = position}
+  local entities = surface.find_entities_filtered { position = position }
   if not entities[1] then error("No entities here.") end
   if entities[2] then error("Too many entities here.") end
   local entity = entities[1]
@@ -91,8 +90,8 @@ end
 local function delete_direction_arrow_outline(obj)
   local color = obj.color
   if not is_grey_scale(color) then return end
-  local from = obj.from.position--[[@as MapPosition]]
-  local to = obj.to.position--[[@as MapPosition]]
+  local from = obj.from.position --[[@as MapPosition]]
+  local to = obj.to.position --[[@as MapPosition]]
   if vec.get_length(vec.sub(from, to)) > 0.75 then return end
   obj.destroy()
 end
@@ -169,13 +168,13 @@ end
 local function take_screenshot(surface, range, name, resolution, pixels_per_tile, anti_alias)
   resolution = resolution or 256
   pixels_per_tile = pixels_per_tile or (resolution / (get_actual_range(range) * 2 + 1 + 1))
-  game.take_screenshot{
+  game.take_screenshot {
     surface = surface,
     position = get_inserter_position(range),
     daytime = 0,
-    path = "qai/"..name,
+    path = "qai/" .. name,
     anti_alias = anti_alias,
-    resolution = {resolution, resolution},
+    resolution = { resolution, resolution },
     zoom = pixels_per_tile / 32,
     force_render = true,
   }
@@ -206,7 +205,7 @@ end
 ---@param name string
 local function run_delayed_action(name)
   game.tick_paused = true
-  storage.player.request_translation{"", name}
+  storage.player.request_translation { "", name }
 end
 
 add_delayed_action("unpause", function()
@@ -223,7 +222,7 @@ add_action(function()
     all_tiles = false,
   })
   place_inserter(storage.surface, storage.player, 3)
-  adjust_at(storage.surface, storage.player, 3, {x = 0, y = 2})
+  adjust_at(storage.surface, storage.player, 3, { x = 0, y = 2 })
 end)
 wait_ticks(30)
 add_action(function()
@@ -231,7 +230,7 @@ add_action(function()
 end)
 delayed_actions["thumbnail"] = function()
   game.tick_paused = false
-  adjust_at(storage.surface, storage.player, 3, {x = 2, y = -2})
+  adjust_at(storage.surface, storage.player, 3, { x = 2, y = -2 })
   delete_unwanted_rendering_objects()
   make_lines_thicker()
   take_screenshot(storage.surface, 3, "thumbnail.png", 144, 19, true)
@@ -269,16 +268,16 @@ local function add_actions_for_tech_icon_screenshot(name, pickup_tile, drop_tile
     turn_green_into_yellow()
     un_pre_multiply_colors()
     make_background_more_opaque()
-    take_screenshot(storage.surface, 2, name..".png")
+    take_screenshot(storage.surface, 2, name .. ".png")
     run_delayed_action("unpause")
   end
   wait_ticks(30)
 end
 
 add_actions_for_tech_icon_screenshot(
-  "near-inserters",
-  {x = 0, y = 1},
-  {x = 0, y = -1 + 85/256},
+  "bob-near-inserters",
+  { x = 0, y = 1 },
+  { x = 0, y = -1 + 85 / 256 },
   {
     range = 1,
     drop_offset = true,
@@ -289,9 +288,9 @@ add_actions_for_tech_icon_screenshot(
 )
 
 add_actions_for_tech_icon_screenshot(
-  "long-inserters-1",
-  {x = 0, y = 2},
-  {x = 0, y = -2},
+  "bob-long-inserters-1",
+  { x = 0, y = 2 },
+  { x = 0, y = -2 },
   {
     range = 2,
     drop_offset = false,
@@ -302,9 +301,9 @@ add_actions_for_tech_icon_screenshot(
 )
 
 add_actions_for_tech_icon_screenshot(
-  "long-inserters-2",
-  {x = 0, y = 3},
-  {x = 0, y = -3},
+  "bob-long-inserters-2",
+  { x = 0, y = 3 },
+  { x = 0, y = -3 },
   {
     range = 3,
     drop_offset = false,
@@ -315,9 +314,9 @@ add_actions_for_tech_icon_screenshot(
 )
 
 add_actions_for_tech_icon_screenshot(
-  "more-inserters-1",
-  {x = -3, y = 3},
-  {x = 3, y = -3},
+  "bob-more-inserters-1",
+  { x = -3, y = 3 },
+  { x = 3, y = -3 },
   {
     range = 3,
     drop_offset = false,
@@ -328,9 +327,9 @@ add_actions_for_tech_icon_screenshot(
 )
 
 add_actions_for_tech_icon_screenshot(
-  "more-inserters-2",
-  {x = -2, y = 3},
-  {x = 2, y = -3},
+  "bob-more-inserters-2",
+  { x = -2, y = 3 },
+  { x = 2, y = -3 },
   {
     range = 3,
     drop_offset = false,

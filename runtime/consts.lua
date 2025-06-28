@@ -1,4 +1,3 @@
-
 ---@enum LongInserterRangeTypeQAI
 local long_inserter_range_type = {
   retract_then_extend = 1,
@@ -32,14 +31,14 @@ local consts = {
   rect_entity_name = "qai-selectable-rect",
 
   finish_animation_frames = 16,
-  finish_animation_expansion = 3/16,
+  finish_animation_expansion = 3 / 16,
   grid_fade_in_frames = 8, -- Valid values are those where 1 / consts.grid_fade_in_frames keeps all precision.
   grid_fade_out_frames = 12,
   grid_background_opacity = 0.2,
   direction_arrow_opacity = 0.6,
 
   ---Flipped along a diagonal going from left top to right bottom.
-  is_east_or_west_lut = {[defines.direction.east] = true, [defines.direction.west] = true},
+  is_east_or_west_lut = { [defines.direction.east] = true, [defines.direction.west] = true },
   flip_direction_lut = {
     [defines.direction.north] = defines.direction.west,
     [defines.direction.south] = defines.direction.east,
@@ -62,14 +61,14 @@ if consts.use_smart_inserters then
   consts.range_technology_format = "si-unlock-range-%d"
 else
   consts.techs_we_care_about = {
-    ["near-inserters"] = true,
-    ["more-inserters-1"] = true,
-    ["more-inserters-2"] = true,
+    ["bob-near-inserters"] = true,
+    ["bob-more-inserters-1"] = true,
+    ["bob-more-inserters-2"] = true,
   }
   consts.cardinal_inserters_name = nil
-  consts.near_inserters_name = "near-inserters"
-  consts.more_inserters_1_name = "more-inserters-1"
-  consts.more_inserters_2_name = "more-inserters-2"
+  consts.near_inserters_name = "bob-near-inserters"
+  consts.more_inserters_1_name = "bob-more-inserters-1"
+  consts.more_inserters_2_name = "bob-more-inserters-2"
   consts.range_technology_pattern = "^long%-inserters%-([1-9]%d*)$" -- Does not accept leading zeros.
   consts.range_technology_format = "long-inserters-%d"
 end

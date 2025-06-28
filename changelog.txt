@@ -2,6 +2,7 @@
 Version: 2.0.8
 Date: ????
   Changes:
+    - Add 'bob-' prefix to internal technology names to prevent creating duplicate technologies when bobs inserters is also enabled
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.7
 Date: 2025-05-01

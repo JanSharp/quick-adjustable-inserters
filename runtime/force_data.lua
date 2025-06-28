@@ -1,4 +1,3 @@
-
 local consts = require("__quick-adjustable-inserters__.runtime.consts")
 local generate_cache_for_inserter = require("__quick-adjustable-inserters__.runtime.cache")
 local player_data = require("__quick-adjustable-inserters__.runtime.player_data")
@@ -52,7 +51,7 @@ end
 ---@param force ForceDataQAI
 local function update_inserter_cache(force)
   force.inserter_cache_lut = {}
-  for _, inserter in pairs(prototypes.get_entity_filtered{{filter = "type", type = "inserter"}}) do
+  for _, inserter in pairs(prototypes.get_entity_filtered { { filter = "type", type = "inserter" } }) do
     -- No matter what other flags the inserter has set (in other words no matter what crazy things other mods
     -- might be doing), generate cache for it if it has `allow_custom_vectors` set, allowing this mod to
     -- adjust it. Even if it isn't selectable or if it is rotatable 8 way, both of which make little sense for
@@ -119,11 +118,11 @@ do
   ---@return integer
   local function get_range_from_technologies(techs)
     local range = 1
-    for level = 1, 1/0 do -- No artificial limit, the practical limit will be hit pretty quickly anyway.
+    for level = 1, 1 / 0 do      -- No artificial limit, the practical limit will be hit pretty quickly anyway.
       local tech = techs[string.format(consts.range_technology_format, level)]
       if not tech then break end -- Gaps in technologies are not accepted.
       if tech.researched then
-        range = level + 1 -- "long-inserters-1" equates to having 2 range.
+        range = level + 1        -- "bob-long-inserters-1" equates to having 2 range.
       end
       -- Continue even if a technology isn't researched to find the highest technology which has been researched.
       -- The highest technology is unknown, so it's just a loop from the bottom up.
@@ -170,7 +169,7 @@ function init_force(actual_force)
     force = actual_force,
     force_index = force_index,
     tech_level = {},
-    inserter_cache_lut = (nil)--[[@as any]], -- Set in `update_inserter_cache`.
+    inserter_cache_lut = (nil) --[[@as any]], -- Set in `update_inserter_cache`.
   }
   storage.forces[force_index] = force
   update_tech_level_for_force(force)
@@ -178,7 +177,7 @@ function init_force(actual_force)
 end
 
 local function update_only_allow_mirrored_setting()
-  storage.only_allow_mirrored = settings.global["qai-mirrored-inserters-only"].value--[[@as boolean]]
+  storage.only_allow_mirrored = settings.global["qai-mirrored-inserters-only"].value --[[@as boolean]]
   for _, player in utils.safer_pairs(storage.players) do
     if player_data.validate_player(player) then
       states.switch_to_idle_and_back(player)
@@ -194,7 +193,7 @@ do
     -- A setting from another mod, we cannot trust it actually existing.
     -- There's an argument to be made that this should throw an error if the setting does not exist, and yea
     -- I'm considering it. But also :shrug:.
-    return setting and setting.value--[[@as string]] or "equal"
+    return setting and setting.value --[[@as string]] or "equal"
   end
 
   local function update_using_smart_inserters_setting()
@@ -209,7 +208,7 @@ do
   end
 
   local function update_using_qai_setting()
-    local value = settings.global["qai-range-for-long-inserters"].value--[[@as string]]
+    local value = settings.global["qai-range-for-long-inserters"].value --[[@as string]]
     if value == "retract-then-extend" then
       storage.range_for_long_inserters = long_inserter_range_type.retract_then_extend
     elseif value == "extend-only" then
