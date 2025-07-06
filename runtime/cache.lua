@@ -18,9 +18,25 @@ local generate_range_cache_lut = {
     cache.range = cache.base_range + cache.tech_level.range - 1
     cache.range_gap_from_center = 0
   end,
+  [long_inserter_range_type.extend_only_starting_at_inner] = function(cache)
+    cache.range = cache.tech_level.range
+    cache.range_gap_from_center = 0
+  end,
+  [long_inserter_range_type.extend_only_starting_at_inner_intersect_with_gap] = function(cache)
+    cache.range = math.max(0, cache.tech_level.range - cache.base_range + 1)
+    cache.range_gap_from_center = cache.base_range - 1
+  end,
   [long_inserter_range_type.retract_only] = function(cache)
     cache.range = math.min(cache.base_range, cache.tech_level.range)
     cache.range_gap_from_center = cache.base_range - cache.range
+  end,
+  [long_inserter_range_type.retract_only_inverse] = function(cache)
+    cache.range = math.min(cache.base_range, cache.tech_level.range)
+    cache.range_gap_from_center = 0
+  end,
+  [long_inserter_range_type.unlock_when_range_tech_reaches_inserter_range] = function(cache)
+    cache.range = cache.tech_level.range >= cache.base_range and 1 or 0
+    cache.range_gap_from_center = cache.base_range - 1
   end,
 }
 
@@ -535,7 +551,7 @@ end
 local function generate_cache_for_inserter(inserter, tech_level)
   if not tech_level.cardinal and not tech_level.diagonal and not tech_level.drop_offset then
     -- If both cardinal and diagonal are false then all_tiles is also false.
-    return {disabled_because_of_tech_level = true}
+    return {disabled = true, disabled_because_no_tech = true}
   end
 
   local only_drop_offset = not tech_level.cardinal and not tech_level.diagonal and tech_level.drop_offset
@@ -568,6 +584,9 @@ local function generate_cache_for_inserter(inserter, tech_level)
 
   generate_collision_box_related_cache(cache)
   generate_pickup_and_drop_position_related_cache(cache)
+  if cache.range == 0 then
+    return {disabled = true, disabled_because_not_enough_tech = true}
+  end
   generate_left_top_offset_and_grid_center_cache(cache)
   if not only_drop_offset then
     generate_tiles_cache(cache)

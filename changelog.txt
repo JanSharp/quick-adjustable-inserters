@@ -2,6 +2,7 @@
 Version: 2.0.10
 Date: ????
   Changes:
+    - Update support for Smart Inserter's "Max range of each inserter" setting, matching its behavior
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.9
 Date: 2025-06-28

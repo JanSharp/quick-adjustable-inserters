@@ -1,14 +1,32 @@
 ---@enum LongInserterRangeTypeQAI
 local long_inserter_range_type = {
+  ---QAI setting.
   retract_then_extend = 1,
+  ---QAI setting.
+  ---
+  ---Smart Inserters calls it "incremental-with-rebase".
   extend_only = 2,
+  ---QAI setting.
   extend_only_without_gap = 3,
-  ---Only used with smart inserters, because it's pretty nonsensical. I'd much prefer playing without any
-  ---range technologies, so just having 1 range. I mean yea that is different because long handed inserters
-  ---won't be able to reach closer to their base, which is fair I suppose, but balance and logic wise I'd
-  ---prefer just having 1 range and that's it. Could play with extend_only_without_gap as well, the only
-  ---difference then is that you've got all the range from the start of the game. But :shrug:.
-  retract_only = 4,
+  ---Only used with Smart Inserters, it calls it "incremental" and "equal".
+  extend_only_starting_at_inner = 4,
+  ---Only used with Smart Inserters, it calls this "rebase".
+  ---
+  ---Intersect referring to the intersection of 2 sets of values. Also known as inner join.
+  ---
+  ---This can cause inserters to not be adjustable while other are. Like red (long) inserters are not
+  ---adjustable with just 1 range researched.
+  extend_only_starting_at_inner_intersect_with_gap = 5,
+  ---Unused.
+  retract_only = 6,
+  ---Only used with Smart Inserters, it calls this "inserter".
+  ---
+  ---The same as retract_only, but instead of starting at the max range and retracting inwards, the initial
+  ---range of all inserters is the inner most tile and they extend outwards until they reach the range that
+  ---the prototype for that inserter defined.
+  retract_only_inverse = 7,
+  ---Only used with Smart Inserters, it calls this "inserter-with-rebase".
+  unlock_when_range_tech_reaches_inserter_range = 8,
 }
 
 ---@enum AnimationTypeQAI

@@ -89,7 +89,7 @@ script.on_event(ev.on_player_pipette, function(event)
   if not force then return end
   local name = utils.get_real_or_ghost_name(selected)
   local cache = force.inserter_cache_lut[name]
-  if not cache or cache.disabled_because_of_tech_level then return end
+  if not cache or cache.disabled then return end
   player_data.save_pipetted_vectors(player, name, selected)
 end)
 

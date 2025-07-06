@@ -245,8 +245,12 @@ local function try_set_target_inserter(player, target_inserter, do_check_reach, 
     return utils.show_error(player, {"qai.cant-change-inserter-at-runtime"})
   end
 
-  if cache.disabled_because_of_tech_level then
-    return utils.show_error(player, {"qai.cant-adjust-due-to-lack-of-tech"})
+  if cache.disabled_because_no_tech then
+    return utils.show_error(player, {"qai.cant-adjust-due-to-no-tech"})
+  end
+
+  if cache.disabled_because_not_enough_tech then
+    return utils.show_error(player, {"qai.cant-adjust-due-to-not-enough-tech"})
   end
 
   -- Specifically check if the force of the inserter is friends with the player. Friendship is one directional.

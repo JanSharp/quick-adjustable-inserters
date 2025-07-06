@@ -189,7 +189,7 @@ end
 
 local update_range_for_long_inserters_setting
 do
-  ---@return "equal"|"inserter"|"incremental"|string
+  ---@return "inserter"|"incremental"|"equal"|"rebase"|"incremental-with-rebase"|"inserter-with-rebase"|string
   local function get_range_adder_setting_value()
     local setting = settings.startup["si-range-adder"]
     -- A setting from another mod, we cannot trust it actually existing.
@@ -198,15 +198,19 @@ do
     return setting and setting.value --[[@as string]] or "equal"
   end
 
+  local smart_inserters_mapping = {
+    ["inserter"] = long_inserter_range_type.retract_only_inverse,
+    ["incremental"] = long_inserter_range_type.extend_only_starting_at_inner,
+    ["equal"] = long_inserter_range_type.extend_only_starting_at_inner,
+    ["rebase"] = long_inserter_range_type.extend_only_starting_at_inner_intersect_with_gap,
+    ["incremental-with-rebase"] = long_inserter_range_type.extend_only,
+    ["inserter-with-rebase"] = long_inserter_range_type.unlock_when_range_tech_reaches_inserter_range,
+  }
+
   local function update_using_smart_inserters_setting()
     local range_adder_type = get_range_adder_setting_value()
-    if range_adder_type == "incremental" then
-      storage.range_for_long_inserters = long_inserter_range_type.extend_only_without_gap
-    elseif range_adder_type == "inserter" then
-      storage.range_for_long_inserters = long_inserter_range_type.retract_only
-    else -- not elseif, because this is a setting from another mod so we cannot trust its values.
-      storage.range_for_long_inserters = long_inserter_range_type.retract_then_extend
-    end
+    storage.range_for_long_inserters = smart_inserters_mapping[range_adder_type]
+      or long_inserter_range_type.retract_then_extend -- Setting from another mod, could have unknown values.
   end
 
   local function update_using_qai_setting()

@@ -84,8 +84,13 @@ end
 ---@param is_cursor_ghost boolean?
 ---@return LuaEntity? inserter @ The placed inserter if successful.
 local function try_place_held_inserter_and_adjust_it(player, position, inserter_name, cache, is_cursor_ghost)
-  if cache.disabled_because_of_tech_level then
-    utils.show_error(player, {"qai.cant-adjust-due-to-lack-of-tech"})
+  if cache.disabled_because_no_tech then
+    utils.show_error(player, {"qai.cant-adjust-due-to-no-tech"})
+    return
+  end
+
+  if cache.disabled_because_not_enough_tech then
+    utils.show_error(player, {"qai.cant-adjust-due-to-not-enough-tech"})
     return
   end
 

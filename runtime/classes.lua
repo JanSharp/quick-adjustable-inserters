@@ -86,7 +86,9 @@ storage = {}
 ---@field direction defines.direction
 
 ---@class InserterCacheQAI
----@field disabled_because_of_tech_level boolean? @ When true everything else is `nil`.
+---@field disabled boolean? @ true when any of the disabled fields are true.
+---@field disabled_because_no_tech boolean? @ When true everything else is `nil`.
+---@field disabled_because_not_enough_tech boolean? @ When true everything else is `nil`.
 ---Always check valid before using, because prototypes can be removed and in the process of migrating before
 ---or in on_configuration_changed any other could could still end up running.
 ---@field prototype LuaEntityPrototype
