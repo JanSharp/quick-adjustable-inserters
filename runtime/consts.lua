@@ -17,7 +17,7 @@ local long_inserter_range_type = {
   ---This can cause inserters to not be adjustable while other are. Like red (long) inserters are not
   ---adjustable with just 1 range researched.
   extend_only_starting_at_inner_intersect_with_gap = 5,
-  ---Unused.
+  ---QAI setting.
   retract_only = 6,
   ---Only used with Smart Inserters, it calls this "inserter".
   ---

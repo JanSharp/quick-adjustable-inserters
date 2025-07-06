@@ -221,6 +221,8 @@ do
       storage.range_for_long_inserters = long_inserter_range_type.extend_only
     elseif value == "extend-only-without-gap" then
       storage.range_for_long_inserters = long_inserter_range_type.extend_only_without_gap
+    elseif value == "retract-only" then
+      storage.range_for_long_inserters = long_inserter_range_type.retract_only
     end
   end
 

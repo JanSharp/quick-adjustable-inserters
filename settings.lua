@@ -110,6 +110,7 @@ data:extend({
       "retract-then-extend",
       "extend-only",
       "extend-only-without-gap",
+      "retract-only",
     },
   },
 })
