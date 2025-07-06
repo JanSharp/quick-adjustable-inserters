@@ -111,8 +111,6 @@ data:extend({
       "extend-only",
       "extend-only-without-gap",
     },
-    -- TODO: Hidden because this feature is not fully thought out and implemented.
-    hidden = true,
   },
 })
 

@@ -1,6 +1,8 @@
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.10
 Date: ????
+  Features:
+    - Add "Range for long inserters" map setting to define how range technologies affect inserters which inherently have longer range
   Changes:
     - Update support for Smart Inserter's "Max range of each inserter" setting, matching its behavior
 ---------------------------------------------------------------------------------------------------
