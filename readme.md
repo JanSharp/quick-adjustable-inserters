@@ -88,14 +88,12 @@ The technologies this mod uses are the same as [Bob's Adjustable Inserters](http
 
 [Smart Inserters](https://mods.factorio.com/mod/Smart_Inserters) has notably different settings, technologies and behavior. If it is enabled there are a few things to note:
 
-(Note that this list may be out of date due to updates to SI which I've not had the time to look at.)
-
 - Smart Inserters will be the primary mod while Quick Adjustable Inserters will just be an addon. The technologies and related settings from QAI will be hidden and disabled, SI taking the lead
-<!-- - (note: once QAI has more key binds then...) The 2 mods have a very similar set of key binds, however the exact behavior may vary, especially in the more unusual setups. There's a notable difference in drop offset handling as well -->
+- There may be differences I am unaware of due to updates to SI
 - SI does not have a "Mirrored Inserters only" feature, so enabling it in QAI may be a bit awkward
-- Aside from those differences you can expect QAI to behave very similarly to SI in terms of which features are unlocked and when
-
-Overall I personally am not a fan of a few of the design decisions in Smart Inserters, however I've added handling for most of them anyway because it is not my place to decide what other people may enjoy. That means if you enjoy SI you can add QAI and have fun with both mods.
+- QAI does not have support for "Single line for Inserters" nor "Directional Inserters", so enabling those in SI may also be a bit be awkward
+- QAI does not have custom support for Slim Inserters, so SI and QAI handle them differently
+<!-- - (note: once QAI has more key binds then...) The 2 mods have a very similar set of key binds, however the exact behavior may vary, especially in the more unusual setups. There's a notable difference in drop offset handling as well -->
 
 ## Settings
 
