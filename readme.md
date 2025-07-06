@@ -91,7 +91,7 @@ The technologies this mod uses are the same as [Bob's Adjustable Inserters](http
 (Note that this list may be out of date due to updates to SI which I've not had the time to look at.)
 
 - Smart Inserters will be the primary mod while Quick Adjustable Inserters will just be an addon. The technologies and related settings from QAI will be hidden and disabled, SI taking the lead
-- (note: once QAI has more key binds then...) The 2 mods have a very similar set of key binds, however the exact behavior may vary, especially in the more unusual setups. There's a notable difference in drop offset handling as well
+<!-- - (note: once QAI has more key binds then...) The 2 mods have a very similar set of key binds, however the exact behavior may vary, especially in the more unusual setups. There's a notable difference in drop offset handling as well -->
 - SI does not have a "Mirrored Inserters only" feature, so enabling it in QAI may be a bit awkward
 - Aside from those differences you can expect QAI to behave very similarly to SI in terms of which features are unlocked and when
 
